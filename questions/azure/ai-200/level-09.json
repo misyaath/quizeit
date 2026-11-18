@@ -1,0 +1,1091 @@
+{
+  "id": "level-09",
+  "title": "Level 9 · Migration and recovery",
+  "difficulty": 9,
+  "questions": [
+    {
+      "domain": "containers",
+      "type": "multi",
+      "prompt": "What probe change accommodates 140 seconds of initialization while keeping steady-state recovery? Select the action and its supporting safeguard.",
+      "answer": [
+        "Add a startup probe with a budget above 140 seconds and retain liveness",
+        "Retain a readiness check so a started but unready Pod does not receive traffic"
+      ],
+      "explanation": "The startup probe gates liveness and readiness during initialization while leaving steady-state detection intact. Startup, readiness, and liveness address distinct states. Retain the steady-state safety controls.",
+      "options": [
+        "Add a startup probe with a budget above 140 seconds and retain liveness",
+        "Increase the Service port to 8140",
+        "Permanently set steady-state liveness to a 140-second period",
+        "Remove liveness and rely on ACR health",
+        "Retain a readiness check so a started but unready Pod does not receive traffic"
+      ],
+      "caseStudy": {
+        "title": "MeridianIndex",
+        "background": "MeridianIndex ingests records from a dataset with 120 tenants and builds versions of a knowledge index. An AKS node pool hosts CPU-only APIs; it scales rapidly during peaks. The container registry uses a controlled service identity and digest-based promotion. The canary started failing health checks after the application added a multi-minute local model prewarm.\n\nBoth the API and a Python Function use an Entra identity. The new App Configuration release updates the vector model and retrieval thresholds together. App Configuration refresh is driven by a sentinel. Two vector models have equal vector dimensions, but model-space compatibility is explicitly not guaranteed.\n\nSome Service Bus updates represent permanent schema errors. The audit team must receive a reason and inspect the original payload without retrying poison messages indefinitely.",
+        "exhibits": [
+          {
+            "title": "YAML probe excerpt",
+            "code": "livenessProbe:\n  httpGet: {path: /health/live, port: 8080}\n  periodSeconds: 10\n  failureThreshold: 3\n# model startup can take 140 seconds"
+          },
+          {
+            "title": "Release metadata",
+            "code": "retrieval:model: candidate-v4\nretrieval:maxDistance: 0.22\nretrieval:generation: 41\nsentinel: pending\n::"
+          }
+        ]
+      },
+      "id": "level-09-q01"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "What must happen before switching the retrieval model if dimensions happen to match?",
+      "answer": "Backfill and validate a versioned index, then switch the query encoder and index together",
+      "explanation": "Equal dimensions do not prove vector spaces are comparable.",
+      "options": [
+        "Use only smaller vectors from the old model regardless of query encoder",
+        "Skip backfill because column dimensions are equal",
+        "Backfill and validate a versioned index, then switch the query encoder and index together",
+        "Mix the embeddings and rely on metadata after retrieval"
+      ],
+      "caseStudy": {
+        "title": "MeridianIndex",
+        "background": "MeridianIndex ingests records from a dataset with 120 tenants and builds versions of a knowledge index. An AKS node pool hosts CPU-only APIs; it scales rapidly during peaks. The container registry uses a controlled service identity and digest-based promotion. The canary started failing health checks after the application added a multi-minute local model prewarm.\n\nBoth the API and a Python Function use an Entra identity. The new App Configuration release updates the vector model and retrieval thresholds together. App Configuration refresh is driven by a sentinel. Two vector models have equal vector dimensions, but model-space compatibility is explicitly not guaranteed.\n\nSome Service Bus updates represent permanent schema errors. The audit team must receive a reason and inspect the original payload without retrying poison messages indefinitely.",
+        "exhibits": [
+          {
+            "title": "YAML probe excerpt",
+            "code": "livenessProbe:\n  httpGet: {path: /health/live, port: 8080}\n  periodSeconds: 10\n  failureThreshold: 3\n# model startup can take 140 seconds"
+          },
+          {
+            "title": "Release metadata",
+            "code": "retrieval:model: candidate-v4\nretrieval:maxDistance: 0.22\nretrieval:generation: 41\nsentinel: pending\n::"
+          }
+        ]
+      },
+      "id": "level-09-q02"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "When cache keys currently omit index generation, how should a zero-downtime cutover protect old and new readers?",
+      "answer": "Include index generation and caller scope in keys so versions can coexist",
+      "explanation": "Versioned cache keys prevent cross-generation pollution while both deployments are active.",
+      "options": [
+        "Include index generation and caller scope in keys so versions can coexist",
+        "Expire every cache entry on each query",
+        "Force a common global key and cut its TTL in half",
+        "Use only the original query embedding bytes as a global key"
+      ],
+      "caseStudy": {
+        "title": "MeridianIndex",
+        "background": "MeridianIndex ingests records from a dataset with 120 tenants and builds versions of a knowledge index. An AKS node pool hosts CPU-only APIs; it scales rapidly during peaks. The container registry uses a controlled service identity and digest-based promotion. The canary started failing health checks after the application added a multi-minute local model prewarm.\n\nBoth the API and a Python Function use an Entra identity. The new App Configuration release updates the vector model and retrieval thresholds together. App Configuration refresh is driven by a sentinel. Two vector models have equal vector dimensions, but model-space compatibility is explicitly not guaranteed.\n\nSome Service Bus updates represent permanent schema errors. The audit team must receive a reason and inspect the original payload without retrying poison messages indefinitely.",
+        "exhibits": [
+          {
+            "title": "YAML probe excerpt",
+            "code": "livenessProbe:\n  httpGet: {path: /health/live, port: 8080}\n  periodSeconds: 10\n  failureThreshold: 3\n# model startup can take 140 seconds"
+          },
+          {
+            "title": "Release metadata",
+            "code": "retrieval:model: candidate-v4\nretrieval:maxDistance: 0.22\nretrieval:generation: 41\nsentinel: pending\n::"
+          }
+        ]
+      },
+      "id": "level-09-q03"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "What should the worker do when a schema version is unsupported and cannot become valid on retry?",
+      "answer": "Dead-letter with a stable reason and useful description",
+      "explanation": "Explicit dead-lettering preserves the item for controlled remediation and avoids repeated futile deliveries.",
+      "options": [
+        "Complete without recording payload or diagnostics",
+        "Defer and never store the sequence number",
+        "Dead-letter with a stable reason and useful description",
+        "Abandon endlessly"
+      ],
+      "caseStudy": {
+        "title": "MeridianIndex",
+        "background": "MeridianIndex ingests records from a dataset with 120 tenants and builds versions of a knowledge index. An AKS node pool hosts CPU-only APIs; it scales rapidly during peaks. The container registry uses a controlled service identity and digest-based promotion. The canary started failing health checks after the application added a multi-minute local model prewarm.\n\nBoth the API and a Python Function use an Entra identity. The new App Configuration release updates the vector model and retrieval thresholds together. App Configuration refresh is driven by a sentinel. Two vector models have equal vector dimensions, but model-space compatibility is explicitly not guaranteed.\n\nSome Service Bus updates represent permanent schema errors. The audit team must receive a reason and inspect the original payload without retrying poison messages indefinitely.",
+        "exhibits": [
+          {
+            "title": "YAML probe excerpt",
+            "code": "livenessProbe:\n  httpGet: {path: /health/live, port: 8080}\n  periodSeconds: 10\n  failureThreshold: 3\n# model startup can take 140 seconds"
+          },
+          {
+            "title": "Release metadata",
+            "code": "retrieval:model: candidate-v4\nretrieval:maxDistance: 0.22\nretrieval:generation: 41\nsentinel: pending\n::"
+          }
+        ]
+      },
+      "id": "level-09-q04"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "In what order should App Configuration be updated?",
+      "answer": "Publish all related settings, then update the sentinel",
+      "explanation": "Publishing the sentinel last avoids telling clients to refresh before the dependent keys are written.",
+      "options": [
+        "Update the sentinel before writing the model and threshold",
+        "Randomly update the sentinel for each key independently",
+        "Publish all related settings, then update the sentinel",
+        "Update only the sentinel and assume values changed"
+      ],
+      "caseStudy": {
+        "title": "MeridianIndex",
+        "background": "MeridianIndex ingests records from a dataset with 120 tenants and builds versions of a knowledge index. An AKS node pool hosts CPU-only APIs; it scales rapidly during peaks. The container registry uses a controlled service identity and digest-based promotion. The canary started failing health checks after the application added a multi-minute local model prewarm.\n\nBoth the API and a Python Function use an Entra identity. The new App Configuration release updates the vector model and retrieval thresholds together. App Configuration refresh is driven by a sentinel. Two vector models have equal vector dimensions, but model-space compatibility is explicitly not guaranteed.\n\nSome Service Bus updates represent permanent schema errors. The audit team must receive a reason and inspect the original payload without retrying poison messages indefinitely.",
+        "exhibits": [
+          {
+            "title": "YAML probe excerpt",
+            "code": "livenessProbe:\n  httpGet: {path: /health/live, port: 8080}\n  periodSeconds: 10\n  failureThreshold: 3\n# model startup can take 140 seconds"
+          },
+          {
+            "title": "Release metadata",
+            "code": "retrieval:model: candidate-v4\nretrieval:maxDistance: 0.22\nretrieval:generation: 41\nsentinel: pending\n::"
+          }
+        ]
+      },
+      "id": "level-09-q05"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "An image uses a private base with separate release cadence. Which rollout prevents a base-triggered build from silently changing production behavior before review?",
+      "answer": "Trigger dependent builds automatically, create a new digest, and promote that tested digest through staging",
+      "explanation": "Automatic builds create candidates. Digest-based release promotion keeps production changes intentional.",
+      "options": [
+        "Give production a mutable tag that always tracks the newest dependent build",
+        "Trigger dependent builds automatically, create a new digest, and promote that tested digest through staging",
+        "Ship new base layers directly to existing running containers",
+        "Move the ACR registry hostname into the application's environment variables"
+      ],
+      "id": "level-09-q06"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The trident candidate consumes 535 MiB at startup and spikes by another 168 MiB during batch processing. Using these measured values only, what minimum limit in MiB covers the combined peak?",
+      "answer": "703",
+      "explanation": "The startup allocation remains resident during the batch. Add the incremental peak before setting a real production safety margin.",
+      "options": [
+        "703",
+        "1070",
+        "599",
+        "535"
+      ],
+      "exhibits": [
+        {
+          "title": "Observed Pod status",
+          "code": "Last State: Terminated\nReason: OOMKilled\nConfigured limit: 599Mi"
+        }
+      ],
+      "id": "level-09-q07"
+    },
+    {
+      "domain": "data",
+      "type": "order",
+      "prompt": "Order the retrieval path for the trident assistant after the caller submits a query. Resolve scope before contacting the data tier.",
+      "answer": [
+        "Determine the verified tenant and retrieval generation",
+        "Embed the question using the selected generation encoder",
+        "Retrieve up to 14 nearest eligible rows with metadata predicates",
+        "Supply only eligible chunks and their provenance to generation"
+      ],
+      "explanation": "The retrieval scope must be established before retrieving data, and the query vector must match the index.",
+      "id": "level-09-q08"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "The trident Event Grid function receives document version 12 followed by version 11. What should the durable update predicate enforce?",
+      "answer": "Only apply an event whose version is strictly newer than the stored document version",
+      "explanation": "Idempotency protects duplicates, while monotonic version checks protect against distinct events arriving out of order.",
+      "options": [
+        "Always overwrite with the most recently delivered event",
+        "Compare only whether the event IDs differ",
+        "Use the delivery retry count to choose the newest document",
+        "Only apply an event whose version is strictly newer than the stored document version"
+      ],
+      "id": "level-09-q09"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "A Container Apps Service Bus scaler authenticates with a user-assigned managed identity. The worker can receive, but the scaler authenticates using a retired secret reference. Which fix targets only the scale rule?",
+      "answer": "Configure the rule's managed identity, grant the permissions required by the scaler, and remove the obsolete secret auth entry",
+      "explanation": "Scaler authentication is configured separately from worker SDK authentication. Both paths need suitable permissions.",
+      "options": [
+        "Use the control-plane Reader role alone for every broker operation",
+        "Turn off scale-to-zero and keep invalid scaler authentication",
+        "Increase the worker's receive timeout while retaining scaler secret auth",
+        "Configure the rule's managed identity, grant the permissions required by the scaler, and remove the obsolete secret auth entry"
+      ],
+      "exhibits": [
+        {
+          "title": "Scale fragment",
+          "code": "rules:\n  - name: broker\n    custom:\n      type: azure-servicebus\n      metadata: {queueName: jobs}\n      auth: [{secretRef: old-connection, triggerParameter: connection}]"
+        }
+      ],
+      "id": "level-09-q10"
+    },
+    {
+      "domain": "integration",
+      "type": "order",
+      "prompt": "Arrange the successful trident PeekLock path so a fault after the database write leaves the operation safe to replay.",
+      "answer": [
+        "Receive and lock the message",
+        "Validate the payload and derive the stable operation key",
+        "Commit the idempotent business result",
+        "Complete the broker delivery"
+      ],
+      "explanation": "Acknowledgment follows a durable idempotent write, preserving retry safety.",
+      "id": "level-09-q11"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "The trident updates must be processed in order for each document while unrelated documents process concurrently. What should the producer put into SessionId?",
+      "answer": "The verified tenant and stable document ID together",
+      "explanation": "Session keys group related work. A single global key over-serializes the independent documents.",
+      "options": [
+        "The verified tenant and stable document ID together",
+        "A random identifier created for each send",
+        "The same global value for all tenants and documents",
+        "The retry counter"
+      ],
+      "exhibits": [
+        {
+          "title": "Service Bus sender (Python)",
+          "code": "msg = ServiceBusMessage(body, message_id=operation_id, session_id=___)\n# Queue is session-enabled for tenant trident"
+        }
+      ],
+      "id": "level-09-q12"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "Complete the KQL filter to restrict the trident view to requests from the preceding 13 minutes.",
+      "answer": "where TimeGenerated >= ago(13m)",
+      "explanation": "ago() yields a timestamp. Keep events at or after that time using where.",
+      "options": [
+        "where TimeGenerated >= ago(13m)",
+        "project TimeGenerated >= ago(13m)",
+        "where TimeGenerated <= ago(13m)",
+        "where TimeGenerated == ago(13m)"
+      ],
+      "exhibits": [
+        {
+          "title": "Request query (KQL)",
+          "code": "AppRequests\n| ____\n| where AppRoleName == \"trident-api\""
+        }
+      ],
+      "id": "level-09-q13"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "Retrieval and generation share an OperationId. Sampling retained lookup spans only for some requests. Which inference is justified by this KQL result?",
+      "answer": "A missing joined dependency row means no matching dependency telemetry was captured in the query window",
+      "explanation": "Telemetry missingness can come from sampling or lost spans. Outer joins preserve the request and expose an absence of matching observations.",
+      "options": [
+        "Every request with any dependency row executed exactly once",
+        "A missing joined dependency row means no matching dependency telemetry was captured in the query window",
+        "A missing dependency row proves the backend was never invoked",
+        "A leftouter join only returns rows that have full traces"
+      ],
+      "exhibits": [
+        {
+          "title": "KQL query",
+          "code": "AppRequests\n"
+        }
+      ],
+      "id": "level-09-q14"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "Changing a Redis reply invalidates the current key, but an older concurrent cache fill can repopulate stale data after invalidation. What is the robust fix when the source version is available to readers?",
+      "answer": "Include the authoritative data generation in cache identity so late older fills target the previous key",
+      "explanation": "Versioned cache keys prevent a delayed fill for an old generation from overwriting the cache entry a current reader uses.",
+      "options": [
+        "Include the authoritative data generation in cache identity so late older fills target the previous key",
+        "Use a global cache key shared by all versions and customers",
+        "Extend the stale entry's lifetime and continue to reuse it",
+        "Delete only the old value after each read to force more races"
+      ],
+      "exhibits": [
+        {
+          "title": "Concurrent execution timeline",
+          "code": "A reads source version 11\nB commits version 12 and invalidates the key\nA writes the version 11 result into cache after invalidation"
+        }
+      ],
+      "id": "level-09-q15"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "The trident change feed processor is being scaled to 10 instances with a shared processor identity. Which state enables partition ownership and checkpointing?",
+      "answer": "The lease container shared by these processor instances",
+      "explanation": "A shared lease container coordinates assignment and preserves progress across instances.",
+      "options": [
+        "The cluster node hostname in each document",
+        "The vector query continuation token reused as a lock",
+        "The lease container shared by these processor instances",
+        "A separate new lease container per instance"
+      ],
+      "id": "level-09-q16"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "The Azure Managed Redis cache for trident stores per-tenant answers. Which cache key is sufficient when changing model generations?",
+      "answer": "trident:<verified-tenant>:<model-generation>:<query-hash>",
+      "explanation": "Tenant scope and model generation are both retrieval inputs and must participate in cache identity.",
+      "options": [
+        "trident:<query-hash>",
+        "trident:<verified-tenant>:<model-generation>:<query-hash>",
+        "trident:<verified-tenant>:<query-hash>",
+        "trident:<model-generation>:<query-hash>"
+      ],
+      "id": "level-09-q17"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "A document writer needs to update embeddings for two tenants with distinct logical partition keys. Which statement correctly scopes Cosmos DB transactional batches?",
+      "answer": "Use one batch per logical partition and design cross-tenant changes for independent retry or compensating behavior",
+      "explanation": "A transactional batch is limited to a single logical partition. Cross-partition coordination requires a separate protocol.",
+      "options": [
+        "Use continuation tokens as cross-partition locks",
+        "Use one batch per logical partition and design cross-tenant changes for independent retry or compensating behavior",
+        "Enable a stronger consistency level and treat all writes as one transaction",
+        "Use one batch containing both tenant keys and assume atomicity"
+      ],
+      "id": "level-09-q18"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "The trident Cosmos transport gets HTTP 429. What minimum timing should its first custom retry honor before retrying?",
+      "answer": "Wait at least 1350 ms as indicated by the service",
+      "explanation": "x-ms-retry-after-ms reports milliseconds. Use this hint with bounded retry behavior.",
+      "options": [
+        "Wait 1.35 ms",
+        "Retry only after changing the consistency level",
+        "Wait at least 1350 ms as indicated by the service",
+        "Retry immediately on another client"
+      ],
+      "exhibits": [
+        {
+          "title": "Response headers",
+          "code": "HTTP/1.1 429 Too Many Requests\nx-ms-retry-after-ms: 1350"
+        }
+      ],
+      "id": "level-09-q19"
+    },
+    {
+      "domain": "containers",
+      "type": "text",
+      "prompt": "The trident container listens on the port printed below. Enter the numeric Container Apps ingress targetPort.",
+      "answer": [
+        "8009"
+      ],
+      "explanation": "Ingress forwards to the internal listening port, regardless of the public HTTPS port.",
+      "exhibits": [
+        {
+          "title": "Server startup log",
+          "code": "INFO: Listening on 0.0.0.0:8009\nINFO: External endpoint uses HTTPS"
+        }
+      ],
+      "id": "level-09-q20"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The trident initializer needs 99 seconds. Using a simplified startup budget of periodSeconds × failureThreshold, which threshold is the smallest that provides at least one full additional probe period beyond initialization?",
+      "answer": "21",
+      "explanation": "Round up (99 + 5)/5. This is a simplified sizing estimate. Actual probes should also allow for observed variance.",
+      "options": [
+        "22",
+        "21",
+        "24",
+        "19"
+      ],
+      "exhibits": [
+        {
+          "title": "Deployment probe fragment",
+          "code": "startupProbe:\n  httpGet: {path: /started, port: 8080}\n  periodSeconds: 5\n  failureThreshold: ___"
+        }
+      ],
+      "id": "level-09-q21"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "The trident chart requires failed requests counted per 13 minutes by service role. Which query aggregation builds buckets and counts rows?",
+      "answer": "summarize Failures=count() by AppRoleName, bin(TimeGenerated, 13m)",
+      "explanation": "Group by role and binned timestamps. Grouping by raw timestamps or role only omits the requested interval grouping.",
+      "options": [
+        "summarize Failures=count() by AppRoleName, TimeGenerated",
+        "project AppRoleName, bin(TimeGenerated, 13m)",
+        "summarize Failures=count() by AppRoleName, bin(TimeGenerated, 13m)",
+        "summarize Failures=count() by AppRoleName"
+      ],
+      "id": "level-09-q22"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "An Event Grid subscription should allow only trident.DocumentAccepted events with subjects under /tenant/trident/. Which configuration expresses both constraints?",
+      "answer": "Include event type trident.DocumentAccepted and set subjectBeginsWith to /tenant/trident/",
+      "explanation": "Event-type selection and a subject prefix address separate constraints. Include the ending slash to avoid adjacent prefix matches.",
+      "options": [
+        "Use a subscription filter on delivery attempt only",
+        "Include event type trident.DocumentAccepted and set subjectBeginsWith to /tenant/trident/",
+        "Include event type trident.DocumentAccepted and remove subject filtering",
+        "Use subjectEndsWith /tenant/trident/ without an event-type filter"
+      ],
+      "id": "level-09-q23"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "The trident security team needs to investigate failures without storing raw document text or bearer tokens. What should be exported?",
+      "answer": "Sanitized error categories and stable operation identifiers with approved allowlisted attributes",
+      "explanation": "Redact secrets before export and use correlation identifiers to preserve incident context.",
+      "options": [
+        "Sanitized error categories and stable operation identifiers with approved allowlisted attributes",
+        "Entire input and unchanged exception fields for every failure",
+        "Headers and prompt text in span attributes",
+        "Raw credentials in a separate logging table keyed by operation"
+      ],
+      "id": "level-09-q24"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The trident worker scales from zero. Its queue backlog may grow during periods without HTTP traffic. Which configuration follows the backlog?",
+      "answer": "Use a Service Bus KEDA scale rule with minReplicas 0",
+      "explanation": "A queue scaler can observe the broker while the container has zero replicas. A CPU rule cannot measure a nonexistent replica.",
+      "options": [
+        "Increase maxReplicas without setting an event-driven rule",
+        "Use an HTTP rule with concurrentRequests 1",
+        "Use a CPU utilization rule without a queue trigger",
+        "Use a Service Bus KEDA scale rule with minReplicas 0"
+      ],
+      "id": "level-09-q25"
+    },
+    {
+      "domain": "operations",
+      "type": "text",
+      "prompt": "Type the W3C header name that carries the active trace and parent span identifiers for the trident API.",
+      "answer": [
+        "traceparent"
+      ],
+      "explanation": "traceparent carries the trace ID and parent span ID used to correlate the downstream span.",
+      "exhibits": [
+        {
+          "title": "Downstream HTTP headers",
+          "code": "___: 00-dddddddddddddddddddddddddddddddd-aaaaaaaaaaaaaaaa-01\naccept: application/json"
+        }
+      ],
+      "id": "level-09-q26"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "Which OpenTelemetry resource attribute identifies the logical trident service independently of the request operation name?",
+      "answer": "service.name",
+      "explanation": "service.name groups instances of the same logical service. service.instance.id identifies an individual instance.",
+      "options": [
+        "server.address",
+        "service.name",
+        "http.request.method",
+        "service.instance.id"
+      ],
+      "exhibits": [
+        {
+          "title": "OpenTelemetry resource attributes",
+          "code": "{\"___\": \"trident-retrieval-api\", \"deployment.environment.name\": \"production\"}"
+        }
+      ],
+      "id": "level-09-q27"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "Each trident batch has 151 Cosmos reads that cost 11 RU each. What total RU charge should be expected if all reads complete once?",
+      "answer": "1661",
+      "explanation": "Multiply the count by the RU charge per operation. Retry overhead is excluded.",
+      "options": [
+        "11",
+        "151",
+        "1661",
+        "1812"
+      ],
+      "exhibits": [
+        {
+          "title": "Cosmos logs",
+          "code": "completedReads=151\nx-ms-request-charge per read=11"
+        }
+      ],
+      "id": "level-09-q28"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The trident node has 4200m allocatable CPU and 1775m in existing Pod requests. How many whole new 810m Pods can the scheduler fit using CPU alone?",
+      "answer": "2",
+      "explanation": "Subtract existing requests from allocatable CPU and divide downward by the incoming request.",
+      "options": [
+        "5",
+        "3",
+        "2",
+        "1"
+      ],
+      "id": "level-09-q29"
+    },
+    {
+      "domain": "operations",
+      "type": "order",
+      "prompt": "Order the trident database credential rotation so existing calls can continue while the app switches. The database supports overlapping credentials.",
+      "answer": [
+        "Create the replacement credential and publish a new secret version",
+        "Refresh the app and have it fetch the replacement",
+        "Verify authenticated requests on the new credential",
+        "Revoke the previous credential"
+      ],
+      "explanation": "Keep overlap until verifying that clients can authenticate with the replacement.",
+      "id": "level-09-q30"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The trident release must survive image tag reassignment. Which image reference pins the staging artifact?",
+      "answer": "acr.azurecr.io/retrieval@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "explanation": "A manifest digest identifies immutable content. Tags resolve to whatever digest they currently reference.",
+      "options": [
+        "acr.azurecr.io/retrieval",
+        "acr.azurecr.io/retrieval:stable",
+        "acr.azurecr.io/retrieval@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "acr.azurecr.io/retrieval:latest"
+      ],
+      "exhibits": [
+        {
+          "title": "Artifact to promote",
+          "code": "tag: candidate-9\nmanifestDigest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      ],
+      "id": "level-09-q31"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "Which query operation keeps every failed trident request, including failures whose dependency telemetry was sampled out?",
+      "answer": "Join with kind=leftouter on OperationId with failed AppRequests on the left",
+      "explanation": "A leftouter join keeps unmatched request rows while enriching matched rows.",
+      "options": [
+        "Filter dependency rows by matching HTTP status with no operation identity",
+        "Join with kind=leftanti to keep everything",
+        "Join with kind=inner on OperationId",
+        "Join with kind=leftouter on OperationId with failed AppRequests on the left"
+      ],
+      "exhibits": [
+        {
+          "title": "KQL input",
+          "code": "let Failures = AppRequests | where AppRoleName == \"trident-api\" and Success == false;\nFailures\n| join kind=___ (AppDependencies) on OperationId"
+        }
+      ],
+      "id": "level-09-q32"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The trident Deployment creates Ready Pods, but the Kubernetes Service selects no Pods. Which exact selector must the Service use?",
+      "answer": "app: retrieve-trident",
+      "explanation": "A Service uses a flat map under spec.selector and matches actual Pod labels.",
+      "options": [
+        "matchLabels: retrieve",
+        "app: search-trident",
+        "app: retrieve-trident",
+        "port: 8080"
+      ],
+      "exhibits": [
+        {
+          "title": "Service and Deployment excerpts",
+          "code": "# Service\nspec:\n  selector: {app: search-trident}\n# Deployment template\nmetadata:\n  labels: {app: retrieve-trident}"
+        }
+      ],
+      "id": "level-09-q33"
+    },
+    {
+      "domain": "integration",
+      "type": "text",
+      "prompt": "Enter the Python Azure Functions v2 decorator name, without @app. or parentheses, for the trident HTTP endpoint.",
+      "answer": [
+        "route"
+      ],
+      "explanation": "The route decorator configures the HTTP route and trigger.",
+      "exhibits": [
+        {
+          "title": "Function fragment (Python)",
+          "code": "@app.___(route=\"trident/jobs\", methods=[\"POST\"])\ndef submit(req):\n    return accept(req)"
+        }
+      ],
+      "id": "level-09-q34"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "In Azure App Configuration, the model and threshold for trident must be refreshed together on reading a sentinel. Which publishing order fits?",
+      "answer": "Update all dependent values, then update the sentinel",
+      "explanation": "Write the sentinel after publishing the dependent keys so a refresh sees the complete intended set.",
+      "options": [
+        "Use the production values under the staging label",
+        "Update all dependent values, then update the sentinel",
+        "Republish an unchanged sentinel before each individual key write",
+        "Update the sentinel first, then write values independently"
+      ],
+      "exhibits": [
+        {
+          "title": "App Configuration change set",
+          "code": "Key: retrieval:model, Label: trident\nKey: retrieval:threshold, Label: trident\nKey: retrieval:sentinel, Label: trident"
+        }
+      ],
+      "id": "level-09-q35"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The trident Docker image builder installs dependencies again after every application-only edit. Which Dockerfile edit fixes that without bundling build tools?",
+      "answer": "Copy dependency metadata before application code and install the dependencies in a build stage",
+      "explanation": "Docker invalidates layers downstream of a changed COPY. Separate stable dependency inputs and use a runtime stage for the output.",
+      "options": [
+        "Copy the entire repository before dependency installation",
+        "Copy dependency metadata before application code and install the dependencies in a build stage",
+        "Move the application COPY below CMD but keep it before dependency installation",
+        "Install build tools in the final stage at process startup"
+      ],
+      "exhibits": [
+        {
+          "title": "Current Dockerfile",
+          "code": "FROM python:3.12-slim\nWORKDIR /app\nCOPY . .\nRUN pip wheel -r requirements.txt -w /wheels"
+        }
+      ],
+      "id": "level-09-q36"
+    },
+    {
+      "domain": "integration",
+      "type": "multi",
+      "prompt": "The trident Function uses identity-based delivery from one queue. Which two requirements let it process while supporting clean retries?",
+      "answer": [
+        "Grant the Function identity Azure Service Bus Data Receiver on the applicable resource",
+        "Make the durable result idempotent using the stable operation key"
+      ],
+      "explanation": "The Service Bus receiver needs receive permission, and idempotency protects the durable side effect across redelivery.",
+      "options": [
+        "Treat temporary broker retries as permanently invalid data",
+        "Grant the identity Data Sender alone",
+        "Grant the Function identity Azure Service Bus Data Receiver on the applicable resource",
+        "Generate a fresh business key on every delivery",
+        "Make the durable result idempotent using the stable operation key"
+      ],
+      "id": "level-09-q37"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "A DLQ replay uses the source MessageId inside the Service Bus duplicate-detection window. The publish call succeeds, but no repaired message appears. What replay approach preserves business idempotency while allowing the explicit send?",
+      "answer": "Use a new broker MessageId for this replay and preserve the stable business operation key in application properties or payload",
+      "explanation": "The broker may accept and suppress a duplicate send. Separate the intentional replay's transport identity from worker-side business idempotency.",
+      "options": [
+        "Delete the DLQ message before sending the repair",
+        "Switch to ReceiveAndDelete for every ordinary message",
+        "Use a new broker MessageId for this replay and preserve the stable business operation key in application properties or payload",
+        "Generate a new business key and reuse the old broker MessageId"
+      ],
+      "id": "level-09-q38"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "The trident worker begins a completely new trace for every Service Bus delivery. Which corrected operation associates spans with the producer?",
+      "answer": "Extract propagated context from message properties and use it as a parent or span link according to messaging semantics",
+      "explanation": "Producer context belongs in transport metadata. The receiving span uses the context to link the operations across the broker.",
+      "options": [
+        "Extract propagated context from message properties and use it as a parent or span link according to messaging semantics",
+        "Derive the trace ID from message length",
+        "Copy the queue lock token into the span name",
+        "Put the account credential into baggage"
+      ],
+      "id": "level-09-q39"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "The deployed trident Function tries to resolve the connection named in the decorator. Which location provides the deployed setting?",
+      "answer": "The Function App application settings using the configured connection name or identity-based prefix",
+      "explanation": "The hosted process receives application settings from the Function App. Local settings only apply during local execution.",
+      "options": [
+        "The Service Bus message body",
+        "The SQL schema of the function result",
+        "The Function App application settings using the configured connection name or identity-based prefix",
+        "The developer workstation local.settings.json without publishing settings"
+      ],
+      "exhibits": [
+        {
+          "title": "Worker function (Python)",
+          "code": "@app.service_bus_queue_trigger(arg_name=\"msg\", queue_name=\"trident-jobs\", connection=\"JobBus\")\ndef work(msg):\n    handle(msg)"
+        }
+      ],
+      "id": "level-09-q40"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "A team uses a sentinel to switch both endpoint configuration and credentials. Several replicas refresh at different moments. Which rotation procedure avoids cutting off stale replicas prematurely?",
+      "answer": "Publish compatible new configuration and secrets, refresh and verify all required clients, then revoke the old credential",
+      "explanation": "Distributed refresh is not instantaneous. Overlap continues until the old credential is no longer needed.",
+      "options": [
+        "Set two unrelated sentinel keys and revoke on the first reload",
+        "Keep the new secret version pinned to the old versioned URI",
+        "Publish compatible new configuration and secrets, refresh and verify all required clients, then revoke the old credential",
+        "Revoke the old credential immediately after writing the sentinel"
+      ],
+      "id": "level-09-q41"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "What failure can occur when the trident worker runs this code and exits at the marked line?",
+      "answer": "The message is removed even though the database update has not happened",
+      "explanation": "The code settles the message before doing its work. Move completion after the durable, idempotent result.",
+      "options": [
+        "A duplicate is guaranteed because the lock was renewed",
+        "A permanently invalid message goes to the DLQ automatically before completion",
+        "The message is removed even though the database update has not happened",
+        "The successful database write is automatically rolled back by Service Bus"
+      ],
+      "exhibits": [
+        {
+          "title": "PeekLock worker (Python)",
+          "code": "receiver.complete_message(message)\n# Process exits here.\nwrite_result(\"trident\", message)"
+        }
+      ],
+      "id": "level-09-q42"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The trident Pod reports ImagePullBackOff. Which first move tests the most specific failure cause?",
+      "answer": "Check image name, registry access and pull events",
+      "explanation": "The container never started. Inspect Pod events before application startup logs.",
+      "options": [
+        "Change the application load-balancer DNS name",
+        "Change the Docker tag without inspecting Pod events",
+        "Disable all health checks for healthy peers",
+        "Check image name, registry access and pull events"
+      ],
+      "exhibits": [
+        {
+          "title": "AKS status",
+          "code": "Container state: ImagePullBackOff\nCheck requested for deployment/trident-api"
+        }
+      ],
+      "id": "level-09-q43"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "For the trident event consumer, what should the deduplication key contain under CloudEvents if two publishers can generate the same id?",
+      "answer": "Both source and id",
+      "explanation": "CloudEvents treats the source and id combination as unique for distinct events.",
+      "options": [
+        "Both source and id",
+        "Only specversion and time",
+        "Only id across all sources",
+        "Only the delivery count"
+      ],
+      "exhibits": [
+        {
+          "title": "Event pair (JSON lines)",
+          "code": "{\"id\":\"11\",\"source\":\"/sites/trident/api\"}\n{\"id\":\"11\",\"source\":\"/sites/trident/backfill\"}"
+        }
+      ],
+      "id": "level-09-q44"
+    },
+    {
+      "domain": "data",
+      "type": "multi",
+      "prompt": "The trident service has 185 available database connections including all simultaneously active workloads. It may run 12 replicas. Which two controls avoid connection saturation and help confirm operating headroom?",
+      "answer": [
+        "Cap each replica pool at 15 or fewer connections",
+        "Measure peak pool wait time and active connections during scale-out"
+      ],
+      "explanation": "Pool caps protect the shared database. Peak observed connections and wait time show contention under surge conditions.",
+      "options": [
+        "Measure peak pool wait time and active connections during scale-out",
+        "Cap each replica pool at 15 or fewer connections",
+        "Open a separate connection for every query and disable pooling",
+        "Allow at least 16 connections in every pool",
+        "Measure vector dimensions only"
+      ],
+      "id": "level-09-q45"
+    },
+    {
+      "domain": "data",
+      "type": "match",
+      "prompt": "Match the three distinct Redis requirements at trident.",
+      "answer": [
+        "SET key value EX 165",
+        "DEL key",
+        "TTL key"
+      ],
+      "explanation": "EX sets expiration with the write, DEL invalidates the key, and TTL reports the remaining time.",
+      "labels": [
+        "Write a reply that expires after 165 seconds",
+        "Invalidate a reply immediately following an update",
+        "Inspect the remaining lifetime in seconds"
+      ],
+      "id": "level-09-q46"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "The trident PostgreSQL query ranks using negative inner product. Which HNSW operator class supports the shown operator?",
+      "answer": "vector_ip_ops",
+      "explanation": "The HNSW operator class must match the ranking operator. Cosine uses <=>, Euclidean uses <->, and negative inner product uses <#>.",
+      "options": [
+        "vector_l2_ops",
+        "text_pattern_ops",
+        "vector_ip_ops",
+        "vector_cosine_ops"
+      ],
+      "exhibits": [
+        {
+          "title": "pgvector query",
+          "code": "SELECT id FROM chunks\nWHERE tenant_id = $2\nORDER BY embedding <#> $1\nLIMIT 14;"
+        }
+      ],
+      "id": "level-09-q47"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "Which KQL aggregation calculates the 91th percentile of request latency grouped by ResultCode for the trident deployment?",
+      "answer": "summarize Tail = percentile(DurationMs, 91) by ResultCode",
+      "explanation": "percentile aggregates a requested quantile over each group. Multiplying individual durations does not calculate a percentile.",
+      "options": [
+        "extend Tail = DurationMs * 0.91",
+        "summarize Tail = avg(DurationMs) by ResultCode",
+        "summarize Tail = percentile(DurationMs, 91) by ResultCode",
+        "summarize Tail = max(DurationMs) by ResultCode"
+      ],
+      "id": "level-09-q48"
+    },
+    {
+      "domain": "data",
+      "type": "text",
+      "prompt": "Type the Redis SET option used in the trident command to express a 165-second expiry.",
+      "answer": [
+        "EX"
+      ],
+      "explanation": "SET with EX attaches an expiration in seconds as part of the value write.",
+      "exhibits": [
+        {
+          "title": "Redis command",
+          "code": "SET trident:summary result ____ 165"
+        }
+      ],
+      "id": "level-09-q49"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "The trident app must pick up current secret versions on future fetches. Which Key Vault call avoids pinning a specific version?",
+      "answer": "client.get_secret(\"trident-db-password\")",
+      "explanation": "A versionless get resolves the current version. The application must still perform its next fetch according to its cache policy.",
+      "options": [
+        "client.get_secret(\"trident-db-password\")",
+        "client.get_deleted_secret(\"db-password\")",
+        "client.list_properties_of_secrets()",
+        "client.get_secret(\"trident-db-password\", version=\"old-version\")"
+      ],
+      "exhibits": [
+        {
+          "title": "SecretClient call (Python)",
+          "code": "client = SecretClient(vault_url=vault_url, credential=credential)\nsecret = ____"
+        }
+      ],
+      "id": "level-09-q50"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "The trident sender retried within the broker duplicate detection window. Which message property must stay unchanged on an unpartitioned queue?",
+      "answer": "message_id",
+      "explanation": "Duplicate detection uses the application-assigned MessageId. Sequence numbers and delivery counts are set by the broker.",
+      "options": [
+        "message_id",
+        "delivery_count",
+        "locked_until_utc",
+        "sequence_number"
+      ],
+      "exhibits": [
+        {
+          "title": "Service Bus retry (Python)",
+          "code": "new_msg = ServiceBusMessage(body, message_id=f\"trident:{operation_id}\")\nsender.send_messages(new_msg)"
+        }
+      ],
+      "id": "level-09-q51"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "The trident store must accept 768-dimensional embeddings, while the old table contains 1024-dimensional vectors. Which change preserves rollback?",
+      "answer": "Backfill a versioned vector(768) column or table and pair it with the new encoder",
+      "explanation": "An index must match the encoder dimension and embedding space. Versioned storage keeps the prior model and data available.",
+      "options": [
+        "Backfill a versioned vector(768) column or table and pair it with the new encoder",
+        "Pad and compare representations from both model spaces without validation",
+        "Convert vectors to a shared integer and sort by the integer",
+        "Write the new vectors directly to vector(1024)"
+      ],
+      "id": "level-09-q52"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The trident deployment has 243 usable database connections, 12 steady replicas and maxSurge 4. What is the maximum equal per-Pod connection pool size that respects the rollout budget?",
+      "answer": "15",
+      "explanation": "During rollout up to replicas plus surge Pods can coexist. Divide the usable connections by that maximum and round down.",
+      "options": [
+        "20",
+        "14",
+        "16",
+        "15"
+      ],
+      "exhibits": [
+        {
+          "title": "Deployment excerpts",
+          "code": "replicas: 12\nstrategy:\n  rollingUpdate:\n    maxSurge: 4\n    maxUnavailable: 0"
+        }
+      ],
+      "id": "level-09-q53"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "An Event Grid producer retries when a network connection times out, even if the event may already have been accepted. The consumer might then update PostgreSQL twice. Which approach handles ambiguity at both ends?",
+      "answer": "Reuse the same CloudEvents source/id on retry and make the database side effect idempotent for the corresponding operation",
+      "explanation": "Producer identity correlates repeated notifications. Durable consumer idempotency survives redelivery and process restarts.",
+      "options": [
+        "Return success to Event Grid before persisting anything and remove retries",
+        "Generate a new event ID each retry and trust temporal ordering to suppress duplicates",
+        "Reuse the same CloudEvents source/id on retry and make the database side effect idempotent for the corresponding operation",
+        "Store event ID only in volatile process memory"
+      ],
+      "id": "level-09-q54"
+    },
+    {
+      "domain": "operations",
+      "type": "multi",
+      "prompt": "The trident canary has a slower p95 but migration traffic mixes different request types. Which two analysis changes help isolate the regression?",
+      "answer": [
+        "Group the latency percentile by revision and request operation",
+        "Examine dependency spans for the affected operations and revisions"
+      ],
+      "explanation": "Keep like-for-like cohorts, then inspect downstream contributions to the observed request time.",
+      "options": [
+        "Examine dependency spans for the affected operations and revisions",
+        "Compare a single application-wide mean",
+        "Group the latency percentile by revision and request operation",
+        "Discard failures before identifying affected operations",
+        "Select the maximum latency sample from unrelated services"
+      ],
+      "id": "level-09-q55"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The trident process is running but should receive traffic only after /ready succeeds. Which probe should own that endpoint?",
+      "answer": "readinessProbe",
+      "explanation": "Readiness is evaluated after startup and controls whether Pods are available for Service traffic.",
+      "options": [
+        "a service selector",
+        "readinessProbe",
+        "livenessProbe",
+        "startupProbe only"
+      ],
+      "exhibits": [
+        {
+          "title": "Endpoint behavior",
+          "code": "GET /ready → 503 until query encoder and dependencies are available\nGET /live → 200 while process can run"
+        }
+      ],
+      "id": "level-09-q56"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "The trident Cosmos Python handler has a document ID and tenant. Which SDK call performs a point read?",
+      "answer": "container.read_item(item=\"trident-9\", partition_key=\"trident\")",
+      "explanation": "A Cosmos point read uses the id and logical partition key, and avoids query fan-out.",
+      "options": [
+        "container.read_item(item=\"trident\", partition_key=\"trident-9\")",
+        "container.read_item(item=\"trident-9\", partition_key=\"trident\")",
+        "container.query_items(\"SELECT * FROM c WHERE c.id = 'trident-9'\", enable_cross_partition_query=True)",
+        "container.read()"
+      ],
+      "exhibits": [
+        {
+          "title": "Stored document",
+          "code": "{\"id\": \"trident-9\", \"accountId\": \"trident\", \"status\": \"ready\"}"
+        }
+      ],
+      "id": "level-09-q57"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "The trident operation needs to reprocess a permanently failed message after fixing upstream data. Which sequence avoids losing the original on a failed send?",
+      "answer": "Receive from the dead-letter subqueue, send a corrected message, confirm acceptance, then complete the original",
+      "explanation": "Keep the dead-letter delivery until the corrected copy is accepted. Account for duplicate detection when replaying.",
+      "options": [
+        "Complete the original, then attempt to send a corrected copy",
+        "Receive from the dead-letter subqueue, send a corrected message, confirm acceptance, then complete the original",
+        "Use ReceiveAndDelete on the dead-letter subqueue before validating the data",
+        "Send a fresh unrelated payload and reset the queue"
+      ],
+      "id": "level-09-q58"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "The trident enqueue handler completes in 198 ms, but a worker takes minutes. Which HTTP contract preserves tracked asynchronous work?",
+      "answer": "Persist the operation, enqueue it, then return 202 with an authorized status URL",
+      "explanation": "A 202 response can carry polling metadata after durable acceptance. The caller can track completion without holding a request open.",
+      "options": [
+        "Return 200 and discard operation state",
+        "Wait synchronously for the full worker execution",
+        "Return a success response before job acceptance is durable",
+        "Persist the operation, enqueue it, then return 202 with an authorized status URL"
+      ],
+      "id": "level-09-q59"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "The trident approximate index returned 12 authorized results while exact filtered search returned 14. Which experiment can improve recall without weakening the filter?",
+      "answer": "Increase HNSW candidate effort and compare approximate results to exact search under the same predicate",
+      "explanation": "Candidate tuning can improve filtered recall. Exact results from the same permitted corpus provide an appropriate reference.",
+      "options": [
+        "Remove the tenant predicate when the first search falls short",
+        "Compare approximate recall against an unfiltered query",
+        "Increase HNSW candidate effort and compare approximate results to exact search under the same predicate",
+        "Evaluate only p95 latency and ignore result quality"
+      ],
+      "id": "level-09-q60"
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "name": "quizeit",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch scripts/build.mjs --dev",
+    "build": "node scripts/build.mjs",
+    "start": "node scripts/start.mjs",
+    "judge0:up": "node scripts/judge0-docker.mjs",
+    "judge0:stop": "node scripts/judge0-docker.mjs --stop",
+    "editor:up": "node scripts/editor-docker.mjs",
+    "editor:stop": "node scripts/editor-docker.mjs --stop"
+  },
+  "dependencies": {
+    "jose": "^6.2.17",
+    "pdfjs-dist": "^5.7.284",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  }
+}

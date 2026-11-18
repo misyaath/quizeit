@@ -1,0 +1,9 @@
+{
+  "name": "quiz-activity",
+  "displayName": "quizeit",
+  "publisher": "azure-study",
+  "version": "1.0.0",
+  "engines": { "vscode": "^1.90.0" },
+  "activationEvents": ["onStartupFinished"],
+  "main": "./extension.cjs"
+}

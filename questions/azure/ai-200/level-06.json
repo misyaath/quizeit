@@ -1,0 +1,1097 @@
+{
+  "id": "level-06",
+  "title": "Level 6 · Reliability patterns",
+  "difficulty": 6,
+  "questions": [
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "Which revision change makes a worker with disabled ingress scale on pending invoices?",
+      "answer": "Configure a Service Bus KEDA rule and allow minReplicas: 0",
+      "explanation": "A broker-backed scaler can observe backlog while the worker has no replica.",
+      "options": [
+        "Increase the number of image tags in ACR",
+        "Enable CPU-only scaling with zero idle replicas and no external trigger",
+        "Set an HTTP concurrency rule with a smaller threshold",
+        "Configure a Service Bus KEDA rule and allow minReplicas: 0"
+      ],
+      "caseStudy": {
+        "title": "LedgerSift",
+        "background": "LedgerSift uses a Python Service Bus worker to extract features from enterprise invoices. Each partner is a separate logical domain. One subscription receives invoices while another captures auditing events. The extraction worker publishes a size-limited result and commits a PostgreSQL processing marker; it cannot make the broker completion and PostgreSQL transaction atomic.\n\nA Container Apps worker currently scales on HTTP request concurrency even though it has no ingress. The team wants a queue-driven worker that can scale down between submissions. The data store uses tenant-specific records and an Azure Managed Redis expiration policy to release cached inference details.\n\nInvestigators need a KQL query that preserves failed requests lacking dependency telemetry. A missing sampled dependency span must not remove the parent failure from the report.",
+        "exhibits": [
+          {
+            "title": "Ordering requirements",
+            "code": "Business key: partnerId + invoiceId + version\nMessage receive mode: PeekLock\nProcess exit may occur after SQL COMMIT but before broker completion"
+          },
+          {
+            "title": "KQL source tables",
+            "code": "AppRequests(OperationId, TimeGenerated, Success, Name)\nAppDependencies(OperationId, TimeGenerated, Target)\n::"
+          }
+        ]
+      },
+      "id": "level-06-q01"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "Which PostgreSQL constraint prevents duplicate processing markers for the same invoice version?",
+      "answer": "UNIQUE (partner_id, invoice_id, version)",
+      "explanation": "Only the complete business key distinguishes the operations that must be idempotent.",
+      "options": [
+        "UNIQUE (version) alone",
+        "UNIQUE (partner_id) alone",
+        "UNIQUE (partner_id, invoice_id, version)",
+        "A nonunique index on creation time"
+      ],
+      "caseStudy": {
+        "title": "LedgerSift",
+        "background": "LedgerSift uses a Python Service Bus worker to extract features from enterprise invoices. Each partner is a separate logical domain. One subscription receives invoices while another captures auditing events. The extraction worker publishes a size-limited result and commits a PostgreSQL processing marker; it cannot make the broker completion and PostgreSQL transaction atomic.\n\nA Container Apps worker currently scales on HTTP request concurrency even though it has no ingress. The team wants a queue-driven worker that can scale down between submissions. The data store uses tenant-specific records and an Azure Managed Redis expiration policy to release cached inference details.\n\nInvestigators need a KQL query that preserves failed requests lacking dependency telemetry. A missing sampled dependency span must not remove the parent failure from the report.",
+        "exhibits": [
+          {
+            "title": "Ordering requirements",
+            "code": "Business key: partnerId + invoiceId + version\nMessage receive mode: PeekLock\nProcess exit may occur after SQL COMMIT but before broker completion"
+          },
+          {
+            "title": "KQL source tables",
+            "code": "AppRequests(OperationId, TimeGenerated, Success, Name)\nAppDependencies(OperationId, TimeGenerated, Target)\n::"
+          }
+        ]
+      },
+      "id": "level-06-q02"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "A new inference value must be stored with a one-minute expiration in one Redis command. Which command fits?",
+      "answer": "SET inference:82 result EX 60",
+      "explanation": "EX is seconds and sets the expiration atomically with the value.",
+      "options": [
+        "SET inference:82 result EX 60",
+        "EXPIRE inference:82 0",
+        "SET inference:82 result XX",
+        "SET inference:82 result PX 60"
+      ],
+      "caseStudy": {
+        "title": "LedgerSift",
+        "background": "LedgerSift uses a Python Service Bus worker to extract features from enterprise invoices. Each partner is a separate logical domain. One subscription receives invoices while another captures auditing events. The extraction worker publishes a size-limited result and commits a PostgreSQL processing marker; it cannot make the broker completion and PostgreSQL transaction atomic.\n\nA Container Apps worker currently scales on HTTP request concurrency even though it has no ingress. The team wants a queue-driven worker that can scale down between submissions. The data store uses tenant-specific records and an Azure Managed Redis expiration policy to release cached inference details.\n\nInvestigators need a KQL query that preserves failed requests lacking dependency telemetry. A missing sampled dependency span must not remove the parent failure from the report.",
+        "exhibits": [
+          {
+            "title": "Ordering requirements",
+            "code": "Business key: partnerId + invoiceId + version\nMessage receive mode: PeekLock\nProcess exit may occur after SQL COMMIT but before broker completion"
+          },
+          {
+            "title": "KQL source tables",
+            "code": "AppRequests(OperationId, TimeGenerated, Success, Name)\nAppDependencies(OperationId, TimeGenerated, Target)\n::"
+          }
+        ]
+      },
+      "id": "level-06-q03"
+    },
+    {
+      "domain": "integration",
+      "type": "multi",
+      "prompt": "How should the worker acknowledge processing safely? Select the action and its supporting safeguard.",
+      "answer": [
+        "Commit an idempotent marker/work result, then complete the message",
+        "Apply the same business key on redelivery when checking the durable marker"
+      ],
+      "explanation": "Completing after a durable commit prevents lost work. The stable marker handles a crash before acknowledgment. The replay must identify the original operation before settlement.",
+      "options": [
+        "Commit an idempotent marker/work result, then complete the message",
+        "Complete before starting the SQL transaction",
+        "Keep the transaction open until receiving another message",
+        "Raise max delivery count and insert duplicate rows as needed",
+        "Apply the same business key on redelivery when checking the durable marker"
+      ],
+      "caseStudy": {
+        "title": "LedgerSift",
+        "background": "LedgerSift uses a Python Service Bus worker to extract features from enterprise invoices. Each partner is a separate logical domain. One subscription receives invoices while another captures auditing events. The extraction worker publishes a size-limited result and commits a PostgreSQL processing marker; it cannot make the broker completion and PostgreSQL transaction atomic.\n\nA Container Apps worker currently scales on HTTP request concurrency even though it has no ingress. The team wants a queue-driven worker that can scale down between submissions. The data store uses tenant-specific records and an Azure Managed Redis expiration policy to release cached inference details.\n\nInvestigators need a KQL query that preserves failed requests lacking dependency telemetry. A missing sampled dependency span must not remove the parent failure from the report.",
+        "exhibits": [
+          {
+            "title": "Ordering requirements",
+            "code": "Business key: partnerId + invoiceId + version\nMessage receive mode: PeekLock\nProcess exit may occur after SQL COMMIT but before broker completion"
+          },
+          {
+            "title": "KQL source tables",
+            "code": "AppRequests(OperationId, TimeGenerated, Success, Name)\nAppDependencies(OperationId, TimeGenerated, Target)\n::"
+          }
+        ]
+      },
+      "id": "level-06-q04"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "Which KQL join preserves failed requests without a dependency match?",
+      "answer": "Place failed AppRequests on the left and use kind=leftouter",
+      "explanation": "leftouter retains the left rows even when right-hand telemetry is absent.",
+      "options": [
+        "Use kind=inner on OperationId",
+        "Place failed AppRequests on the left and use kind=leftouter",
+        "Use a cross join on Name",
+        "Place failed AppRequests on the left and use kind=leftsemi"
+      ],
+      "caseStudy": {
+        "title": "LedgerSift",
+        "background": "LedgerSift uses a Python Service Bus worker to extract features from enterprise invoices. Each partner is a separate logical domain. One subscription receives invoices while another captures auditing events. The extraction worker publishes a size-limited result and commits a PostgreSQL processing marker; it cannot make the broker completion and PostgreSQL transaction atomic.\n\nA Container Apps worker currently scales on HTTP request concurrency even though it has no ingress. The team wants a queue-driven worker that can scale down between submissions. The data store uses tenant-specific records and an Azure Managed Redis expiration policy to release cached inference details.\n\nInvestigators need a KQL query that preserves failed requests lacking dependency telemetry. A missing sampled dependency span must not remove the parent failure from the report.",
+        "exhibits": [
+          {
+            "title": "Ordering requirements",
+            "code": "Business key: partnerId + invoiceId + version\nMessage receive mode: PeekLock\nProcess exit may occur after SQL COMMIT but before broker completion"
+          },
+          {
+            "title": "KQL source tables",
+            "code": "AppRequests(OperationId, TimeGenerated, Success, Name)\nAppDependencies(OperationId, TimeGenerated, Target)\n::"
+          }
+        ]
+      },
+      "id": "level-06-q05"
+    },
+    {
+      "domain": "data",
+      "type": "match",
+      "prompt": "Match the three distinct Redis requirements at central.",
+      "answer": [
+        "SET key value EX 120",
+        "DEL key",
+        "TTL key"
+      ],
+      "explanation": "EX sets expiration with the write, DEL invalidates the key, and TTL reports the remaining time.",
+      "labels": [
+        "Write a reply that expires after 120 seconds",
+        "Invalidate a reply immediately following an update",
+        "Inspect the remaining lifetime in seconds"
+      ],
+      "id": "level-06-q06"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The central canary receives 15% of explicitly weighted ingress. What stable weight keeps the split valid?",
+      "answer": "85",
+      "explanation": "The weights for the active ingress targets must sum to 100%.",
+      "options": [
+        "15",
+        "100",
+        "85",
+        "0"
+      ],
+      "id": "level-06-q07"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "Complete the KQL filter to restrict the central view to requests from the preceding 10 minutes.",
+      "answer": "where TimeGenerated >= ago(10m)",
+      "explanation": "ago() yields a timestamp. Keep events at or after that time using where.",
+      "options": [
+        "where TimeGenerated == ago(10m)",
+        "where TimeGenerated >= ago(10m)",
+        "where TimeGenerated <= ago(10m)",
+        "project TimeGenerated >= ago(10m)"
+      ],
+      "exhibits": [
+        {
+          "title": "Request query (KQL)",
+          "code": "AppRequests\n| ____\n| where AppRoleName == \"central-api\""
+        }
+      ],
+      "id": "level-06-q08"
+    },
+    {
+      "domain": "containers",
+      "type": "text",
+      "prompt": "The central container listens on the port printed below. Enter the numeric Container Apps ingress targetPort.",
+      "answer": [
+        "8006"
+      ],
+      "explanation": "Ingress forwards to the internal listening port, regardless of the public HTTPS port.",
+      "exhibits": [
+        {
+          "title": "Server startup log",
+          "code": "INFO: Listening on 0.0.0.0:8006\nINFO: External endpoint uses HTTPS"
+        }
+      ],
+      "id": "level-06-q09"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The central candidate consumes 430 MiB at startup and spikes by another 144 MiB during batch processing. Using these measured values only, what minimum limit in MiB covers the combined peak?",
+      "answer": "574",
+      "explanation": "The startup allocation remains resident during the batch. Add the incremental peak before setting a real production safety margin.",
+      "options": [
+        "430",
+        "860",
+        "494",
+        "574"
+      ],
+      "exhibits": [
+        {
+          "title": "Observed Pod status",
+          "code": "Last State: Terminated\nReason: OOMKilled\nConfigured limit: 494Mi"
+        }
+      ],
+      "id": "level-06-q10"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The central deployment has 192 usable database connections, 9 steady replicas and maxSurge 3. What is the maximum equal per-Pod connection pool size that respects the rollout budget?",
+      "answer": "16",
+      "explanation": "During rollout up to replicas plus surge Pods can coexist. Divide the usable connections by that maximum and round down.",
+      "options": [
+        "15",
+        "16",
+        "17",
+        "21"
+      ],
+      "exhibits": [
+        {
+          "title": "Deployment excerpts",
+          "code": "replicas: 9\nstrategy:\n  rollingUpdate:\n    maxSurge: 3\n    maxUnavailable: 0"
+        }
+      ],
+      "id": "level-06-q11"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The central release must survive image tag reassignment. Which image reference pins the staging artifact?",
+      "answer": "acr.azurecr.io/retrieval@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "explanation": "A manifest digest identifies immutable content. Tags resolve to whatever digest they currently reference.",
+      "options": [
+        "acr.azurecr.io/retrieval:latest",
+        "acr.azurecr.io/retrieval:stable",
+        "acr.azurecr.io/retrieval",
+        "acr.azurecr.io/retrieval@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      ],
+      "exhibits": [
+        {
+          "title": "Artifact to promote",
+          "code": "tag: candidate-6\nmanifestDigest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      ],
+      "id": "level-06-q12"
+    },
+    {
+      "domain": "integration",
+      "type": "multi",
+      "prompt": "The central Function uses identity-based delivery from one queue. Which two requirements let it process while supporting clean retries?",
+      "answer": [
+        "Grant the Function identity Azure Service Bus Data Receiver on the applicable resource",
+        "Make the durable result idempotent using the stable operation key"
+      ],
+      "explanation": "The Service Bus receiver needs receive permission, and idempotency protects the durable side effect across redelivery.",
+      "options": [
+        "Treat temporary broker retries as permanently invalid data",
+        "Generate a fresh business key on every delivery",
+        "Grant the identity Data Sender alone",
+        "Grant the Function identity Azure Service Bus Data Receiver on the applicable resource",
+        "Make the durable result idempotent using the stable operation key"
+      ],
+      "id": "level-06-q13"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "The central security team needs to investigate failures without storing raw document text or bearer tokens. What should be exported?",
+      "answer": "Sanitized error categories and stable operation identifiers with approved allowlisted attributes",
+      "explanation": "Redact secrets before export and use correlation identifiers to preserve incident context.",
+      "options": [
+        "Headers and prompt text in span attributes",
+        "Raw credentials in a separate logging table keyed by operation",
+        "Sanitized error categories and stable operation identifiers with approved allowlisted attributes",
+        "Entire input and unchanged exception fields for every failure"
+      ],
+      "id": "level-06-q14"
+    },
+    {
+      "domain": "integration",
+      "type": "order",
+      "prompt": "Arrange the successful central PeekLock path so a fault after the database write leaves the operation safe to replay.",
+      "answer": [
+        "Receive and lock the message",
+        "Validate the payload and derive the stable operation key",
+        "Commit the idempotent business result",
+        "Complete the broker delivery"
+      ],
+      "explanation": "Acknowledgment follows a durable idempotent write, preserving retry safety.",
+      "id": "level-06-q15"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "The deployed central Function tries to resolve the connection named in the decorator. Which location provides the deployed setting?",
+      "answer": "The Function App application settings using the configured connection name or identity-based prefix",
+      "explanation": "The hosted process receives application settings from the Function App. Local settings only apply during local execution.",
+      "options": [
+        "The developer workstation local.settings.json without publishing settings",
+        "The Function App application settings using the configured connection name or identity-based prefix",
+        "The SQL schema of the function result",
+        "The Service Bus message body"
+      ],
+      "exhibits": [
+        {
+          "title": "Worker function (Python)",
+          "code": "@app.service_bus_queue_trigger(arg_name=\"msg\", queue_name=\"central-jobs\", connection=\"JobBus\")\ndef work(msg):\n    handle(msg)"
+        }
+      ],
+      "id": "level-06-q16"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The central Deployment creates Ready Pods, but the Kubernetes Service selects no Pods. Which exact selector must the Service use?",
+      "answer": "app: retrieve-central",
+      "explanation": "A Service uses a flat map under spec.selector and matches actual Pod labels.",
+      "options": [
+        "app: search-central",
+        "app: retrieve-central",
+        "matchLabels: retrieve",
+        "port: 8080"
+      ],
+      "exhibits": [
+        {
+          "title": "Service and Deployment excerpts",
+          "code": "# Service\nspec:\n  selector: {app: search-central}\n# Deployment template\nmetadata:\n  labels: {app: retrieve-central}"
+        }
+      ],
+      "id": "level-06-q17"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "The Azure Managed Redis cache for central stores per-tenant answers. Which cache key is sufficient when changing model generations?",
+      "answer": "central:<verified-tenant>:<model-generation>:<query-hash>",
+      "explanation": "Tenant scope and model generation are both retrieval inputs and must participate in cache identity.",
+      "options": [
+        "central:<model-generation>:<query-hash>",
+        "central:<verified-tenant>:<model-generation>:<query-hash>",
+        "central:<query-hash>",
+        "central:<verified-tenant>:<query-hash>"
+      ],
+      "id": "level-06-q18"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "The central sender retried within the broker duplicate detection window. Which message property must stay unchanged on an unpartitioned queue?",
+      "answer": "message_id",
+      "explanation": "Duplicate detection uses the application-assigned MessageId. Sequence numbers and delivery counts are set by the broker.",
+      "options": [
+        "delivery_count",
+        "locked_until_utc",
+        "message_id",
+        "sequence_number"
+      ],
+      "exhibits": [
+        {
+          "title": "Service Bus retry (Python)",
+          "code": "new_msg = ServiceBusMessage(body, message_id=f\"central:{operation_id}\")\nsender.send_messages(new_msg)"
+        }
+      ],
+      "id": "level-06-q19"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "The central chart requires failed requests counted per 10 minutes by service role. Which query aggregation builds buckets and counts rows?",
+      "answer": "summarize Failures=count() by AppRoleName, bin(TimeGenerated, 10m)",
+      "explanation": "Group by role and binned timestamps. Grouping by raw timestamps or role only omits the requested interval grouping.",
+      "options": [
+        "summarize Failures=count() by AppRoleName, bin(TimeGenerated, 10m)",
+        "summarize Failures=count() by AppRoleName",
+        "project AppRoleName, bin(TimeGenerated, 10m)",
+        "summarize Failures=count() by AppRoleName, TimeGenerated"
+      ],
+      "id": "level-06-q20"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "In Azure App Configuration, the model and threshold for central must be refreshed together on reading a sentinel. Which publishing order fits?",
+      "answer": "Update all dependent values, then update the sentinel",
+      "explanation": "Write the sentinel after publishing the dependent keys so a refresh sees the complete intended set.",
+      "options": [
+        "Update the sentinel first, then write values independently",
+        "Use the production values under the staging label",
+        "Update all dependent values, then update the sentinel",
+        "Republish an unchanged sentinel before each individual key write"
+      ],
+      "exhibits": [
+        {
+          "title": "App Configuration change set",
+          "code": "Key: retrieval:model, Label: central\nKey: retrieval:threshold, Label: central\nKey: retrieval:sentinel, Label: central"
+        }
+      ],
+      "id": "level-06-q21"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "Jobs A and B update the same document. Their receiver uses a session, but a long-running job may lose its lock. Which statement is correct?",
+      "answer": "Sessions organize ordered processing, while durable state and idempotency are still needed for retry and lock loss",
+      "explanation": "A session provides an ordered grouping and exclusive consumer ownership while held. It does not make external writes transactional with settlement.",
+      "options": [
+        "Sessions remove the need to keep a stable document version",
+        "Sessions organize ordered processing, while durable state and idempotency are still needed for retry and lock loss",
+        "Sessions make every database write exactly once automatically",
+        "Sessions cause all messages from all documents to process sequentially"
+      ],
+      "id": "level-06-q22"
+    },
+    {
+      "domain": "data",
+      "type": "order",
+      "prompt": "Order the retrieval path for the central assistant after the caller submits a query. Resolve scope before contacting the data tier.",
+      "answer": [
+        "Determine the verified tenant and retrieval generation",
+        "Embed the question using the selected generation encoder",
+        "Retrieve up to 11 nearest eligible rows with metadata predicates",
+        "Supply only eligible chunks and their provenance to generation"
+      ],
+      "explanation": "The retrieval scope must be established before retrieving data, and the query vector must match the index.",
+      "id": "level-06-q23"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "The central PostgreSQL query ranks using negative inner product. Which HNSW operator class supports the shown operator?",
+      "answer": "vector_ip_ops",
+      "explanation": "The HNSW operator class must match the ranking operator. Cosine uses <=>, Euclidean uses <->, and negative inner product uses <#>.",
+      "options": [
+        "vector_cosine_ops",
+        "vector_ip_ops",
+        "text_pattern_ops",
+        "vector_l2_ops"
+      ],
+      "exhibits": [
+        {
+          "title": "pgvector query",
+          "code": "SELECT id FROM chunks\nWHERE tenant_id = $2\nORDER BY embedding <#> $1\nLIMIT 11;"
+        }
+      ],
+      "id": "level-06-q24"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "Which OpenTelemetry resource attribute identifies the logical central service independently of the request operation name?",
+      "answer": "service.name",
+      "explanation": "service.name groups instances of the same logical service. service.instance.id identifies an individual instance.",
+      "options": [
+        "service.instance.id",
+        "server.address",
+        "service.name",
+        "http.request.method"
+      ],
+      "exhibits": [
+        {
+          "title": "OpenTelemetry resource attributes",
+          "code": "{\"___\": \"central-retrieval-api\", \"deployment.environment.name\": \"production\"}"
+        }
+      ],
+      "id": "level-06-q25"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The central Docker image builder installs dependencies again after every application-only edit. Which Dockerfile edit fixes that without bundling build tools?",
+      "answer": "Copy dependency metadata before application code and install the dependencies in a build stage",
+      "explanation": "Docker invalidates layers downstream of a changed COPY. Separate stable dependency inputs and use a runtime stage for the output.",
+      "options": [
+        "Install build tools in the final stage at process startup",
+        "Copy dependency metadata before application code and install the dependencies in a build stage",
+        "Move the application COPY below CMD but keep it before dependency installation",
+        "Copy the entire repository before dependency installation"
+      ],
+      "exhibits": [
+        {
+          "title": "Current Dockerfile",
+          "code": "FROM python:3.12-slim\nWORKDIR /app\nCOPY . .\nRUN pip wheel -r requirements.txt -w /wheels"
+        }
+      ],
+      "id": "level-06-q26"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "The central app must pick up current secret versions on future fetches. Which Key Vault call avoids pinning a specific version?",
+      "answer": "client.get_secret(\"central-db-password\")",
+      "explanation": "A versionless get resolves the current version. The application must still perform its next fetch according to its cache policy.",
+      "options": [
+        "client.list_properties_of_secrets()",
+        "client.get_secret(\"central-db-password\")",
+        "client.get_deleted_secret(\"db-password\")",
+        "client.get_secret(\"central-db-password\", version=\"old-version\")"
+      ],
+      "exhibits": [
+        {
+          "title": "SecretClient call (Python)",
+          "code": "client = SecretClient(vault_url=vault_url, credential=credential)\nsecret = ____"
+        }
+      ],
+      "id": "level-06-q27"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "The central approximate index returned 9 authorized results while exact filtered search returned 11. Which experiment can improve recall without weakening the filter?",
+      "answer": "Increase HNSW candidate effort and compare approximate results to exact search under the same predicate",
+      "explanation": "Candidate tuning can improve filtered recall. Exact results from the same permitted corpus provide an appropriate reference.",
+      "options": [
+        "Compare approximate recall against an unfiltered query",
+        "Remove the tenant predicate when the first search falls short",
+        "Evaluate only p95 latency and ignore result quality",
+        "Increase HNSW candidate effort and compare approximate results to exact search under the same predicate"
+      ],
+      "id": "level-06-q28"
+    },
+    {
+      "domain": "integration",
+      "type": "text",
+      "prompt": "Enter the Python Azure Functions v2 decorator name, without @app. or parentheses, for the central HTTP endpoint.",
+      "answer": [
+        "route"
+      ],
+      "explanation": "The route decorator configures the HTTP route and trigger.",
+      "exhibits": [
+        {
+          "title": "Function fragment (Python)",
+          "code": "@app.___(route=\"central/jobs\", methods=[\"POST\"])\ndef submit(req):\n    return accept(req)"
+        }
+      ],
+      "id": "level-06-q29"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "An AKS HTTP API must route both old and new Pods during one rolling update. How can you add a release label for tracing without breaking the stable Service selector?",
+      "answer": "Keep a common app label on both Pod templates and set a separate release label",
+      "explanation": "The Service selects Pod labels. Keeping a stable application label routes both Ready generations during the update.",
+      "options": [
+        "Put a new label only on the top-level Deployment metadata",
+        "Change the app label on candidate Pods only while keeping the original Service selector",
+        "Keep a common app label on both Pod templates and set a separate release label",
+        "Set the shared Service selector to a changing release label during every rollout"
+      ],
+      "exhibits": [
+        {
+          "title": "Pod template change",
+          "code": "metadata:\n  labels:\n    app: query-api\n    release: \"2026-10\""
+        }
+      ],
+      "id": "level-06-q30"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "A request trace is propagated across services, but some dependency spans are omitted by sampling. The report must still count one row per failed request after correlating. Which strategy prevents dropped and duplicated failures?",
+      "answer": "Aggregate dependencies by OperationId first, then leftouter join them to filtered AppRequests",
+      "explanation": "Grouping dependencies once per operation avoids one-to-many expansion. The outer join retains unmatched failures.",
+      "options": [
+        "Join all rows on timestamp and then count dependency records",
+        "Leftouter join every raw dependency and count all output rows as failed requests",
+        "Aggregate dependencies by OperationId first, then leftouter join them to filtered AppRequests",
+        "Inner join raw requests to dependencies"
+      ],
+      "id": "level-06-q31"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "The central change feed processor is being scaled to 7 instances with a shared processor identity. Which state enables partition ownership and checkpointing?",
+      "answer": "The lease container shared by these processor instances",
+      "explanation": "A shared lease container coordinates assignment and preserves progress across instances.",
+      "options": [
+        "A separate new lease container per instance",
+        "The cluster node hostname in each document",
+        "The lease container shared by these processor instances",
+        "The vector query continuation token reused as a lock"
+      ],
+      "id": "level-06-q32"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "For the central event consumer, what should the deduplication key contain under CloudEvents if two publishers can generate the same id?",
+      "answer": "Both source and id",
+      "explanation": "CloudEvents treats the source and id combination as unique for distinct events.",
+      "options": [
+        "Both source and id",
+        "Only id across all sources",
+        "Only the delivery count",
+        "Only specversion and time"
+      ],
+      "exhibits": [
+        {
+          "title": "Event pair (JSON lines)",
+          "code": "{\"id\":\"8\",\"source\":\"/sites/central/api\"}\n{\"id\":\"8\",\"source\":\"/sites/central/backfill\"}"
+        }
+      ],
+      "id": "level-06-q33"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "The central Cosmos transport gets HTTP 429. What minimum timing should its first custom retry honor before retrying?",
+      "answer": "Wait at least 900 ms as indicated by the service",
+      "explanation": "x-ms-retry-after-ms reports milliseconds. Use this hint with bounded retry behavior.",
+      "options": [
+        "Wait 0.9 ms",
+        "Wait at least 900 ms as indicated by the service",
+        "Retry immediately on another client",
+        "Retry only after changing the consistency level"
+      ],
+      "exhibits": [
+        {
+          "title": "Response headers",
+          "code": "HTTP/1.1 429 Too Many Requests\nx-ms-retry-after-ms: 900"
+        }
+      ],
+      "id": "level-06-q34"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The central initializer needs 72 seconds. Using a simplified startup budget of periodSeconds × failureThreshold, which threshold is the smallest that provides at least one full additional probe period beyond initialization?",
+      "answer": "9",
+      "explanation": "Round up (72 + 10)/10. This is a simplified sizing estimate. Actual probes should also allow for observed variance.",
+      "options": [
+        "9",
+        "10",
+        "7",
+        "12"
+      ],
+      "exhibits": [
+        {
+          "title": "Deployment probe fragment",
+          "code": "startupProbe:\n  httpGet: {path: /started, port: 8080}\n  periodSeconds: 10\n  failureThreshold: ___"
+        }
+      ],
+      "id": "level-06-q35"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "Which query operation keeps every failed central request, including failures whose dependency telemetry was sampled out?",
+      "answer": "Join with kind=leftouter on OperationId with failed AppRequests on the left",
+      "explanation": "A leftouter join keeps unmatched request rows while enriching matched rows.",
+      "options": [
+        "Filter dependency rows by matching HTTP status with no operation identity",
+        "Join with kind=leftouter on OperationId with failed AppRequests on the left",
+        "Join with kind=inner on OperationId",
+        "Join with kind=leftanti to keep everything"
+      ],
+      "exhibits": [
+        {
+          "title": "KQL input",
+          "code": "let Failures = AppRequests | where AppRoleName == \"central-api\" and Success == false;\nFailures\n| join kind=___ (AppDependencies) on OperationId"
+        }
+      ],
+      "id": "level-06-q36"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "The central Cosmos Python handler has a document ID and tenant. Which SDK call performs a point read?",
+      "answer": "container.read_item(item=\"central-6\", partition_key=\"central\")",
+      "explanation": "A Cosmos point read uses the id and logical partition key, and avoids query fan-out.",
+      "options": [
+        "container.query_items(\"SELECT * FROM c WHERE c.id = 'central-6'\", enable_cross_partition_query=True)",
+        "container.read_item(item=\"central\", partition_key=\"central-6\")",
+        "container.read()",
+        "container.read_item(item=\"central-6\", partition_key=\"central\")"
+      ],
+      "exhibits": [
+        {
+          "title": "Stored document",
+          "code": "{\"id\": \"central-6\", \"accountId\": \"central\", \"status\": \"ready\"}"
+        }
+      ],
+      "id": "level-06-q37"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "An Event Grid subscription should allow only central.DocumentAccepted events with subjects under /tenant/central/. Which configuration expresses both constraints?",
+      "answer": "Include event type central.DocumentAccepted and set subjectBeginsWith to /tenant/central/",
+      "explanation": "Event-type selection and a subject prefix address separate constraints. Include the ending slash to avoid adjacent prefix matches.",
+      "options": [
+        "Include event type central.DocumentAccepted and remove subject filtering",
+        "Use a subscription filter on delivery attempt only",
+        "Use subjectEndsWith /tenant/central/ without an event-type filter",
+        "Include event type central.DocumentAccepted and set subjectBeginsWith to /tenant/central/"
+      ],
+      "id": "level-06-q38"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "The central Event Grid function receives document version 9 followed by version 8. What should the durable update predicate enforce?",
+      "answer": "Only apply an event whose version is strictly newer than the stored document version",
+      "explanation": "Idempotency protects duplicates, while monotonic version checks protect against distinct events arriving out of order.",
+      "options": [
+        "Only apply an event whose version is strictly newer than the stored document version",
+        "Always overwrite with the most recently delivered event",
+        "Use the delivery retry count to choose the newest document",
+        "Compare only whether the event IDs differ"
+      ],
+      "id": "level-06-q39"
+    },
+    {
+      "domain": "operations",
+      "type": "order",
+      "prompt": "Order the central database credential rotation so existing calls can continue while the app switches. The database supports overlapping credentials.",
+      "answer": [
+        "Create the replacement credential and publish a new secret version",
+        "Refresh the app and have it fetch the replacement",
+        "Verify authenticated requests on the new credential",
+        "Revoke the previous credential"
+      ],
+      "explanation": "Keep overlap until verifying that clients can authenticate with the replacement.",
+      "id": "level-06-q40"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The central process is running but should receive traffic only after /ready succeeds. Which probe should own that endpoint?",
+      "answer": "readinessProbe",
+      "explanation": "Readiness is evaluated after startup and controls whether Pods are available for Service traffic.",
+      "options": [
+        "readinessProbe",
+        "a service selector",
+        "startupProbe only",
+        "livenessProbe"
+      ],
+      "exhibits": [
+        {
+          "title": "Endpoint behavior",
+          "code": "GET /ready → 503 until query encoder and dependencies are available\nGET /live → 200 while process can run"
+        }
+      ],
+      "id": "level-06-q41"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "The central updates must be processed in order for each document while unrelated documents process concurrently. What should the producer put into SessionId?",
+      "answer": "The verified tenant and stable document ID together",
+      "explanation": "Session keys group related work. A single global key over-serializes the independent documents.",
+      "options": [
+        "The same global value for all tenants and documents",
+        "The verified tenant and stable document ID together",
+        "The retry counter",
+        "A random identifier created for each send"
+      ],
+      "exhibits": [
+        {
+          "title": "Service Bus sender (Python)",
+          "code": "msg = ServiceBusMessage(body, message_id=operation_id, session_id=___)\n# Queue is session-enabled for tenant central"
+        }
+      ],
+      "id": "level-06-q42"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "What failure can occur when the central worker runs this code and exits at the marked line?",
+      "answer": "The message is removed even though the database update has not happened",
+      "explanation": "The code settles the message before doing its work. Move completion after the durable, idempotent result.",
+      "options": [
+        "The successful database write is automatically rolled back by Service Bus",
+        "A duplicate is guaranteed because the lock was renewed",
+        "The message is removed even though the database update has not happened",
+        "A permanently invalid message goes to the DLQ automatically before completion"
+      ],
+      "exhibits": [
+        {
+          "title": "PeekLock worker (Python)",
+          "code": "receiver.complete_message(message)\n# Process exits here.\nwrite_result(\"central\", message)"
+        }
+      ],
+      "id": "level-06-q43"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "The central store must accept 1024-dimensional embeddings, while the old table contains 1536-dimensional vectors. Which change preserves rollback?",
+      "answer": "Backfill a versioned vector(1024) column or table and pair it with the new encoder",
+      "explanation": "An index must match the encoder dimension and embedding space. Versioned storage keeps the prior model and data available.",
+      "options": [
+        "Write the new vectors directly to vector(1536)",
+        "Pad and compare representations from both model spaces without validation",
+        "Backfill a versioned vector(1024) column or table and pair it with the new encoder",
+        "Convert vectors to a shared integer and sort by the integer"
+      ],
+      "id": "level-06-q44"
+    },
+    {
+      "domain": "data",
+      "type": "text",
+      "prompt": "Type the Redis SET option used in the central command to express a 120-second expiry.",
+      "answer": [
+        "EX"
+      ],
+      "explanation": "SET with EX attaches an expiration in seconds as part of the value write.",
+      "exhibits": [
+        {
+          "title": "Redis command",
+          "code": "SET central:summary result ____ 120"
+        }
+      ],
+      "id": "level-06-q45"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "Each central batch has 124 Cosmos reads that cost 8 RU each. What total RU charge should be expected if all reads complete once?",
+      "answer": "992",
+      "explanation": "Multiply the count by the RU charge per operation. Retry overhead is excluded.",
+      "options": [
+        "8",
+        "124",
+        "992",
+        "1116"
+      ],
+      "exhibits": [
+        {
+          "title": "Cosmos logs",
+          "code": "completedReads=124\nx-ms-request-charge per read=8"
+        }
+      ],
+      "id": "level-06-q46"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "The request latency chart changes dramatically after enabling different sampling settings in two services. What should an incident reviewer compare before concluding that production latency improved?",
+      "answer": "Check sampling behavior and compare representative telemetry from equivalent traffic cohorts",
+      "explanation": "Sampling changes the observed telemetry set. Comparable cohorts and sampling-aware analysis are needed for an actionable conclusion.",
+      "options": [
+        "Assume a lower observed request count proves throughput improved",
+        "Summarize exception text alone",
+        "Compare old sampled p95 against current raw minima",
+        "Check sampling behavior and compare representative telemetry from equivalent traffic cohorts"
+      ],
+      "id": "level-06-q47"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "The team tunes a filtered ANN index using a relevance set of 20 eligible exact neighbors. The ANN result contains 14 of those same IDs plus six other documents. What is recall@20 against that reference?",
+      "answer": "0.70",
+      "explanation": "Recall@20 is the number of eligible exact results recovered divided by 20. Having 20 output rows does not make recall 100%.",
+      "options": [
+        "0.30",
+        "1.00",
+        "0.47",
+        "0.70"
+      ],
+      "exhibits": [
+        {
+          "title": "Evaluation output",
+          "code": "Reference exact neighbors: 20\nApproximate neighbors: 20\nShared document IDs: 14"
+        }
+      ],
+      "id": "level-06-q48"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The central worker scales from zero. Its queue backlog may grow during periods without HTTP traffic. Which configuration follows the backlog?",
+      "answer": "Use a Service Bus KEDA scale rule with minReplicas 0",
+      "explanation": "A queue scaler can observe the broker while the container has zero replicas. A CPU rule cannot measure a nonexistent replica.",
+      "options": [
+        "Use a Service Bus KEDA scale rule with minReplicas 0",
+        "Increase maxReplicas without setting an event-driven rule",
+        "Use a CPU utilization rule without a queue trigger",
+        "Use an HTTP rule with concurrentRequests 1"
+      ],
+      "id": "level-06-q49"
+    },
+    {
+      "domain": "operations",
+      "type": "multi",
+      "prompt": "The central canary has a slower p95 but migration traffic mixes different request types. Which two analysis changes help isolate the regression?",
+      "answer": [
+        "Group the latency percentile by revision and request operation",
+        "Examine dependency spans for the affected operations and revisions"
+      ],
+      "explanation": "Keep like-for-like cohorts, then inspect downstream contributions to the observed request time.",
+      "options": [
+        "Discard failures before identifying affected operations",
+        "Group the latency percentile by revision and request operation",
+        "Examine dependency spans for the affected operations and revisions",
+        "Select the maximum latency sample from unrelated services",
+        "Compare a single application-wide mean"
+      ],
+      "id": "level-06-q50"
+    },
+    {
+      "domain": "data",
+      "type": "multi",
+      "prompt": "The central service has 155 available database connections including all simultaneously active workloads. It may run 9 replicas. Which two controls avoid connection saturation and help confirm operating headroom?",
+      "answer": [
+        "Cap each replica pool at 17 or fewer connections",
+        "Measure peak pool wait time and active connections during scale-out"
+      ],
+      "explanation": "Pool caps protect the shared database. Peak observed connections and wait time show contention under surge conditions.",
+      "options": [
+        "Open a separate connection for every query and disable pooling",
+        "Cap each replica pool at 17 or fewer connections",
+        "Measure vector dimensions only",
+        "Measure peak pool wait time and active connections during scale-out",
+        "Allow at least 18 connections in every pool"
+      ],
+      "id": "level-06-q51"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "Which KQL aggregation calculates the 96th percentile of request latency grouped by ResultCode for the central deployment?",
+      "answer": "summarize Tail = percentile(DurationMs, 96) by ResultCode",
+      "explanation": "percentile aggregates a requested quantile over each group. Multiplying individual durations does not calculate a percentile.",
+      "options": [
+        "extend Tail = DurationMs * 0.96",
+        "summarize Tail = max(DurationMs) by ResultCode",
+        "summarize Tail = avg(DurationMs) by ResultCode",
+        "summarize Tail = percentile(DurationMs, 96) by ResultCode"
+      ],
+      "id": "level-06-q52"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "A Service Bus-triggered Function usually takes eight minutes. Its current lock-renewal budget is five minutes. Which edit addresses the limit while preserving protection against duplicate delivery?",
+      "answer": "Raise maxAutoLockRenewalDuration above the expected runtime and keep durable idempotency",
+      "explanation": "Lock renewal reduces expiration during expected processing times. It cannot guarantee exactly-once effects.",
+      "options": [
+        "Reuse the queue name as the idempotency key for every document",
+        "Raise maxAutoLockRenewalDuration above the expected runtime and keep durable idempotency",
+        "Use larger prefetch to keep many locks waiting together",
+        "Disable lock renewal and complete on receipt"
+      ],
+      "exhibits": [
+        {
+          "title": "host.json (extension v5)",
+          "code": "{\"extensions\":{\"serviceBus\":{\"maxAutoLockRenewalDuration\":\"00:05:00\",\"prefetchCount\":0}}}"
+        }
+      ],
+      "id": "level-06-q53"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The central Pod reports CrashLoopBackOff with OOMKilled. Which first move tests the most specific failure cause?",
+      "answer": "Check memory usage and the container memory limit",
+      "explanation": "OOMKilled points to memory pressure or the enforced memory budget.",
+      "options": [
+        "Change the application load-balancer DNS name",
+        "Change the Docker tag without inspecting Pod events",
+        "Disable all health checks for healthy peers",
+        "Check memory usage and the container memory limit"
+      ],
+      "exhibits": [
+        {
+          "title": "AKS status",
+          "code": "Container state: CrashLoopBackOff with OOMKilled\nCheck requested for deployment/central-api"
+        }
+      ],
+      "id": "level-06-q54"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "Several PostgreSQL requests reuse pooled connections. A transaction should raise HNSW search effort for a selective query without affecting later unrelated requests. What should the code execute?",
+      "answer": "SET LOCAL hnsw.ef_search = 120 inside the transaction immediately before the query",
+      "explanation": "SET LOCAL limits the runtime setting to the current transaction. ef_construction is an index-build parameter.",
+      "options": [
+        "SET LOCAL hnsw.ef_search = 120 inside the transaction immediately before the query",
+        "SET hnsw.ef_search = 120 and return the connection without resetting it",
+        "Change hnsw.ef_construction for every query",
+        "ALTER SYSTEM SET hnsw.ef_search = 120"
+      ],
+      "exhibits": [
+        {
+          "title": "Query transaction",
+          "code": "BEGIN;\n____\nSELECT id FROM chunks WHERE category_id = 7 ORDER BY embedding <=> $1 LIMIT 10;\nCOMMIT;"
+        }
+      ],
+      "id": "level-06-q55"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "The central operation needs to reprocess a permanently failed message after fixing upstream data. Which sequence avoids losing the original on a failed send?",
+      "answer": "Receive from the dead-letter subqueue, send a corrected message, confirm acceptance, then complete the original",
+      "explanation": "Keep the dead-letter delivery until the corrected copy is accepted. Account for duplicate detection when replaying.",
+      "options": [
+        "Send a fresh unrelated payload and reset the queue",
+        "Complete the original, then attempt to send a corrected copy",
+        "Use ReceiveAndDelete on the dead-letter subqueue before validating the data",
+        "Receive from the dead-letter subqueue, send a corrected message, confirm acceptance, then complete the original"
+      ],
+      "id": "level-06-q56"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "The central enqueue handler completes in 144 ms, but a worker takes minutes. Which HTTP contract preserves tracked asynchronous work?",
+      "answer": "Persist the operation, enqueue it, then return 202 with an authorized status URL",
+      "explanation": "A 202 response can carry polling metadata after durable acceptance. The caller can track completion without holding a request open.",
+      "options": [
+        "Return 200 and discard operation state",
+        "Wait synchronously for the full worker execution",
+        "Return a success response before job acceptance is durable",
+        "Persist the operation, enqueue it, then return 202 with an authorized status URL"
+      ],
+      "id": "level-06-q57"
+    },
+    {
+      "domain": "operations",
+      "type": "text",
+      "prompt": "Type the W3C header name that carries the active trace and parent span identifiers for the central API.",
+      "answer": [
+        "traceparent"
+      ],
+      "explanation": "traceparent carries the trace ID and parent span ID used to correlate the downstream span.",
+      "exhibits": [
+        {
+          "title": "Downstream HTTP headers",
+          "code": "___: 00-dddddddddddddddddddddddddddddddd-aaaaaaaaaaaaaaaa-01\naccept: application/json"
+        }
+      ],
+      "id": "level-06-q58"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "The central worker begins a completely new trace for every Service Bus delivery. Which corrected operation associates spans with the producer?",
+      "answer": "Extract propagated context from message properties and use it as a parent or span link according to messaging semantics",
+      "explanation": "Producer context belongs in transport metadata. The receiving span uses the context to link the operations across the broker.",
+      "options": [
+        "Extract propagated context from message properties and use it as a parent or span link according to messaging semantics",
+        "Derive the trace ID from message length",
+        "Put the account credential into baggage",
+        "Copy the queue lock token into the span name"
+      ],
+      "id": "level-06-q59"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The central node has 3600m allocatable CPU and 1550m in existing Pod requests. How many whole new 690m Pods can the scheduler fit using CPU alone?",
+      "answer": "2",
+      "explanation": "Subtract existing requests from allocatable CPU and divide downward by the incoming request.",
+      "options": [
+        "3",
+        "5",
+        "1",
+        "2"
+      ],
+      "id": "level-06-q60"
+    }
+  ]
+}

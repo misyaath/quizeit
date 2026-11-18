@@ -1,0 +1,1079 @@
+{
+  "id": "level-08",
+  "title": "Level 8 · Cross-service troubleshooting",
+  "difficulty": 8,
+  "questions": [
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "What fixes the immediate connectivity failure without weakening readiness checks?",
+      "answer": "Align the Service selector with the intended Pods' labels",
+      "explanation": "Healthy Pods still need to match their Service selector to receive traffic.",
+      "options": [
+        "Align the Service selector with the intended Pods' labels",
+        "Set the Service target port to the client port without checking the app",
+        "Replace readiness probes with liveness probes",
+        "Disable traffic splitting on the Container Apps gateway"
+      ],
+      "caseStudy": {
+        "title": "QuaySignals",
+        "background": "QuaySignals runs a Container Apps gateway in multiple revision mode with an AKS embedding service downstream. The next release adds an optional formatting capability behind App Configuration. The team has been asked to diagnose a failed canary without changing cluster-wide settings.\n\nThe release dashboard shows the candidate has Ready Pods but no Service endpoints. An AKS manifest was edited to use a different application label. Pgvector retrieval after the rollout uses HNSW and applies a selective site filter. It now returns fewer than the requested 20 results even though at least 100 eligible records exist.\n\nThe gateway accepts documents through Service Bus with duplicate detection enabled. Support wants components to share one trace graph without recording document contents.",
+        "exhibits": [
+          {
+            "title": "AKS rollout notes",
+            "code": "Service selector app: embed-v1\nCandidate pod label app: embed-v2\nNew Pod readiness: passed"
+          },
+          {
+            "title": "Retrieval evidence",
+            "code": "Approximate top 20 before site filter: 20\nRows returned after filter: 3\nExact filtered search: 20\n::"
+          }
+        ]
+      },
+      "id": "level-08-q01"
+    },
+    {
+      "domain": "data",
+      "type": "multi",
+      "prompt": "Which test can diagnose approximate vector candidate starvation? Select the action and its supporting safeguard.",
+      "answer": [
+        "Increase the HNSW search effort or test iterative scanning, and compare recall to exact filtered search",
+        "Keep the authorized site predicate in both the approximate and exact queries"
+      ],
+      "explanation": "Selective filtering can remove many ANN candidates. Measure recall against eligible exact results. The measurement should compare results over the same authorized corpus.",
+      "options": [
+        "Mark every site as the same tenant",
+        "Set the cosine distance threshold to zero",
+        "Increase the HNSW search effort or test iterative scanning, and compare recall to exact filtered search",
+        "Remove the site filter in production",
+        "Keep the authorized site predicate in both the approximate and exact queries"
+      ],
+      "caseStudy": {
+        "title": "QuaySignals",
+        "background": "QuaySignals runs a Container Apps gateway in multiple revision mode with an AKS embedding service downstream. The next release adds an optional formatting capability behind App Configuration. The team has been asked to diagnose a failed canary without changing cluster-wide settings.\n\nThe release dashboard shows the candidate has Ready Pods but no Service endpoints. An AKS manifest was edited to use a different application label. Pgvector retrieval after the rollout uses HNSW and applies a selective site filter. It now returns fewer than the requested 20 results even though at least 100 eligible records exist.\n\nThe gateway accepts documents through Service Bus with duplicate detection enabled. Support wants components to share one trace graph without recording document contents.",
+        "exhibits": [
+          {
+            "title": "AKS rollout notes",
+            "code": "Service selector app: embed-v1\nCandidate pod label app: embed-v2\nNew Pod readiness: passed"
+          },
+          {
+            "title": "Retrieval evidence",
+            "code": "Approximate top 20 before site filter: 20\nRows returned after filter: 3\nExact filtered search: 20\n::"
+          }
+        ]
+      },
+      "id": "level-08-q02"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "Which query/index change keeps the same cosine objective and lets pgvector use the matching index?",
+      "answer": "ORDER BY embedding <=> the query vector ascending with LIMIT, using vector_cosine_ops",
+      "explanation": "The raw cosine operator in ascending order matches the cosine operator class and indexable query shape.",
+      "options": [
+        "ORDER BY site_id only",
+        "ORDER BY 1 - (embedding <=> the query vector) ascending",
+        "ORDER BY embedding <=> the query vector ascending with LIMIT, using vector_cosine_ops",
+        "ORDER BY embedding <-> the query vector with vector_cosine_ops"
+      ],
+      "caseStudy": {
+        "title": "QuaySignals",
+        "background": "QuaySignals runs a Container Apps gateway in multiple revision mode with an AKS embedding service downstream. The next release adds an optional formatting capability behind App Configuration. The team has been asked to diagnose a failed canary without changing cluster-wide settings.\n\nThe release dashboard shows the candidate has Ready Pods but no Service endpoints. An AKS manifest was edited to use a different application label. Pgvector retrieval after the rollout uses HNSW and applies a selective site filter. It now returns fewer than the requested 20 results even though at least 100 eligible records exist.\n\nThe gateway accepts documents through Service Bus with duplicate detection enabled. Support wants components to share one trace graph without recording document contents.",
+        "exhibits": [
+          {
+            "title": "AKS rollout notes",
+            "code": "Service selector app: embed-v1\nCandidate pod label app: embed-v2\nNew Pod readiness: passed"
+          },
+          {
+            "title": "Retrieval evidence",
+            "code": "Approximate top 20 before site filter: 20\nRows returned after filter: 3\nExact filtered search: 20\n::"
+          }
+        ]
+      },
+      "id": "level-08-q03"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "Duplicate detection is enabled on an unpartitioned queue. What should retrying publishers preserve?",
+      "answer": "The original application-assigned MessageId",
+      "explanation": "Broker deduplication matches the producer's stable MessageId within the configured window.",
+      "options": [
+        "The original application-assigned MessageId",
+        "The original LockedUntil of a downstream delivery",
+        "The Unicode length of the payload",
+        "The last consumer DeliveryCount"
+      ],
+      "caseStudy": {
+        "title": "QuaySignals",
+        "background": "QuaySignals runs a Container Apps gateway in multiple revision mode with an AKS embedding service downstream. The next release adds an optional formatting capability behind App Configuration. The team has been asked to diagnose a failed canary without changing cluster-wide settings.\n\nThe release dashboard shows the candidate has Ready Pods but no Service endpoints. An AKS manifest was edited to use a different application label. Pgvector retrieval after the rollout uses HNSW and applies a selective site filter. It now returns fewer than the requested 20 results even though at least 100 eligible records exist.\n\nThe gateway accepts documents through Service Bus with duplicate detection enabled. Support wants components to share one trace graph without recording document contents.",
+        "exhibits": [
+          {
+            "title": "AKS rollout notes",
+            "code": "Service selector app: embed-v1\nCandidate pod label app: embed-v2\nNew Pod readiness: passed"
+          },
+          {
+            "title": "Retrieval evidence",
+            "code": "Approximate top 20 before site filter: 20\nRows returned after filter: 3\nExact filtered search: 20\n::"
+          }
+        ]
+      },
+      "id": "level-08-q04"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "Which telemetry design supports cross-service correlation while preserving document confidentiality?",
+      "answer": "Propagate W3C trace context and log safe operation identifiers instead of document text",
+      "explanation": "Trace propagation preserves linkage and redacted structured fields avoid exposing payloads.",
+      "options": [
+        "Use a fresh unrelated trace ID for every component",
+        "Copy secrets into the span name",
+        "Propagate W3C trace context and log safe operation identifiers instead of document text",
+        "Put document contents in baggage and capture every span attribute"
+      ],
+      "caseStudy": {
+        "title": "QuaySignals",
+        "background": "QuaySignals runs a Container Apps gateway in multiple revision mode with an AKS embedding service downstream. The next release adds an optional formatting capability behind App Configuration. The team has been asked to diagnose a failed canary without changing cluster-wide settings.\n\nThe release dashboard shows the candidate has Ready Pods but no Service endpoints. An AKS manifest was edited to use a different application label. Pgvector retrieval after the rollout uses HNSW and applies a selective site filter. It now returns fewer than the requested 20 results even though at least 100 eligible records exist.\n\nThe gateway accepts documents through Service Bus with duplicate detection enabled. Support wants components to share one trace graph without recording document contents.",
+        "exhibits": [
+          {
+            "title": "AKS rollout notes",
+            "code": "Service selector app: embed-v1\nCandidate pod label app: embed-v2\nNew Pod readiness: passed"
+          },
+          {
+            "title": "Retrieval evidence",
+            "code": "Approximate top 20 before site filter: 20\nRows returned after filter: 3\nExact filtered search: 20\n::"
+          }
+        ]
+      },
+      "id": "level-08-q05"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "The north store must accept 384-dimensional embeddings, while the old table contains 768-dimensional vectors. Which change preserves rollback?",
+      "answer": "Backfill a versioned vector(384) column or table and pair it with the new encoder",
+      "explanation": "An index must match the encoder dimension and embedding space. Versioned storage keeps the prior model and data available.",
+      "options": [
+        "Backfill a versioned vector(384) column or table and pair it with the new encoder",
+        "Pad and compare representations from both model spaces without validation",
+        "Write the new vectors directly to vector(768)",
+        "Convert vectors to a shared integer and sort by the integer"
+      ],
+      "id": "level-08-q06"
+    },
+    {
+      "domain": "data",
+      "type": "multi",
+      "prompt": "The north service has 175 available database connections including all simultaneously active workloads. It may run 11 replicas. Which two controls avoid connection saturation and help confirm operating headroom?",
+      "answer": [
+        "Cap each replica pool at 15 or fewer connections",
+        "Measure peak pool wait time and active connections during scale-out"
+      ],
+      "explanation": "Pool caps protect the shared database. Peak observed connections and wait time show contention under surge conditions.",
+      "options": [
+        "Measure peak pool wait time and active connections during scale-out",
+        "Open a separate connection for every query and disable pooling",
+        "Measure vector dimensions only",
+        "Allow at least 16 connections in every pool",
+        "Cap each replica pool at 15 or fewer connections"
+      ],
+      "id": "level-08-q07"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "A platform uses an ACR configured with repository-scoped ABAC permissions. An AKS kubelet identity still has registry-wide AcrPull but receives a registry authorization failure on the approved repository. What should the platform check?",
+      "answer": "Grant Container Registry Repository Reader covering the repository to the kubelet identity",
+      "explanation": "Repository ABAC mode uses repository permissions. Image pulls are performed by the kubelet identity, separate from in-Pod identities.",
+      "options": [
+        "Add a Kubernetes NetworkPolicy allowing public DNS and assume identity is fixed",
+        "Grant Container Registry Repository Reader covering the repository to the kubelet identity",
+        "Add Microsoft Entra Workload ID labels to the application Pod only",
+        "Use ACR Contributor on an unrelated registry"
+      ],
+      "id": "level-08-q08"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "Which KQL aggregation calculates the 90th percentile of request latency grouped by Name for the north deployment?",
+      "answer": "summarize Tail = percentile(DurationMs, 90) by Name",
+      "explanation": "percentile aggregates a requested quantile over each group. Multiplying individual durations does not calculate a percentile.",
+      "options": [
+        "summarize Tail = percentile(DurationMs, 90) by Name",
+        "summarize Tail = avg(DurationMs) by Name",
+        "extend Tail = DurationMs * 0.9",
+        "summarize Tail = max(DurationMs) by Name"
+      ],
+      "id": "level-08-q09"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "The north sender retried within the broker duplicate detection window. Which message property must stay unchanged on an unpartitioned queue?",
+      "answer": "message_id",
+      "explanation": "Duplicate detection uses the application-assigned MessageId. Sequence numbers and delivery counts are set by the broker.",
+      "options": [
+        "locked_until_utc",
+        "delivery_count",
+        "message_id",
+        "sequence_number"
+      ],
+      "exhibits": [
+        {
+          "title": "Service Bus retry (Python)",
+          "code": "new_msg = ServiceBusMessage(body, message_id=f\"north:{operation_id}\")\nsender.send_messages(new_msg)"
+        }
+      ],
+      "id": "level-08-q10"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "The Azure Managed Redis cache for north stores per-tenant answers. Which cache key is sufficient when changing model generations?",
+      "answer": "north:<verified-tenant>:<model-generation>:<query-hash>",
+      "explanation": "Tenant scope and model generation are both retrieval inputs and must participate in cache identity.",
+      "options": [
+        "north:<verified-tenant>:<query-hash>",
+        "north:<verified-tenant>:<model-generation>:<query-hash>",
+        "north:<model-generation>:<query-hash>",
+        "north:<query-hash>"
+      ],
+      "id": "level-08-q11"
+    },
+    {
+      "domain": "containers",
+      "type": "text",
+      "prompt": "The north container listens on the port printed below. Enter the numeric Container Apps ingress targetPort.",
+      "answer": [
+        "8008"
+      ],
+      "explanation": "Ingress forwards to the internal listening port, regardless of the public HTTPS port.",
+      "exhibits": [
+        {
+          "title": "Server startup log",
+          "code": "INFO: Listening on 0.0.0.0:8008\nINFO: External endpoint uses HTTPS"
+        }
+      ],
+      "id": "level-08-q12"
+    },
+    {
+      "domain": "integration",
+      "type": "text",
+      "prompt": "Enter the Python Azure Functions v2 decorator name, without @app. or parentheses, for the north HTTP endpoint.",
+      "answer": [
+        "route"
+      ],
+      "explanation": "The route decorator configures the HTTP route and trigger.",
+      "exhibits": [
+        {
+          "title": "Function fragment (Python)",
+          "code": "@app.___(route=\"north/jobs\", methods=[\"POST\"])\ndef submit(req):\n    return accept(req)"
+        }
+      ],
+      "id": "level-08-q13"
+    },
+    {
+      "domain": "data",
+      "type": "match",
+      "prompt": "Match the three distinct Redis requirements at north.",
+      "answer": [
+        "SET key value EX 150",
+        "DEL key",
+        "TTL key"
+      ],
+      "explanation": "EX sets expiration with the write, DEL invalidates the key, and TTL reports the remaining time.",
+      "labels": [
+        "Write a reply that expires after 150 seconds",
+        "Invalidate a reply immediately following an update",
+        "Inspect the remaining lifetime in seconds"
+      ],
+      "id": "level-08-q14"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "Two Event Grid subscriptions deliver operational and billing events to the same endpoint. A backend processes them with different idempotency policies. How should it disambiguate the events?",
+      "answer": "Route by the actual event type or configured subscription context, then use an idempotency scope matching the intended side effect",
+      "explanation": "Routing and idempotency are separate. Each intended side effect must distinguish its operation from other handlers.",
+      "options": [
+        "Assume Event Grid always sends same-type events to an endpoint in publish order",
+        "Use a global boolean set after the endpoint's first successful request",
+        "Use the HTTP retry attempt number as the integration identity",
+        "Route by the actual event type or configured subscription context, then use an idempotency scope matching the intended side effect"
+      ],
+      "id": "level-08-q15"
+    },
+    {
+      "domain": "operations",
+      "type": "multi",
+      "prompt": "The north canary has a slower p95 but migration traffic mixes different request types. Which two analysis changes help isolate the regression?",
+      "answer": [
+        "Group the latency percentile by revision and request operation",
+        "Examine dependency spans for the affected operations and revisions"
+      ],
+      "explanation": "Keep like-for-like cohorts, then inspect downstream contributions to the observed request time.",
+      "options": [
+        "Group the latency percentile by revision and request operation",
+        "Discard failures before identifying affected operations",
+        "Examine dependency spans for the affected operations and revisions",
+        "Select the maximum latency sample from unrelated services",
+        "Compare a single application-wide mean"
+      ],
+      "id": "level-08-q16"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "The north updates must be processed in order for each document while unrelated documents process concurrently. What should the producer put into SessionId?",
+      "answer": "The verified tenant and stable document ID together",
+      "explanation": "Session keys group related work. A single global key over-serializes the independent documents.",
+      "options": [
+        "The verified tenant and stable document ID together",
+        "The retry counter",
+        "A random identifier created for each send",
+        "The same global value for all tenants and documents"
+      ],
+      "exhibits": [
+        {
+          "title": "Service Bus sender (Python)",
+          "code": "msg = ServiceBusMessage(body, message_id=operation_id, session_id=___)\n# Queue is session-enabled for tenant north"
+        }
+      ],
+      "id": "level-08-q17"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "Each north batch has 142 Cosmos reads that cost 10 RU each. What total RU charge should be expected if all reads complete once?",
+      "answer": "1420",
+      "explanation": "Multiply the count by the RU charge per operation. Retry overhead is excluded.",
+      "options": [
+        "1562",
+        "142",
+        "10",
+        "1420"
+      ],
+      "exhibits": [
+        {
+          "title": "Cosmos logs",
+          "code": "completedReads=142\nx-ms-request-charge per read=10"
+        }
+      ],
+      "id": "level-08-q18"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "The north operation needs to reprocess a permanently failed message after fixing upstream data. Which sequence avoids losing the original on a failed send?",
+      "answer": "Receive from the dead-letter subqueue, send a corrected message, confirm acceptance, then complete the original",
+      "explanation": "Keep the dead-letter delivery until the corrected copy is accepted. Account for duplicate detection when replaying.",
+      "options": [
+        "Receive from the dead-letter subqueue, send a corrected message, confirm acceptance, then complete the original",
+        "Complete the original, then attempt to send a corrected copy",
+        "Use ReceiveAndDelete on the dead-letter subqueue before validating the data",
+        "Send a fresh unrelated payload and reset the queue"
+      ],
+      "id": "level-08-q19"
+    },
+    {
+      "domain": "operations",
+      "type": "text",
+      "prompt": "Type the W3C header name that carries the active trace and parent span identifiers for the north API.",
+      "answer": [
+        "traceparent"
+      ],
+      "explanation": "traceparent carries the trace ID and parent span ID used to correlate the downstream span.",
+      "exhibits": [
+        {
+          "title": "Downstream HTTP headers",
+          "code": "___: 00-dddddddddddddddddddddddddddddddd-aaaaaaaaaaaaaaaa-01\naccept: application/json"
+        }
+      ],
+      "id": "level-08-q20"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "An Event Grid subscription should allow only north.DocumentAccepted events with subjects under /tenant/north/. Which configuration expresses both constraints?",
+      "answer": "Include event type north.DocumentAccepted and set subjectBeginsWith to /tenant/north/",
+      "explanation": "Event-type selection and a subject prefix address separate constraints. Include the ending slash to avoid adjacent prefix matches.",
+      "options": [
+        "Include event type north.DocumentAccepted and set subjectBeginsWith to /tenant/north/",
+        "Use a subscription filter on delivery attempt only",
+        "Use subjectEndsWith /tenant/north/ without an event-type filter",
+        "Include event type north.DocumentAccepted and remove subject filtering"
+      ],
+      "id": "level-08-q21"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "The north security team needs to investigate failures without storing raw document text or bearer tokens. What should be exported?",
+      "answer": "Sanitized error categories and stable operation identifiers with approved allowlisted attributes",
+      "explanation": "Redact secrets before export and use correlation identifiers to preserve incident context.",
+      "options": [
+        "Raw credentials in a separate logging table keyed by operation",
+        "Headers and prompt text in span attributes",
+        "Entire input and unchanged exception fields for every failure",
+        "Sanitized error categories and stable operation identifiers with approved allowlisted attributes"
+      ],
+      "id": "level-08-q22"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "The north Cosmos transport gets HTTP 429. What minimum timing should its first custom retry honor before retrying?",
+      "answer": "Wait at least 1200 ms as indicated by the service",
+      "explanation": "x-ms-retry-after-ms reports milliseconds. Use this hint with bounded retry behavior.",
+      "options": [
+        "Wait 1.2 ms",
+        "Wait at least 1200 ms as indicated by the service",
+        "Retry only after changing the consistency level",
+        "Retry immediately on another client"
+      ],
+      "exhibits": [
+        {
+          "title": "Response headers",
+          "code": "HTTP/1.1 429 Too Many Requests\nx-ms-retry-after-ms: 1200"
+        }
+      ],
+      "id": "level-08-q23"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "A change feed writes embedding version 8, then a retry tries to write version 7. PostgreSQL has a unique key per tenant and document. Which upsert clause rejects the stale write atomically?",
+      "answer": "WHERE stored.version < EXCLUDED.version in the ON CONFLICT DO UPDATE clause",
+      "explanation": "The database evaluates the version predicate as part of the conflict update, closing a separate read-then-write race.",
+      "options": [
+        "Use INSERT without ON CONFLICT and retry every unique violation",
+        "WHERE stored.version < EXCLUDED.version in the ON CONFLICT DO UPDATE clause",
+        "WHERE stored.version > EXCLUDED.version",
+        "Always overwrite the existing version after a duplicate key"
+      ],
+      "exhibits": [
+        {
+          "title": "PostgreSQL UPSERT fragment",
+          "code": "INSERT INTO embeddings AS stored (tenant_id, doc_id, version, embedding)\nVALUES ($1, $2, $3, $4)\nON CONFLICT (tenant_id, doc_id) DO UPDATE\nSET version = EXCLUDED.version, embedding = EXCLUDED.embedding\n____;"
+        }
+      ],
+      "id": "level-08-q24"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The north Pod reports Running, not Ready; readiness HTTP 503. Which first move tests the most specific failure cause?",
+      "answer": "Inspect readiness endpoint dependencies",
+      "explanation": "The process can run while refusing traffic until its prerequisites are ready.",
+      "options": [
+        "Disable all health checks for healthy peers",
+        "Inspect readiness endpoint dependencies",
+        "Change the application load-balancer DNS name",
+        "Change the Docker tag without inspecting Pod events"
+      ],
+      "exhibits": [
+        {
+          "title": "AKS status",
+          "code": "Container state: Running, not Ready; readiness HTTP 503\nCheck requested for deployment/north-api"
+        }
+      ],
+      "id": "level-08-q25"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "Complete the KQL filter to restrict the north view to requests from the preceding 12 minutes.",
+      "answer": "where TimeGenerated >= ago(12m)",
+      "explanation": "ago() yields a timestamp. Keep events at or after that time using where.",
+      "options": [
+        "where TimeGenerated == ago(12m)",
+        "where TimeGenerated <= ago(12m)",
+        "project TimeGenerated >= ago(12m)",
+        "where TimeGenerated >= ago(12m)"
+      ],
+      "exhibits": [
+        {
+          "title": "Request query (KQL)",
+          "code": "AppRequests\n| ____\n| where AppRoleName == \"north-api\""
+        }
+      ],
+      "id": "level-08-q26"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "The deployed north Function tries to resolve the connection named in the decorator. Which location provides the deployed setting?",
+      "answer": "The Function App application settings using the configured connection name or identity-based prefix",
+      "explanation": "The hosted process receives application settings from the Function App. Local settings only apply during local execution.",
+      "options": [
+        "The developer workstation local.settings.json without publishing settings",
+        "The Service Bus message body",
+        "The Function App application settings using the configured connection name or identity-based prefix",
+        "The SQL schema of the function result"
+      ],
+      "exhibits": [
+        {
+          "title": "Worker function (Python)",
+          "code": "@app.service_bus_queue_trigger(arg_name=\"msg\", queue_name=\"north-jobs\", connection=\"JobBus\")\ndef work(msg):\n    handle(msg)"
+        }
+      ],
+      "id": "level-08-q27"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "A canary incident dashboard joins on OperationId across arbitrary dates and millions of dependencies. What change reduces scanning and keeps trace correlation meaningful?",
+      "answer": "Filter both inputs to the incident interval and aggregate relevant dependencies before joining on OperationId",
+      "explanation": "Time filters shrink both inputs. Aggregation controls duplication while the operation key preserves causal linkage.",
+      "options": [
+        "Filter only after computing the full join",
+        "Remove the join key and compare each request to the entire dependency table",
+        "Filter both inputs to the incident interval and aggregate relevant dependencies before joining on OperationId",
+        "Replace correlation with a random sample of arbitrary database traces"
+      ],
+      "id": "level-08-q28"
+    },
+    {
+      "domain": "operations",
+      "type": "order",
+      "prompt": "Order the north database credential rotation so existing calls can continue while the app switches. The database supports overlapping credentials.",
+      "answer": [
+        "Create the replacement credential and publish a new secret version",
+        "Refresh the app and have it fetch the replacement",
+        "Verify authenticated requests on the new credential",
+        "Revoke the previous credential"
+      ],
+      "explanation": "Keep overlap until verifying that clients can authenticate with the replacement.",
+      "id": "level-08-q29"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "The north PostgreSQL query ranks using Euclidean distance. Which HNSW operator class supports the shown operator?",
+      "answer": "vector_l2_ops",
+      "explanation": "The HNSW operator class must match the ranking operator. Cosine uses <=>, Euclidean uses <->, and negative inner product uses <#>.",
+      "options": [
+        "vector_ip_ops",
+        "vector_l2_ops",
+        "text_pattern_ops",
+        "vector_cosine_ops"
+      ],
+      "exhibits": [
+        {
+          "title": "pgvector query",
+          "code": "SELECT id FROM chunks\nWHERE tenant_id = $2\nORDER BY embedding <-> $1\nLIMIT 13;"
+        }
+      ],
+      "id": "level-08-q30"
+    },
+    {
+      "domain": "data",
+      "type": "order",
+      "prompt": "Order the retrieval path for the north assistant after the caller submits a query. Resolve scope before contacting the data tier.",
+      "answer": [
+        "Determine the verified tenant and retrieval generation",
+        "Embed the question using the selected generation encoder",
+        "Retrieve up to 13 nearest eligible rows with metadata predicates",
+        "Supply only eligible chunks and their provenance to generation"
+      ],
+      "explanation": "The retrieval scope must be established before retrieving data, and the query vector must match the index.",
+      "id": "level-08-q31"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The north Deployment creates Ready Pods, but the Kubernetes Service selects no Pods. Which exact selector must the Service use?",
+      "answer": "app: retrieve-north",
+      "explanation": "A Service uses a flat map under spec.selector and matches actual Pod labels.",
+      "options": [
+        "matchLabels: retrieve",
+        "app: search-north",
+        "app: retrieve-north",
+        "port: 8080"
+      ],
+      "exhibits": [
+        {
+          "title": "Service and Deployment excerpts",
+          "code": "# Service\nspec:\n  selector: {app: search-north}\n# Deployment template\nmetadata:\n  labels: {app: retrieve-north}"
+        }
+      ],
+      "id": "level-08-q32"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "Which query operation keeps every failed north request, including failures whose dependency telemetry was sampled out?",
+      "answer": "Join with kind=leftouter on OperationId with failed AppRequests on the left",
+      "explanation": "A leftouter join keeps unmatched request rows while enriching matched rows.",
+      "options": [
+        "Join with kind=inner on OperationId",
+        "Join with kind=leftanti to keep everything",
+        "Filter dependency rows by matching HTTP status with no operation identity",
+        "Join with kind=leftouter on OperationId with failed AppRequests on the left"
+      ],
+      "exhibits": [
+        {
+          "title": "KQL input",
+          "code": "let Failures = AppRequests | where AppRoleName == \"north-api\" and Success == false;\nFailures\n| join kind=___ (AppDependencies) on OperationId"
+        }
+      ],
+      "id": "level-08-q33"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "What failure can occur when the north worker runs this code and exits at the marked line?",
+      "answer": "The message is removed even though the database update has not happened",
+      "explanation": "The code settles the message before doing its work. Move completion after the durable, idempotent result.",
+      "options": [
+        "A permanently invalid message goes to the DLQ automatically before completion",
+        "The message is removed even though the database update has not happened",
+        "The successful database write is automatically rolled back by Service Bus",
+        "A duplicate is guaranteed because the lock was renewed"
+      ],
+      "exhibits": [
+        {
+          "title": "PeekLock worker (Python)",
+          "code": "receiver.complete_message(message)\n# Process exits here.\nwrite_result(\"north\", message)"
+        }
+      ],
+      "id": "level-08-q34"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The north initializer needs 90 seconds. Using a simplified startup budget of periodSeconds × failureThreshold, which threshold is the smallest that provides at least one full additional probe period beyond initialization?",
+      "answer": "10",
+      "explanation": "Round up (90 + 10)/10. This is a simplified sizing estimate. Actual probes should also allow for observed variance.",
+      "options": [
+        "9",
+        "14",
+        "10",
+        "12"
+      ],
+      "exhibits": [
+        {
+          "title": "Deployment probe fragment",
+          "code": "startupProbe:\n  httpGet: {path: /started, port: 8080}\n  periodSeconds: 10\n  failureThreshold: ___"
+        }
+      ],
+      "id": "level-08-q35"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "The north Event Grid function receives document version 11 followed by version 10. What should the durable update predicate enforce?",
+      "answer": "Only apply an event whose version is strictly newer than the stored document version",
+      "explanation": "Idempotency protects duplicates, while monotonic version checks protect against distinct events arriving out of order.",
+      "options": [
+        "Always overwrite with the most recently delivered event",
+        "Compare only whether the event IDs differ",
+        "Use the delivery retry count to choose the newest document",
+        "Only apply an event whose version is strictly newer than the stored document version"
+      ],
+      "id": "level-08-q36"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The north worker scales from zero. Its queue backlog may grow during periods without HTTP traffic. Which configuration follows the backlog?",
+      "answer": "Use a Service Bus KEDA scale rule with minReplicas 0",
+      "explanation": "A queue scaler can observe the broker while the container has zero replicas. A CPU rule cannot measure a nonexistent replica.",
+      "options": [
+        "Use a Service Bus KEDA scale rule with minReplicas 0",
+        "Use an HTTP rule with concurrentRequests 1",
+        "Use a CPU utilization rule without a queue trigger",
+        "Increase maxReplicas without setting an event-driven rule"
+      ],
+      "id": "level-08-q37"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "During a canary, the newest revision has a different environment variable and is Healthy. Existing client requests must remain on stable until a scheduled time, but QA needs a persistent test address for the candidate. What should the operator configure?",
+      "answer": "Keep stable at 100% weight and assign the candidate a revision label that QA can use",
+      "explanation": "An active labeled revision can be reached using its label URL, independently of its weighted share of normal traffic.",
+      "options": [
+        "Run the candidate as a different image tag in ACR without a revision",
+        "Keep stable at 100% weight and assign the candidate a revision label that QA can use",
+        "Give the latest revision 100% and preserve stable's label as the public endpoint",
+        "Deactivate the candidate and give it a label while it is inactive"
+      ],
+      "id": "level-08-q38"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "The north enqueue handler completes in 180 ms, but a worker takes minutes. Which HTTP contract preserves tracked asynchronous work?",
+      "answer": "Persist the operation, enqueue it, then return 202 with an authorized status URL",
+      "explanation": "A 202 response can carry polling metadata after durable acceptance. The caller can track completion without holding a request open.",
+      "options": [
+        "Persist the operation, enqueue it, then return 202 with an authorized status URL",
+        "Return a success response before job acceptance is durable",
+        "Wait synchronously for the full worker execution",
+        "Return 200 and discard operation state"
+      ],
+      "id": "level-08-q39"
+    },
+    {
+      "domain": "integration",
+      "type": "multi",
+      "prompt": "The north Function uses identity-based delivery from one queue. Which two requirements let it process while supporting clean retries?",
+      "answer": [
+        "Grant the Function identity Azure Service Bus Data Receiver on the applicable resource",
+        "Make the durable result idempotent using the stable operation key"
+      ],
+      "explanation": "The Service Bus receiver needs receive permission, and idempotency protects the durable side effect across redelivery.",
+      "options": [
+        "Make the durable result idempotent using the stable operation key",
+        "Grant the identity Data Sender alone",
+        "Generate a fresh business key on every delivery",
+        "Grant the Function identity Azure Service Bus Data Receiver on the applicable resource",
+        "Treat temporary broker retries as permanently invalid data"
+      ],
+      "id": "level-08-q40"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "In Azure App Configuration, the model and threshold for north must be refreshed together on reading a sentinel. Which publishing order fits?",
+      "answer": "Update all dependent values, then update the sentinel",
+      "explanation": "Write the sentinel after publishing the dependent keys so a refresh sees the complete intended set.",
+      "options": [
+        "Update all dependent values, then update the sentinel",
+        "Update the sentinel first, then write values independently",
+        "Republish an unchanged sentinel before each individual key write",
+        "Use the production values under the staging label"
+      ],
+      "exhibits": [
+        {
+          "title": "App Configuration change set",
+          "code": "Key: retrieval:model, Label: north\nKey: retrieval:threshold, Label: north\nKey: retrieval:sentinel, Label: north"
+        }
+      ],
+      "id": "level-08-q41"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "The incident report must compare canary and baseline failure rates when there are multiple instances and unequal traffic. Which query calculation produces a rate per revision?",
+      "answer": "Group by revision and divide sum of failure counts by total requests in each revision",
+      "explanation": "Group-level rates require a numerator and denominator from the same filtered population. Equal weighting over instances can bias the result.",
+      "options": [
+        "Average each instance's failure percentage without accounting for volume",
+        "Group by revision and divide sum of failure counts by total requests in each revision",
+        "Compare total failed request counts directly",
+        "Take the ratio of the fastest request to the slowest request"
+      ],
+      "id": "level-08-q42"
+    },
+    {
+      "domain": "data",
+      "type": "text",
+      "prompt": "Type the Redis SET option used in the north command to express a 150-second expiry.",
+      "answer": [
+        "EX"
+      ],
+      "explanation": "SET with EX attaches an expiration in seconds as part of the value write.",
+      "exhibits": [
+        {
+          "title": "Redis command",
+          "code": "SET north:summary result ____ 150"
+        }
+      ],
+      "id": "level-08-q43"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "For the north event consumer, what should the deduplication key contain under CloudEvents if two publishers can generate the same id?",
+      "answer": "Both source and id",
+      "explanation": "CloudEvents treats the source and id combination as unique for distinct events.",
+      "options": [
+        "Only the delivery count",
+        "Both source and id",
+        "Only id across all sources",
+        "Only specversion and time"
+      ],
+      "exhibits": [
+        {
+          "title": "Event pair (JSON lines)",
+          "code": "{\"id\":\"10\",\"source\":\"/sites/north/api\"}\n{\"id\":\"10\",\"source\":\"/sites/north/backfill\"}"
+        }
+      ],
+      "id": "level-08-q44"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The north candidate consumes 500 MiB at startup and spikes by another 160 MiB during batch processing. Using these measured values only, what minimum limit in MiB covers the combined peak?",
+      "answer": "660",
+      "explanation": "The startup allocation remains resident during the batch. Add the incremental peak before setting a real production safety margin.",
+      "options": [
+        "564",
+        "660",
+        "500",
+        "1000"
+      ],
+      "exhibits": [
+        {
+          "title": "Observed Pod status",
+          "code": "Last State: Terminated\nReason: OOMKilled\nConfigured limit: 564Mi"
+        }
+      ],
+      "id": "level-08-q45"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "The north Cosmos Python handler has a document ID and tenant. Which SDK call performs a point read?",
+      "answer": "container.read_item(item=\"north-8\", partition_key=\"north\")",
+      "explanation": "A Cosmos point read uses the id and logical partition key, and avoids query fan-out.",
+      "options": [
+        "container.read_item(item=\"north\", partition_key=\"north-8\")",
+        "container.read()",
+        "container.query_items(\"SELECT * FROM c WHERE c.id = 'north-8'\", enable_cross_partition_query=True)",
+        "container.read_item(item=\"north-8\", partition_key=\"north\")"
+      ],
+      "exhibits": [
+        {
+          "title": "Stored document",
+          "code": "{\"id\": \"north-8\", \"customerId\": \"north\", \"status\": \"ready\"}"
+        }
+      ],
+      "id": "level-08-q46"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "The north app must pick up current secret versions on future fetches. Which Key Vault call avoids pinning a specific version?",
+      "answer": "client.get_secret(\"north-db-password\")",
+      "explanation": "A versionless get resolves the current version. The application must still perform its next fetch according to its cache policy.",
+      "options": [
+        "client.list_properties_of_secrets()",
+        "client.get_secret(\"north-db-password\")",
+        "client.get_secret(\"north-db-password\", version=\"old-version\")",
+        "client.get_deleted_secret(\"db-password\")"
+      ],
+      "exhibits": [
+        {
+          "title": "SecretClient call (Python)",
+          "code": "client = SecretClient(vault_url=vault_url, credential=credential)\nsecret = ____"
+        }
+      ],
+      "id": "level-08-q47"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The north Docker image builder installs dependencies again after every application-only edit. Which Dockerfile edit fixes that without bundling build tools?",
+      "answer": "Copy dependency metadata before application code and install the dependencies in a build stage",
+      "explanation": "Docker invalidates layers downstream of a changed COPY. Separate stable dependency inputs and use a runtime stage for the output.",
+      "options": [
+        "Move the application COPY below CMD but keep it before dependency installation",
+        "Copy dependency metadata before application code and install the dependencies in a build stage",
+        "Install build tools in the final stage at process startup",
+        "Copy the entire repository before dependency installation"
+      ],
+      "exhibits": [
+        {
+          "title": "Current Dockerfile",
+          "code": "FROM python:3.12-slim\nWORKDIR /app\nCOPY . .\nRUN pip wheel -r requirements.txt -w /wheels"
+        }
+      ],
+      "id": "level-08-q48"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "The north chart requires failed requests counted per 12 minutes by service role. Which query aggregation builds buckets and counts rows?",
+      "answer": "summarize Failures=count() by AppRoleName, bin(TimeGenerated, 12m)",
+      "explanation": "Group by role and binned timestamps. Grouping by raw timestamps or role only omits the requested interval grouping.",
+      "options": [
+        "summarize Failures=count() by AppRoleName",
+        "summarize Failures=count() by AppRoleName, TimeGenerated",
+        "project AppRoleName, bin(TimeGenerated, 12m)",
+        "summarize Failures=count() by AppRoleName, bin(TimeGenerated, 12m)"
+      ],
+      "id": "level-08-q49"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The north deployment has 226 usable database connections, 11 steady replicas and maxSurge 3. What is the maximum equal per-Pod connection pool size that respects the rollout budget?",
+      "answer": "16",
+      "explanation": "During rollout up to replicas plus surge Pods can coexist. Divide the usable connections by that maximum and round down.",
+      "options": [
+        "16",
+        "20",
+        "17",
+        "15"
+      ],
+      "exhibits": [
+        {
+          "title": "Deployment excerpts",
+          "code": "replicas: 11\nstrategy:\n  rollingUpdate:\n    maxSurge: 3\n    maxUnavailable: 0"
+        }
+      ],
+      "id": "level-08-q50"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "Which OpenTelemetry resource attribute identifies the logical north service independently of the request operation name?",
+      "answer": "service.name",
+      "explanation": "service.name groups instances of the same logical service. service.instance.id identifies an individual instance.",
+      "options": [
+        "service.name",
+        "service.instance.id",
+        "http.request.method",
+        "server.address"
+      ],
+      "exhibits": [
+        {
+          "title": "OpenTelemetry resource attributes",
+          "code": "{\"___\": \"north-retrieval-api\", \"deployment.environment.name\": \"production\"}"
+        }
+      ],
+      "id": "level-08-q51"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The north process is running but should receive traffic only after /internal/readiness succeeds. Which probe should own that endpoint?",
+      "answer": "readinessProbe",
+      "explanation": "Readiness is evaluated after startup and controls whether Pods are available for Service traffic.",
+      "options": [
+        "startupProbe only",
+        "livenessProbe",
+        "readinessProbe",
+        "a service selector"
+      ],
+      "exhibits": [
+        {
+          "title": "Endpoint behavior",
+          "code": "GET /internal/readiness → 503 until query encoder and dependencies are available\nGET /live → 200 while process can run"
+        }
+      ],
+      "id": "level-08-q52"
+    },
+    {
+      "domain": "integration",
+      "type": "order",
+      "prompt": "Arrange the successful north PeekLock path so a fault after the database write leaves the operation safe to replay.",
+      "answer": [
+        "Receive and lock the message",
+        "Validate the payload and derive the stable operation key",
+        "Commit the idempotent business result",
+        "Complete the broker delivery"
+      ],
+      "explanation": "Acknowledgment follows a durable idempotent write, preserving retry safety.",
+      "id": "level-08-q53"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "The north change feed processor is being scaled to 9 instances with a shared processor identity. Which state enables partition ownership and checkpointing?",
+      "answer": "The lease container shared by these processor instances",
+      "explanation": "A shared lease container coordinates assignment and preserves progress across instances.",
+      "options": [
+        "The vector query continuation token reused as a lock",
+        "The lease container shared by these processor instances",
+        "The cluster node hostname in each document",
+        "A separate new lease container per instance"
+      ],
+      "id": "level-08-q54"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The north node has 4000m allocatable CPU and 1700m in existing Pod requests. How many whole new 770m Pods can the scheduler fit using CPU alone?",
+      "answer": "2",
+      "explanation": "Subtract existing requests from allocatable CPU and divide downward by the incoming request.",
+      "options": [
+        "5",
+        "2",
+        "3",
+        "1"
+      ],
+      "id": "level-08-q55"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The north release must survive image tag reassignment. Which image reference pins the staging artifact?",
+      "answer": "acr.azurecr.io/retrieval@sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "explanation": "A manifest digest identifies immutable content. Tags resolve to whatever digest they currently reference.",
+      "options": [
+        "acr.azurecr.io/retrieval:stable",
+        "acr.azurecr.io/retrieval",
+        "acr.azurecr.io/retrieval@sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "acr.azurecr.io/retrieval:latest"
+      ],
+      "exhibits": [
+        {
+          "title": "Artifact to promote",
+          "code": "tag: candidate-8\nmanifestDigest: sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        }
+      ],
+      "id": "level-08-q56"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "The north approximate index returned 11 authorized results while exact filtered search returned 13. Which experiment can improve recall without weakening the filter?",
+      "answer": "Increase HNSW candidate effort and compare approximate results to exact search under the same predicate",
+      "explanation": "Candidate tuning can improve filtered recall. Exact results from the same permitted corpus provide an appropriate reference.",
+      "options": [
+        "Remove the tenant predicate when the first search falls short",
+        "Increase HNSW candidate effort and compare approximate results to exact search under the same predicate",
+        "Compare approximate recall against an unfiltered query",
+        "Evaluate only p95 latency and ignore result quality"
+      ],
+      "id": "level-08-q57"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "The team replaces the embedding index while preserving reads during backfill. The database contains 200,000 writable rows. What rollout keeps the search and source update paths consistent?",
+      "answer": "Backfill a versioned index, make live writes update the new version, validate, then switch readers through a controlled cutover",
+      "explanation": "Backfill plus coverage for ongoing writes avoids a synchronization gap. A versioned cutover retains rollback.",
+      "options": [
+        "Update the existing index in place and change the encoder before validation",
+        "Export a single vector ranking and treat it as valid for both models",
+        "Switch readers to the empty candidate and rewrite old records from their summaries",
+        "Backfill a versioned index, make live writes update the new version, validate, then switch readers through a controlled cutover"
+      ],
+      "id": "level-08-q58"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "The north worker begins a completely new trace for every Service Bus delivery. Which corrected operation associates spans with the producer?",
+      "answer": "Extract propagated context from message properties and use it as a parent or span link according to messaging semantics",
+      "explanation": "Producer context belongs in transport metadata. The receiving span uses the context to link the operations across the broker.",
+      "options": [
+        "Extract propagated context from message properties and use it as a parent or span link according to messaging semantics",
+        "Put the account credential into baggage",
+        "Derive the trace ID from message length",
+        "Copy the queue lock token into the span name"
+      ],
+      "id": "level-08-q59"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "Cosmos DB commits a new document, then the API exits before publishing a Service Bus message. Which design ensures a retryable publication signal without an unsafe dual-write assumption?",
+      "answer": "Record the document and an outbox item under the same Cosmos logical partition in a transactional batch, then publish via change feed with stable IDs",
+      "explanation": "Cosmos transactional batches are atomic within a logical partition. A change-feed publisher can retry durable outbox records.",
+      "options": [
+        "Use separate logical partitions and assume Cosmos transactions span both",
+        "Write the document and publish separately, treating the first success as proof of both",
+        "Dispatch the message first and assume subscribers can always find the document",
+        "Record the document and an outbox item under the same Cosmos logical partition in a transactional batch, then publish via change feed with stable IDs"
+      ],
+      "id": "level-08-q60"
+    }
+  ]
+}

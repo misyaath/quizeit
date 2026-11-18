@@ -1,0 +1,320 @@
+{
+  "id": "bonus",
+  "title": "Bonus drill",
+  "questions": [
+    {
+      "id": "containers-14",
+      "domain": "containers",
+      "type": "single",
+      "prompt": "A Container App with HTTP ingress has cold-start delays and must always keep one replica available. What should be set?",
+      "explanation": "A nonzero minimum keeps at least the configured desired replica count provisioned and reduces scale-from-zero latency.",
+      "options": [
+        "The traffic weight to one percent",
+        "The maximum replica count to zero",
+        "The minimum replica count to one",
+        "The readiness failure threshold to one"
+      ],
+      "answer": "The minimum replica count to one"
+    },
+    {
+      "id": "data-20",
+      "domain": "data",
+      "type": "single",
+      "prompt": "A pgvector HNSW search misses relevant neighbors. The team can trade higher query latency for better recall. Which query setting should it test increasing?",
+      "explanation": "A larger ef_search expands the HNSW search candidate list and can improve recall at additional query cost.",
+      "options": [
+        "idle_in_transaction_session_timeout",
+        "log_min_duration_statement",
+        "work_mem set to zero",
+        "hnsw.ef_search"
+      ],
+      "answer": "hnsw.ef_search"
+    },
+    {
+      "id": "integration-18",
+      "domain": "integration",
+      "type": "single",
+      "prompt": "A producer publishes custom CloudEvents to Event Grid. Which pair identifies an event instance in the CloudEvents model?",
+      "explanation": "The combination of source and id identifies a distinct event. Consumers can use it for deduplication.",
+      "options": [
+        "type and datacontenttype",
+        "specversion and subject",
+        "source and id",
+        "subject and time"
+      ],
+      "answer": "source and id"
+    },
+    {
+      "id": "operations-19",
+      "domain": "operations",
+      "type": "single",
+      "prompt": "An engineer wants to see how one request traverses the API, queue consumer, and database call. Which telemetry signal is designed for this?",
+      "explanation": "A trace relates spans representing individual operations across service boundaries and their timings.",
+      "options": [
+        "Distributed traces",
+        "A Key Vault secret list",
+        "A scheduled image build report",
+        "A single global request count"
+      ],
+      "answer": "Distributed traces"
+    },
+    {
+      "id": "operations-43",
+      "domain": "operations",
+      "type": "match",
+      "prompt": "Match each telemetry signal to a use.",
+      "explanation": "Choose traces for request paths, metrics for time-series trends, and logs for discrete event details.",
+      "labels": [
+        "Traces",
+        "Metrics",
+        "Logs"
+      ],
+      "options": [
+        "Read structured details about a particular event",
+        "Follow a request across services",
+        "Track aggregate latency and failure trends"
+      ],
+      "answer": [
+        "Follow a request across services",
+        "Track aggregate latency and failure trends",
+        "Read structured details about a particular event"
+      ]
+    },
+    {
+      "id": "integration-39",
+      "domain": "integration",
+      "type": "multi",
+      "prompt": "A Python Function must read a Service Bus queue using managed identity. Which two deployment settings are needed for the connection?",
+      "explanation": "The trigger's connection settings identify the namespace and the identity needs data-plane receive permissions.",
+      "options": [
+        "Set the HTTP route to the queue name",
+        "Configure an identity-based connection for the trigger",
+        "Authorize the app's identity to receive messages",
+        "Publish local.settings.json with account keys as application code"
+      ],
+      "answer": [
+        "Configure an identity-based connection for the trigger",
+        "Authorize the app's identity to receive messages"
+      ]
+    },
+    {
+      "id": "data-43",
+      "domain": "data",
+      "type": "multi",
+      "prompt": "A cache-aside endpoint needs a bound on stale entries and prompt refresh when source data changes. Which two choices meet those requirements?",
+      "explanation": "TTL bounds how long missed invalidation can matter, while deleting updated entries triggers a fresh read on the next miss.",
+      "options": [
+        "Set a TTL on each cache entry",
+        "Remove source data after caching it",
+        "Invalidate affected cache entries after source writes",
+        "Extend the TTL every time a stale value is found"
+      ],
+      "answer": [
+        "Set a TTL on each cache entry",
+        "Invalidate affected cache entries after source writes"
+      ]
+    },
+    {
+      "id": "operations-4",
+      "domain": "operations",
+      "type": "single",
+      "prompt": "A Key Vault secret remains in a long-lived process cache after the operations team publishes a new version. What should the team change?",
+      "explanation": "A new secret version does not invalidate application memory. Explicit refresh or bounded caching lets the running app pick up rotations.",
+      "options": [
+        "Change the secret metadata display name only",
+        "Turn on more Service Bus prefetch",
+        "Expire or refresh the app's cached value on a bounded schedule",
+        "Give the app permission to delete the secret"
+      ],
+      "answer": "Expire or refresh the app's cached value on a bounded schedule"
+    },
+    {
+      "id": "data-7",
+      "domain": "data",
+      "type": "single",
+      "prompt": "An AI API accepts user search terms in a Cosmos DB SQL query. What is the correct way to pass the term?",
+      "explanation": "Parameterized query values separate input from query syntax and handle escaping safely.",
+      "options": [
+        "Use a query parameter such as @term",
+        "Send the search term as a consistency level",
+        "Concatenate the value into the query string",
+        "Use the term as a method name"
+      ],
+      "answer": "Use a query parameter such as @term"
+    },
+    {
+      "id": "operations-49",
+      "domain": "operations",
+      "type": "text",
+      "prompt": "Type the KQL tabular operator used to combine rows in aggregate groups.",
+      "explanation": "summarize applies aggregations such as count and percentile by optional grouping columns.",
+      "answer": [
+        "summarize"
+      ]
+    },
+    {
+      "id": "integration-50",
+      "domain": "integration",
+      "type": "text",
+      "prompt": "In Service Bus, type the message property used to route a message into an ordered session.",
+      "explanation": "SessionId identifies the session to which a message belongs.",
+      "answer": [
+        "SessionId",
+        "Session ID"
+      ]
+    },
+    {
+      "id": "operations-39",
+      "domain": "operations",
+      "type": "multi",
+      "prompt": "Which two choices reduce the chance of exposing PII from a document assistant through observability?",
+      "explanation": "Redaction minimizes sensitive telemetry, and safe identifiers support investigation without storing raw inputs.",
+      "options": [
+        "Redact or exclude sensitive request values before export",
+        "Log the caller's bearer token to make incidents searchable",
+        "Store document contents as trace span names",
+        "Use safe correlation identifiers to connect spans and logs"
+      ],
+      "answer": [
+        "Redact or exclude sensitive request values before export",
+        "Use safe correlation identifiers to connect spans and logs"
+      ]
+    },
+    {
+      "id": "data-52",
+      "domain": "data",
+      "type": "text",
+      "prompt": "In a Redis SET command, type the two-letter option to set expiration in seconds.",
+      "explanation": "The EX option takes a TTL in seconds. PX takes milliseconds.",
+      "answer": [
+        "EX"
+      ]
+    },
+    {
+      "id": "integration-34",
+      "domain": "integration",
+      "type": "single",
+      "prompt": "A Function App must accept requests through a route that includes a document identifier in the URL. Which route template fits the path /api/documents/42 with the default route prefix?",
+      "explanation": "The default prefix adds /api and the placeholder captures the final path segment.",
+      "options": [
+        "documents?{id}",
+        "{id}/documents",
+        "documents/{id}",
+        "api/api/documents"
+      ],
+      "answer": "documents/{id}"
+    },
+    {
+      "id": "containers-39",
+      "domain": "containers",
+      "type": "match",
+      "prompt": "Choose the hosting feature for each workload.",
+      "explanation": "Each feature fits a different workload: image building, bounded execution, or Kubernetes orchestration.",
+      "labels": [
+        "Dependency rebuild after a base image update",
+        "Recurring bounded batch inference",
+        "Declarative deployment through Kubernetes manifests"
+      ],
+      "options": [
+        "AKS Deployment",
+        "Container Apps scheduled job",
+        "ACR Tasks"
+      ],
+      "answer": [
+        "ACR Tasks",
+        "Container Apps scheduled job",
+        "AKS Deployment"
+      ]
+    },
+    {
+      "id": "data-45",
+      "domain": "data",
+      "type": "match",
+      "prompt": "Match each data access requirement to an appropriate mechanism.",
+      "explanation": "These mechanisms handle query progress, change processing coordination, and direct document lookup respectively.",
+      "labels": [
+        "Resume a paginated Cosmos DB query",
+        "Track ownership in a change feed processor",
+        "Retrieve an item by known id and partition"
+      ],
+      "options": [
+        "Lease container",
+        "Point read",
+        "Continuation token"
+      ],
+      "answer": [
+        "Continuation token",
+        "Lease container",
+        "Point read"
+      ]
+    },
+    {
+      "id": "data-49",
+      "domain": "data",
+      "type": "order",
+      "prompt": "Order the steps of a constrained RAG retrieval pipeline.",
+      "explanation": "Resolve access scope first, use a compatible query embedding, then include only retrieved authorized context.",
+      "options": [
+        "Run similarity retrieval with authorization and metadata predicates",
+        "Build the model context using authorized chunks and provenance",
+        "Authenticate the caller and determine permitted scope",
+        "Embed the query with the same model used for documents"
+      ],
+      "answer": [
+        "Authenticate the caller and determine permitted scope",
+        "Embed the query with the same model used for documents",
+        "Run similarity retrieval with authorization and metadata predicates",
+        "Build the model context using authorized chunks and provenance"
+      ]
+    },
+    {
+      "id": "integration-42",
+      "domain": "integration",
+      "type": "match",
+      "prompt": "Match each requirement to an Azure messaging feature.",
+      "explanation": "Subscriptions duplicate delivery across groups, filters select events, and sessions group brokered messages for ordered processing.",
+      "labels": [
+        "Independent copies for consumers",
+        "Route notifications by event payload",
+        "Process ordered groups of related commands"
+      ],
+      "options": [
+        "Service Bus sessions",
+        "Service Bus topic subscriptions",
+        "Event Grid advanced filters"
+      ],
+      "answer": [
+        "Service Bus topic subscriptions",
+        "Event Grid advanced filters",
+        "Service Bus sessions"
+      ]
+    },
+    {
+      "id": "containers-34",
+      "domain": "containers",
+      "type": "multi",
+      "prompt": "Your App Service deployment must pull a private ACR image using managed identity. The registry uses registry-wide Azure RBAC. Which two steps are required alongside selecting the image?",
+      "explanation": "The pull requires both App Service identity configuration and registry data access via AcrPull in this registry authorization mode.",
+      "options": [
+        "Give the app identity Key Vault Reader only",
+        "Configure App Service to use managed identity for its ACR pull",
+        "Grant the app identity AcrPull on the registry",
+        "Enable an anonymous pull policy"
+      ],
+      "answer": [
+        "Grant the app identity AcrPull on the registry",
+        "Configure App Service to use managed identity for its ACR pull"
+      ]
+    },
+    {
+      "id": "containers-44",
+      "domain": "containers",
+      "type": "text",
+      "prompt": "What Kubernetes Deployment field controls which Pods a Deployment manages? Type its dotted manifest path.",
+      "explanation": "The Deployment's spec.selector must match the labels in its Pod template.",
+      "answer": [
+        "spec.selector"
+      ]
+    }
+  ]
+}

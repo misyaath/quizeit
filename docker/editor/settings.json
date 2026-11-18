@@ -1,0 +1,9 @@
+{
+  "files.autoSave": "afterDelay",
+  "files.autoSaveDelay": 350,
+  "workbench.startupEditor": "none",
+  "security.workspace.trust.enabled": false,
+  "extensions.autoUpdate": false,
+  "telemetry.telemetryLevel": "off",
+  "files.exclude": { "**/.quiz": true }
+}

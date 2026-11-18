@@ -1,0 +1,132 @@
+{
+  "id": "ai-200-coding-lab",
+  "title": "AI-200 coding lab · Vector search",
+  "questions": [
+    {
+      "id": "ai-200-code-dot-product",
+      "type": "coding",
+      "domain": "data",
+      "prompt": "Calculate the dot product for two integer vectors. Read n, then n integers for the query vector and n integers for the document vector from standard input. Print the sum of the products at matching positions as a single integer. Assume 1 ≤ n ≤ 100 and each coordinate is between −100 and 100.",
+      "explanation": "The dot product sums the product of corresponding coordinates. Keeping the output as a single integer makes it possible to compare the result directly against the test cases.",
+      "languages": [
+        {
+          "id": "python",
+          "starter": "import sys\n\nvalues = list(map(int, sys.stdin.read().split()))\nn = values[0]\nquery = values[1:n + 1]\ndocument_vector = values[n + 1:]\n\n# Calculate and print the dot product.\n",
+          "solution": "import sys\n\nvalues = list(map(int, sys.stdin.read().split()))\nn = values[0]\nquery = values[1:n + 1]\ndocument_vector = values[n + 1:]\nprint(sum(a * b for a, b in zip(query, document_vector)))\n"
+        },
+        {
+          "id": "javascript",
+          "starter": "const values = require('fs').readFileSync(0, 'utf8').trim().split(/\\s+/).map(Number);\nconst n = values[0];\nconst query = values.slice(1, n + 1);\nconst documentVector = values.slice(n + 1);\n\n// Calculate and print the dot product.\n",
+          "solution": "const values = require('fs').readFileSync(0, 'utf8').trim().split(/\\s+/).map(Number);\nconst n = values[0];\nconst query = values.slice(1, n + 1);\nconst documentVector = values.slice(n + 1);\nconsole.log(query.reduce((sum, value, index) => sum + value * documentVector[index], 0));\n"
+        },
+        {
+          "id": "typescript",
+          "starter": "// @ts-ignore Node.js is provided by the runner\nconst values = require('fs').readFileSync(0, 'utf8').trim().split(/\\s+/).map(Number);\nconst n = values[0];\nconst query = values.slice(1, n + 1);\nconst documentVector = values.slice(n + 1);\n\n// Calculate and print the dot product.\n",
+          "solution": "// @ts-ignore Node.js is provided by the runner\nconst values = require('fs').readFileSync(0, 'utf8').trim().split(/\\s+/).map(Number);\nconst n = values[0];\nconst query = values.slice(1, n + 1);\nconst documentVector = values.slice(n + 1);\nconsole.log(query.reduce((sum, value, index) => sum + value * documentVector[index], 0));\n"
+        },
+        {
+          "id": "php",
+          "starter": "<?php\n$values = array_map('intval', preg_split('/\\s+/', trim(stream_get_contents(STDIN))));\n\n// Calculate and print the requested result.\n",
+          "solution": "<?php\n$values = array_map('intval', preg_split('/\\s+/', trim(stream_get_contents(STDIN))));\n$n = $values[0];\n$total = 0;\nfor ($i = 1; $i <= $n; $i++) {\n    $total += $values[$i] * $values[$i + $n];\n}\necho $total . PHP_EOL;\n"
+        },
+        {
+          "id": "ruby",
+          "starter": "values = STDIN.read.split.map(&:to_i)\n\n# Calculate and print the requested result.\n",
+          "solution": "values = STDIN.read.split.map(&:to_i)\nn = values[0]\nquery = values[1, n]\ndocument = values[n + 1, n]\nputs query.zip(document).sum { |a, b| a * b }\n"
+        },
+        {
+          "id": "bash",
+          "starter": "#!/usr/bin/env bash\n\n# Calculate and print the requested result.\n",
+          "solution": "#!/usr/bin/env bash\nread -ra values <<< \"$(tr '\\n\\t\\r' '   ')\"\nn=${values[0]}\ntotal=0\nfor ((i = 1; i <= n; i++)); do\n    ((total += values[i] * values[i+n]))\ndone\nprintf '%d\\n' \"$total\"\n"
+        },
+        {
+          "id": "lua",
+          "starter": "local values = {}\nfor token in io.read('*a'):gmatch('%S+') do\n    values[#values + 1] = tonumber(token)\nend\n\n-- Calculate and print the requested result.\n",
+          "solution": "local values = {}\nfor token in io.read('*a'):gmatch('%S+') do\n    values[#values + 1] = tonumber(token)\nend\nlocal n, total = values[1], 0\nfor i = 2, n + 1 do\n    total = total + values[i] * values[i + n]\nend\nprint(total)\n"
+        }
+      ],
+      "tests": [
+        {
+          "label": "Three coordinates",
+          "stdin": "3\n1 2 3\n4 5 6\n",
+          "expected": "32"
+        },
+        {
+          "label": "Signed coordinates",
+          "stdin": "3\n-2 0 7\n5 6 1\n",
+          "expected": "-3",
+          "hidden": true
+        },
+        {
+          "label": "Single coordinate",
+          "stdin": "1\n8\n0\n",
+          "expected": "0",
+          "hidden": true
+        }
+      ]
+    },
+    {
+      "id": "ai-200-code-rank-candidates",
+      "type": "coding",
+      "domain": "data",
+      "prompt": "Choose a vector-search candidate from one tenant. Read n and a target tenant ID, then n rows containing document ID, tenant ID, and integer similarity score. Consider only rows for the requested tenant. Print the document ID with the highest score, choosing the smallest ID on ties. Print −1 if the tenant has no candidates. Document and tenant IDs are positive integers. Scores can be negative.",
+      "explanation": "Filter candidates by tenant before ranking them. Breaking score ties by ID produces a stable result even when candidates arrive in a different order.",
+      "languages": [
+        {
+          "id": "python",
+          "starter": "import sys\n\nvalues = list(map(int, sys.stdin.read().split()))\nn, target = values[:2]\n\n# Filter, rank, and print the selected document ID.\n",
+          "solution": "import sys\n\nvalues = list(map(int, sys.stdin.read().split()))\nn, target = values[:2]\nbest = None\nfor index in range(2, 2 + n * 3, 3):\n    doc, tenant, score = values[index:index + 3]\n    candidate = (-score, doc)\n    if tenant == target and (best is None or candidate < best):\n        best = candidate\nprint(-1 if best is None else best[1])\n"
+        },
+        {
+          "id": "javascript",
+          "starter": "const values = require('fs').readFileSync(0, 'utf8').trim().split(/\\s+/).map(Number);\nconst [n, target] = values;\n\n// Filter, rank, and print the selected document ID.\n",
+          "solution": "const values = require('fs').readFileSync(0, 'utf8').trim().split(/\\s+/).map(Number);\nconst [n, target] = values;\nlet bestId = -1;\nlet bestScore = -Infinity;\nfor (let index = 2; index < 2 + n * 3; index += 3) {\n  const [doc, tenant, score] = values.slice(index, index + 3);\n  if (tenant === target && (score > bestScore || (score === bestScore && doc < bestId))) {\n    bestId = doc;\n    bestScore = score;\n  }\n}\nconsole.log(bestId);\n"
+        },
+        {
+          "id": "typescript",
+          "starter": "// @ts-ignore Node.js is provided by the runner\nconst values = require('fs').readFileSync(0, 'utf8').trim().split(/\\s+/).map(Number);\nconst [n, target] = values;\n\n// Filter, rank, and print the selected document ID.\n",
+          "solution": "// @ts-ignore Node.js is provided by the runner\nconst values = require('fs').readFileSync(0, 'utf8').trim().split(/\\s+/).map(Number);\nconst [n, target] = values;\nlet bestId = -1;\nlet bestScore = -Infinity;\nfor (let index = 2; index < 2 + n * 3; index += 3) {\n  const [doc, tenant, score] = values.slice(index, index + 3);\n  if (tenant === target && (score > bestScore || (score === bestScore && doc < bestId))) {\n    bestId = doc;\n    bestScore = score;\n  }\n}\nconsole.log(bestId);\n"
+        },
+        {
+          "id": "php",
+          "starter": "<?php\n$values = array_map('intval', preg_split('/\\s+/', trim(stream_get_contents(STDIN))));\n\n// Calculate and print the requested result.\n",
+          "solution": "<?php\n$values = array_map('intval', preg_split('/\\s+/', trim(stream_get_contents(STDIN))));\n$n = $values[0];\n$target = $values[1];\n$bestId = -1;\n$bestScore = PHP_INT_MIN;\nfor ($i = 2; $i < 2 + $n * 3; $i += 3) {\n    [$id, $tenant, $score] = array_slice($values, $i, 3);\n    if ($tenant === $target && ($bestId === -1 || $score > $bestScore || ($score === $bestScore && $id < $bestId))) {\n        $bestScore = $score;\n        $bestId = $id;\n    }\n}\necho $bestId . PHP_EOL;\n"
+        },
+        {
+          "id": "ruby",
+          "starter": "values = STDIN.read.split.map(&:to_i)\n\n# Calculate and print the requested result.\n",
+          "solution": "values = STDIN.read.split.map(&:to_i)\nn, target = values.first(2)\nmatch = values.drop(2).each_slice(3).take(n).select { |_, tenant, _| tenant == target }.min_by { |id, _, score| [-score, id] }\nputs(match ? match[0] : -1)\n"
+        },
+        {
+          "id": "bash",
+          "starter": "#!/usr/bin/env bash\n\n# Calculate and print the requested result.\n",
+          "solution": "#!/usr/bin/env bash\nread -r n target\nbest_id=-1\nfor ((i = 0; i < n; i++)); do\n    read -r id tenant score\n    if ((tenant == target)) && { ((best_id == -1)) || ((score > best_score || (score == best_score && id < best_id))); }; then\n        best_id=$id\n        best_score=$score\n    fi\ndone\nprintf '%d\\n' \"$best_id\"\n"
+        },
+        {
+          "id": "lua",
+          "starter": "local values = {}\nfor token in io.read('*a'):gmatch('%S+') do\n    values[#values + 1] = tonumber(token)\nend\n\n-- Calculate and print the requested result.\n",
+          "solution": "local values = {}\nfor token in io.read('*a'):gmatch('%S+') do\n    values[#values + 1] = tonumber(token)\nend\nlocal n, target = values[1], values[2]\nlocal best_id, best_score = -1, -math.huge\nfor i = 3, n * 3, 3 do\n    local id, tenant, score = values[i], values[i + 1], values[i + 2]\n    if tenant == target and (score > best_score or (score == best_score and id < best_id)) then\n        best_id, best_score = id, score\n    end\nend\nprint(best_id)\n"
+        }
+      ],
+      "tests": [
+        {
+          "label": "Tenant filter and tie",
+          "stdin": "4 7\n15 7 80\n8 4 99\n6 7 80\n1 7 79\n",
+          "expected": "6"
+        },
+        {
+          "label": "No candidates",
+          "stdin": "1 7\n2 5 40\n",
+          "expected": "-1",
+          "hidden": true
+        },
+        {
+          "label": "Negative scores",
+          "stdin": "2 1\n9 1 -4\n3 1 -9\n",
+          "expected": "9",
+          "hidden": true
+        }
+      ]
+    }
+  ]
+}

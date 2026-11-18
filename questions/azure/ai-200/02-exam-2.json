@@ -1,0 +1,922 @@
+{
+  "id": "exam-2",
+  "title": "Practice exam 2",
+  "questions": [
+    {
+      "id": "containers-18",
+      "domain": "containers",
+      "type": "single",
+      "prompt": "An AKS backend needs a stable endpoint reachable from other workloads inside the cluster. Which Service type fits?",
+      "explanation": "ClusterIP serves the application through a stable cluster-internal address and DNS name.",
+      "options": [
+        "ClusterIP",
+        "NodePort",
+        "LoadBalancer",
+        "ExternalName with a public hostname"
+      ],
+      "answer": "ClusterIP"
+    },
+    {
+      "id": "operations-30",
+      "domain": "operations",
+      "type": "single",
+      "prompt": "A KQL report must correlate AppRequests and AppDependencies across the same Application Insights operation, and take only matching rows from both datasets. Which operation fits?",
+      "explanation": "An inner join matches operation identifiers and keeps rows with a counterpart. Filter relevant time windows first to limit input.",
+      "options": [
+        "A union with no correlation field",
+        "A join on unrelated row timestamps only",
+        "Summarize both names alphabetically",
+        "An inner join on OperationId"
+      ],
+      "answer": "An inner join on OperationId"
+    },
+    {
+      "id": "containers-35",
+      "domain": "containers",
+      "type": "multi",
+      "prompt": "A long-running model API is becoming slow under concurrent requests. Which two measurements can guide a Container Apps HTTP scale threshold?",
+      "explanation": "Concurrency is the HTTP scale signal. Observed latency under load helps choose a target that preserves application responsiveness.",
+      "options": [
+        "The count of inactive ACR tags",
+        "The maximum name length of the app",
+        "Request latency under increasing concurrency",
+        "Per-replica concurrent requests"
+      ],
+      "answer": [
+        "Per-replica concurrent requests",
+        "Request latency under increasing concurrency"
+      ]
+    },
+    {
+      "id": "data-27",
+      "domain": "data",
+      "type": "single",
+      "prompt": "A PostgreSQL knowledge base stores each document as many chunks. Which schema makes tenant filtering and finding a chunk's parent straightforward?",
+      "explanation": "Explicit identifiers preserve the source relationship, and tenant metadata supports constrained retrieval.",
+      "options": [
+        "A chunk table with document_id, tenant_id, content, and an embedding column",
+        "One shared string containing every document and embedding",
+        "A single server-wide vector with no metadata",
+        "A table storing chunk titles only"
+      ],
+      "answer": "A chunk table with document_id, tenant_id, content, and an embedding column"
+    },
+    {
+      "id": "integration-8",
+      "domain": "integration",
+      "type": "single",
+      "prompt": "A Service Bus message must be temporarily set aside and retrieved by the same workflow later. It should be skipped by normal receive. What should the workflow do?",
+      "explanation": "Deferred messages are excluded from regular receive and are retrieved explicitly using their sequence numbers.",
+      "options": [
+        "Complete it and save just its destination",
+        "Abandon it and forget its identifier",
+        "Defer it and persist its sequence number",
+        "Set a low receive prefetch count"
+      ],
+      "answer": "Defer it and persist its sequence number"
+    },
+    {
+      "id": "integration-32",
+      "domain": "integration",
+      "type": "single",
+      "prompt": "A Function App contains unrelated workloads that require different deployment lifecycles and process-level configurations. Which organization gives each workload an independent deployment boundary?",
+      "explanation": "A Function App acts as the unit of deployment and shared runtime configuration.",
+      "options": [
+        "Deploy the workloads into separate Function Apps",
+        "Use one shared app setting for every trigger",
+        "Put every function in the same file",
+        "Use different route names within the same deployment package"
+      ],
+      "answer": "Deploy the workloads into separate Function Apps"
+    },
+    {
+      "id": "data-24",
+      "domain": "data",
+      "type": "single",
+      "prompt": "A team wants evidence that a pgvector query is using the desired index and wants actual execution statistics on staging. What should it run?",
+      "explanation": "The execution plan reports actual row counts, operator timings, and buffer usage. ANALYZE executes the query.",
+      "options": [
+        "VACUUM FULL during each API call",
+        "SELECT version()",
+        "CREATE TABLE AS SELECT on every request",
+        "EXPLAIN (ANALYZE, BUFFERS) with the representative query"
+      ],
+      "answer": "EXPLAIN (ANALYZE, BUFFERS) with the representative query"
+    },
+    {
+      "id": "operations-26",
+      "domain": "operations",
+      "type": "single",
+      "prompt": "An AppRequests query should include only the last hour of rows. Which KQL predicate fits a datetime column named TimeGenerated?",
+      "explanation": "The where operator filters rows. ago(1h) returns the timestamp one hour before query time.",
+      "options": [
+        "project TimeGenerated > ago(1h)",
+        "extend TimeGenerated = 1h",
+        "summarize TimeGenerated by ago(1h)",
+        "where TimeGenerated > ago(1h)"
+      ],
+      "answer": "where TimeGenerated > ago(1h)"
+    },
+    {
+      "id": "containers-7",
+      "domain": "containers",
+      "type": "single",
+      "prompt": "An inference API needs a different MODEL_NAME setting in staging and production with the same container image. Where should the value be configured for App Service?",
+      "explanation": "App Service supplies app settings as environment variables at runtime, so an image can be promoted without rebuilding for each environment.",
+      "options": [
+        "A build argument baked into the image",
+        "An ACR tag annotation",
+        "An AKS ConfigMap in a separate cluster",
+        "App Service application settings for each environment"
+      ],
+      "answer": "App Service application settings for each environment"
+    },
+    {
+      "id": "containers-42",
+      "domain": "containers",
+      "type": "order",
+      "prompt": "Put the steps for a Container Apps canary in order. Assume multiple revision mode is enabled.",
+      "explanation": "A ready revision can begin receiving a measured share of real traffic before promotion.",
+      "options": [
+        "Wait until the new revision is ready",
+        "Route a small share of traffic to it",
+        "Increase the share after validating error and latency metrics",
+        "Deploy a new revision"
+      ],
+      "answer": [
+        "Deploy a new revision",
+        "Wait until the new revision is ready",
+        "Route a small share of traffic to it",
+        "Increase the share after validating error and latency metrics"
+      ]
+    },
+    {
+      "id": "data-1",
+      "domain": "data",
+      "type": "single",
+      "prompt": "A Cosmos DB for NoSQL container uses /tenantId as its partition key. The API has both the document id and tenantId. Which read generally uses the fewest RUs?",
+      "explanation": "A point read addresses a single item directly using its id and partition key.",
+      "options": [
+        "A point read specifying the id and partition key",
+        "A scan of every partition followed by local filtering",
+        "A vector search for the document id",
+        "A cross-partition SELECT filtering only on id"
+      ],
+      "answer": "A point read specifying the id and partition key"
+    },
+    {
+      "id": "data-34",
+      "domain": "data",
+      "type": "single",
+      "prompt": "A team needs an Azure-managed Redis deployment for a new vector caching solution. Which service should it start with?",
+      "explanation": "Azure Managed Redis is the current managed Redis service in the AI-200 blueprint and supports Redis data and vector search features.",
+      "options": [
+        "Azure Blob Storage lifecycle management",
+        "Azure Managed Redis",
+        "Azure SQL Database elastic pools",
+        "Azure Functions Premium"
+      ],
+      "answer": "Azure Managed Redis"
+    },
+    {
+      "id": "integration-22",
+      "domain": "integration",
+      "type": "single",
+      "prompt": "A Python Function uses a Service Bus binding whose connection setting is named WorkflowBus. Where does the hosted function resolve binding configuration?",
+      "explanation": "Binding settings come from the deployed app configuration. Identity-based connections can use a documented group of settings.",
+      "options": [
+        "Function app settings under the connection name or identity-based prefix",
+        "The Service Bus message Subject",
+        "The local Git configuration",
+        "The name of the Python virtual environment"
+      ],
+      "answer": "Function app settings under the connection name or identity-based prefix"
+    },
+    {
+      "id": "data-11",
+      "domain": "data",
+      "type": "single",
+      "prompt": "An assistant retrieves Cosmos DB vectors for users in different tenants. What should the retrieval query enforce before using the results?",
+      "explanation": "Tenant restrictions must apply at retrieval time so the model never receives unauthorized chunks.",
+      "options": [
+        "Filter on the authenticated tenant and scope to its partition where applicable",
+        "Trust the tenant string generated by the language model",
+        "Rank all tenants together and display the first result",
+        "Only increase the vector result limit"
+      ],
+      "answer": "Filter on the authenticated tenant and scope to its partition where applicable"
+    },
+    {
+      "id": "containers-15",
+      "domain": "containers",
+      "type": "single",
+      "prompt": "A Container Apps job should run a short batch cleanup every night at a defined time. What trigger type fits?",
+      "explanation": "Scheduled jobs run at times defined by a cron expression.",
+      "options": [
+        "HTTP ingress",
+        "Registry base-image change",
+        "Manual only",
+        "Schedule"
+      ],
+      "answer": "Schedule"
+    },
+    {
+      "id": "integration-36",
+      "domain": "integration",
+      "type": "multi",
+      "prompt": "A Service Bus worker performs an external payment. Choose two practices that together manage message redelivery safely.",
+      "explanation": "Durable idempotency protects the side effect and late completion preserves recoverability.",
+      "options": [
+        "Commit the payment idempotently with a durable operation key",
+        "Disable every retry regardless of the error",
+        "Complete the message only after the payment outcome is safely recorded",
+        "Use a fresh operation key each time the same message is delivered"
+      ],
+      "answer": [
+        "Commit the payment idempotently with a durable operation key",
+        "Complete the message only after the payment outcome is safely recorded"
+      ]
+    },
+    {
+      "id": "containers-8",
+      "domain": "containers",
+      "type": "single",
+      "prompt": "A sidecar-enabled Linux App Service app runs an OpenTelemetry collector listening on port 4318 in a sidecar. Which address should the main container use for OTLP over HTTP?",
+      "explanation": "App Service containers in the same app share a network namespace and can communicate over localhost on their respective ports.",
+      "options": [
+        "http://localhost:4318",
+        "The ACR registry login URL on port 4318",
+        "A separate private endpoint assigned to the sidecar",
+        "The app’s public hostname on port 4318"
+      ],
+      "answer": "http://localhost:4318"
+    },
+    {
+      "id": "operations-16",
+      "domain": "operations",
+      "type": "single",
+      "prompt": "An app uses the Azure Identity library locally and in Azure. Which credential class can use available developer credentials locally and managed identity in the hosted environment?",
+      "explanation": "DefaultAzureCredential tries an ordered set of credential sources that can include developer credentials and managed identity.",
+      "options": [
+        "AzureKeyCredential",
+        "DefaultAzureCredential",
+        "BasicAuthenticationCredential",
+        "StorageSharedKeyCredential"
+      ],
+      "answer": "DefaultAzureCredential"
+    },
+    {
+      "id": "data-16",
+      "domain": "data",
+      "type": "single",
+      "prompt": "A PostgreSQL table will store fixed 1536-dimensional float embeddings. Which column type fits pgvector?",
+      "explanation": "The vector type stores numeric embeddings. The dimension modifier enforces the expected vector length.",
+      "options": [
+        "varchar(1536)",
+        "numeric(1536)",
+        "tsvector",
+        "vector(1536)"
+      ],
+      "answer": "vector(1536)"
+    },
+    {
+      "id": "operations-23",
+      "domain": "operations",
+      "type": "single",
+      "prompt": "Application Insights telemetry is too expensive during heavy load. The team still wants representative trace data. Which setting should it evaluate?",
+      "explanation": "Sampling reduces retained telemetry volume. Verify that the chosen policy preserves the diagnostic coverage the workload needs.",
+      "options": [
+        "Service Bus dead-letter TTL",
+        "The PostgreSQL extension name",
+        "Supported tracing sampling configuration",
+        "Key Vault network retention"
+      ],
+      "answer": "Supported tracing sampling configuration"
+    },
+    {
+      "id": "integration-1",
+      "domain": "integration",
+      "type": "single",
+      "prompt": "A web API needs to accept inference work quickly and hand each request to one background worker. Which Azure Service Bus entity fits?",
+      "explanation": "A queue lets consumers compete for messages so one processes each delivery at a time.",
+      "options": [
+        "A topic with an independent subscription for every worker instance",
+        "An Event Grid event type",
+        "A Function output binding without a destination",
+        "A queue with competing consumers"
+      ],
+      "answer": "A queue with competing consumers"
+    },
+    {
+      "id": "integration-15",
+      "domain": "integration",
+      "type": "single",
+      "prompt": "An Event Grid event contains data.priority. You need to route only events with high priority. Which feature can evaluate that property?",
+      "explanation": "Advanced filters can evaluate payload fields using supported operators.",
+      "options": [
+        "A subject suffix filter on the HTTP response",
+        "The Azure Functions timer schedule",
+        "An advanced event subscription filter on data.priority",
+        "The Service Bus DLQ description"
+      ],
+      "answer": "An advanced event subscription filter on data.priority"
+    },
+    {
+      "id": "integration-9",
+      "domain": "integration",
+      "type": "single",
+      "prompt": "Several messages update the same customer record and should be processed in sequence per customer. Different customers can be processed independently. What Service Bus feature fits?",
+      "explanation": "Sessions group related messages and allow exclusive processing of a session while other sessions can run concurrently.",
+      "options": [
+        "A single unordered queue with unlimited workers",
+        "Event Grid subject filters alone",
+        "A random session id for every message",
+        "Message sessions using customer id as SessionId"
+      ],
+      "answer": "Message sessions using customer id as SessionId"
+    },
+    {
+      "id": "data-3",
+      "domain": "data",
+      "type": "single",
+      "prompt": "A Cosmos DB container receives many 429 responses during bursts. What should the application use when scheduling retries?",
+      "explanation": "A 429 indicates rate limiting. Respect the service-provided delay and review RU consumption and load distribution if throttling persists.",
+      "options": [
+        "A new account key on every retry",
+        "Immediate retries with no wait",
+        "The service retry delay and bounded retry behavior",
+        "A full query scan after each 429"
+      ],
+      "answer": "The service retry delay and bounded retry behavior"
+    },
+    {
+      "id": "operations-10",
+      "domain": "operations",
+      "type": "single",
+      "prompt": "Staging and production share an Azure App Configuration store. The same setting key needs different values per environment. What feature fits?",
+      "explanation": "The combination of key and label identifies a setting version within the store.",
+      "options": [
+        "Different JSON indentation per environment",
+        "A different Git commit message",
+        "A separate Service Bus message session",
+        "Labels on the same key"
+      ],
+      "answer": "Labels on the same key"
+    },
+    {
+      "id": "integration-12",
+      "domain": "integration",
+      "type": "single",
+      "prompt": "A batch job should send a reminder message that cannot be received until tomorrow. What Service Bus capability fits?",
+      "explanation": "Scheduled enqueueing makes the message available at a future time without an active waiting worker.",
+      "options": [
+        "Scheduled message enqueueing",
+        "Deferral after the reminder is received",
+        "Immediate receive with a longer lock duration",
+        "Event Grid subject suffix filtering"
+      ],
+      "answer": "Scheduled message enqueueing"
+    },
+    {
+      "id": "data-18",
+      "domain": "data",
+      "type": "single",
+      "prompt": "A pgvector cosine query orders by embedding <=> a parameter with LIMIT 10. Which HNSW operator class matches this query?",
+      "explanation": "The index operator class must match the query distance operator. vector_cosine_ops supports cosine distance.",
+      "options": [
+        "vector_l2_ops",
+        "vector_cosine_ops",
+        "text_pattern_ops",
+        "vector_ip_ops"
+      ],
+      "answer": "vector_cosine_ops"
+    },
+    {
+      "id": "integration-37",
+      "domain": "integration",
+      "type": "multi",
+      "prompt": "A new Event Grid consumer must survive transient errors and preserve events after delivery attempts are exhausted. Which two configurations fit?",
+      "explanation": "Retries address temporary problems. A dead-letter destination retains events that remain undeliverable.",
+      "options": [
+        "A dead-letter destination on the event subscription",
+        "A Service Bus session ID on every CloudEvent",
+        "A registry purge policy",
+        "A retry policy suitable for the subscriber"
+      ],
+      "answer": [
+        "A retry policy suitable for the subscriber",
+        "A dead-letter destination on the event subscription"
+      ]
+    },
+    {
+      "id": "containers-6",
+      "domain": "containers",
+      "type": "single",
+      "prompt": "An app with registry access configured attempts to pull myacr.azurecr.io/worker:v7. It gets manifest unknown. Which check comes first?",
+      "explanation": "A manifest lookup can fail when the referenced repository or tag is absent. Check the exact image reference first.",
+      "options": [
+        "Confirm that worker:v7 exists in that registry",
+        "Increase the app replica count",
+        "Increase the container port",
+        "Rotate the PostgreSQL password"
+      ],
+      "answer": "Confirm that worker:v7 exists in that registry"
+    },
+    {
+      "id": "operations-25",
+      "domain": "operations",
+      "type": "single",
+      "prompt": "An alert should catch a regression in the slowest few percent of requests. Which metric is a better fit than average duration?",
+      "explanation": "A tail percentile highlights slow requests that can be hidden by a low average.",
+      "options": [
+        "95th percentile request duration",
+        "Minimum observed request duration",
+        "Total number of deployments",
+        "Number of distinct HTTP methods"
+      ],
+      "answer": "95th percentile request duration"
+    },
+    {
+      "id": "data-5",
+      "domain": "data",
+      "type": "single",
+      "prompt": "A Cosmos DB catalog writes a large JSON diagnostics subtree that the app never queries. Which indexing change can reduce write RU cost?",
+      "explanation": "Maintaining fewer index paths can reduce write costs. Keep indexes for paths used by application queries.",
+      "options": [
+        "Exclude the unused subtree from the indexing policy",
+        "Replace every numeric property with a string",
+        "Increase read consistency to strong",
+        "Include every path and add unused composite indexes"
+      ],
+      "answer": "Exclude the unused subtree from the indexing policy"
+    },
+    {
+      "id": "integration-16",
+      "domain": "integration",
+      "type": "single",
+      "prompt": "An Event Grid subscriber needs to recover events that could not be delivered within the retry policy. What should it configure?",
+      "explanation": "Event Grid can place undeliverable events in configured storage for later inspection and recovery.",
+      "options": [
+        "A dead-letter storage destination for the event subscription",
+        "An App Configuration label for the endpoint",
+        "A Service Bus delivery lock on the webhook",
+        "A Cosmos DB query continuation token"
+      ],
+      "answer": "A dead-letter storage destination for the event subscription"
+    },
+    {
+      "id": "integration-43",
+      "domain": "integration",
+      "type": "match",
+      "prompt": "Match each Functions element to its responsibility.",
+      "explanation": "Triggers start executions and output bindings publish outputs.",
+      "labels": [
+        "HTTP trigger",
+        "Service Bus output binding",
+        "Timer trigger"
+      ],
+      "options": [
+        "Start execution on a schedule",
+        "Write the function's output to a brokered destination",
+        "Start execution for a web request"
+      ],
+      "answer": [
+        "Start execution for a web request",
+        "Write the function's output to a brokered destination",
+        "Start execution on a schedule"
+      ]
+    },
+    {
+      "id": "integration-49",
+      "domain": "integration",
+      "type": "text",
+      "prompt": "Which HTTP status code means an asynchronous inference request was accepted for processing? Type the three digits.",
+      "explanation": "HTTP 202 Accepted indicates that processing is expected to continue asynchronously.",
+      "answer": [
+        "202"
+      ]
+    },
+    {
+      "id": "containers-12",
+      "domain": "containers",
+      "type": "single",
+      "prompt": "Your Container Apps API listens on port 8080. Ingress is enabled and configured to target port 80. What should you change while keeping the image?",
+      "explanation": "The target port must match the port on which the container listens. Public HTTP or HTTPS ports are handled separately by ingress.",
+      "options": [
+        "Set the ingress target port to 8080",
+        "Set the replica count to two",
+        "Change the port on which clients connect to public ingress",
+        "Set the ingress target port to 443"
+      ],
+      "answer": "Set the ingress target port to 8080"
+    },
+    {
+      "id": "containers-37",
+      "domain": "containers",
+      "type": "match",
+      "prompt": "Match each container release requirement to the best feature.",
+      "explanation": "Digests pin content, revisions route live traffic, and a timer trigger schedules builds.",
+      "labels": [
+        "Repeatable image reference",
+        "Canary traffic split",
+        "Scheduled image build"
+      ],
+      "options": [
+        "Image digest",
+        "Multiple active Container Apps revisions",
+        "ACR Tasks timer trigger"
+      ],
+      "answer": [
+        "Image digest",
+        "Multiple active Container Apps revisions",
+        "ACR Tasks timer trigger"
+      ]
+    },
+    {
+      "id": "containers-27",
+      "domain": "containers",
+      "type": "single",
+      "prompt": "An app loses files under its writable container layer after a new Pod replaces it. Which design preserves files across replacement on AKS?",
+      "explanation": "A supported persistent volume can outlive an individual Pod. emptyDir shares a Pod lifetime.",
+      "options": [
+        "Use an emptyDir volume",
+        "Write to a different path inside the container layer",
+        "Set imagePullPolicy to Always",
+        "Use a PersistentVolumeClaim backed by suitable storage"
+      ],
+      "answer": "Use a PersistentVolumeClaim backed by suitable storage"
+    },
+    {
+      "id": "operations-34",
+      "domain": "operations",
+      "type": "single",
+      "prompt": "A remote vector endpoint gets slower only after a release. Which analysis isolates whether the network dependency drives the regression?",
+      "explanation": "Dependency timing and end-to-end latency together show whether spending more time in a downstream call explains the change.",
+      "options": [
+        "Measure the number of repository images only",
+        "Compare request counts without latency or dependency breakdown",
+        "Inspect Key Vault secret names only",
+        "Compare dependency span durations before and after the deployment alongside end-to-end request latency"
+      ],
+      "answer": "Compare dependency span durations before and after the deployment alongside end-to-end request latency"
+    },
+    {
+      "id": "operations-15",
+      "domain": "operations",
+      "type": "single",
+      "prompt": "An AI feature needs a rapid rollout to users controlled by centrally managed settings. Which App Configuration feature fits?",
+      "explanation": "Feature flags let the application evaluate whether to enable functionality without rebuilding it.",
+      "options": [
+        "Feature flags",
+        "Service Bus duplicate detection",
+        "Registry retention policies",
+        "Key Vault purge protection"
+      ],
+      "answer": "Feature flags"
+    },
+    {
+      "id": "data-47",
+      "domain": "data",
+      "type": "match",
+      "prompt": "Match each Redis operation to the effect.",
+      "explanation": "SET EX attaches expiration, DEL invalidates, and TTL reports time remaining.",
+      "labels": [
+        "SET key value EX 60",
+        "DEL key",
+        "TTL key"
+      ],
+      "options": [
+        "Inspect remaining expiration in seconds",
+        "Set a value with a 60-second TTL",
+        "Remove a cached value"
+      ],
+      "answer": [
+        "Set a value with a 60-second TTL",
+        "Remove a cached value",
+        "Inspect remaining expiration in seconds"
+      ]
+    },
+    {
+      "id": "data-42",
+      "domain": "data",
+      "type": "multi",
+      "prompt": "An approximate vector index is being tuned. Which two retrieval metrics should the team compare across configurations?",
+      "explanation": "Approximate indexing trades search quality against performance. Measure recall and latency together.",
+      "options": [
+        "Query latency under representative load",
+        "The number of image tags in ACR only",
+        "Recall against exact search on representative queries",
+        "The number of App Configuration labels only"
+      ],
+      "answer": [
+        "Recall against exact search on representative queries",
+        "Query latency under representative load"
+      ]
+    },
+    {
+      "id": "containers-10",
+      "domain": "containers",
+      "type": "single",
+      "prompt": "QA must access a specific Container Apps revision by its own stable test URL while public traffic remains on another revision. What should you assign?",
+      "explanation": "A revision label has a dedicated URL. A label can be moved to another revision as needed.",
+      "options": [
+        "A KEDA polling interval",
+        "An ACR retention rule",
+        "A revision label",
+        "A Kubernetes cluster IP"
+      ],
+      "answer": "A revision label"
+    },
+    {
+      "id": "operations-13",
+      "domain": "operations",
+      "type": "single",
+      "prompt": "An App Configuration key is a Key Vault reference. The app's provider already reads App Configuration. What else is needed when it resolves the reference?",
+      "explanation": "A Key Vault reference holds a pointer. Retrieving the referenced secret requires separate permission on the vault.",
+      "options": [
+        "The Event Grid Contributor role",
+        "A new Cosmos DB partition",
+        "An identity authorized to read the referenced Key Vault secret",
+        "Only the App Configuration Data Reader role"
+      ],
+      "answer": "An identity authorized to read the referenced Key Vault secret"
+    },
+    {
+      "id": "operations-44",
+      "domain": "operations",
+      "type": "match",
+      "prompt": "Match each Azure built-in role to its least-privilege task.",
+      "explanation": "These roles grant relevant data-plane permissions with narrower privileges than management or ownership roles.",
+      "labels": [
+        "Key Vault Secrets User",
+        "App Configuration Data Reader",
+        "Azure Service Bus Data Receiver"
+      ],
+      "options": [
+        "Receive messages from a queue",
+        "Read key-values from an App Configuration store",
+        "Read a Key Vault secret value"
+      ],
+      "answer": [
+        "Read a Key Vault secret value",
+        "Read key-values from an App Configuration store",
+        "Receive messages from a queue"
+      ]
+    },
+    {
+      "id": "data-8",
+      "domain": "data",
+      "type": "single",
+      "prompt": "A Cosmos DB SDK query returns a continuation token. The API needs to fetch the next page of the same query. What should it do?",
+      "explanation": "A continuation token records query progress and can resume pagination for the same query.",
+      "options": [
+        "Increment the document id by one",
+        "Use the token as an account key",
+        "Restart the query in each physical partition",
+        "Resume the same query with that token and compatible options"
+      ],
+      "answer": "Resume the same query with that token and compatible options"
+    },
+    {
+      "id": "operations-31",
+      "domain": "operations",
+      "type": "single",
+      "prompt": "KQL must display all recent requests, including ones that have no recorded dependency calls. Which join flavor preserves requests when they are on the left side?",
+      "explanation": "A leftouter join keeps all records from the left side and enriches them with right-side matches where available.",
+      "options": [
+        "leftouter",
+        "rightsemi",
+        "leftanti",
+        "inner"
+      ],
+      "answer": "leftouter"
+    },
+    {
+      "id": "containers-28",
+      "domain": "containers",
+      "type": "single",
+      "prompt": "A Container Apps revision is healthy, but requests to a downstream API fail. The team needs to test DNS and HTTP connectivity from the app's running environment. What is the most direct diagnostic?",
+      "explanation": "Testing from the affected workload exercises that environment's DNS, routing, and outbound connectivity.",
+      "options": [
+        "Open a console to the running container and test name resolution and the endpoint",
+        "Increase the public traffic weight",
+        "Run the same request from a developer laptop only",
+        "Inspect only the ACR tag list"
+      ],
+      "answer": "Open a console to the running container and test name resolution and the endpoint"
+    },
+    {
+      "id": "operations-46",
+      "domain": "operations",
+      "type": "order",
+      "prompt": "Order the KQL operations needed to chart failures by minute in a filtered time range.",
+      "explanation": "Select and filter relevant telemetry before aggregating to a chartable time series.",
+      "options": [
+        "Filter to the desired time range and failed requests",
+        "Summarize counts into one-minute bins",
+        "Render the result as a time chart",
+        "Start with the request telemetry table"
+      ],
+      "answer": [
+        "Start with the request telemetry table",
+        "Filter to the desired time range and failed requests",
+        "Summarize counts into one-minute bins",
+        "Render the result as a time chart"
+      ]
+    },
+    {
+      "id": "integration-45",
+      "domain": "integration",
+      "type": "order",
+      "prompt": "Put successful PeekLock processing in order.",
+      "explanation": "Settle a success after the durable result exists, so an interruption before settlement can be handled safely.",
+      "options": [
+        "Commit the business result idempotently",
+        "Complete the message",
+        "Validate the payload and operation identifier",
+        "Receive and lock the message"
+      ],
+      "answer": [
+        "Receive and lock the message",
+        "Validate the payload and operation identifier",
+        "Commit the business result idempotently",
+        "Complete the message"
+      ]
+    },
+    {
+      "id": "integration-27",
+      "domain": "integration",
+      "type": "single",
+      "prompt": "A function writes a Service Bus message and needs to receive structured details from an unsuccessful send within its own code. Which approach gives direct control over the send operation?",
+      "explanation": "The SDK gives the function explicit send calls and lets it handle exceptions at that point in the code.",
+      "options": [
+        "Use an output binding as the only send mechanism",
+        "Use the Service Bus SDK client in the function",
+        "Enable Function App log streaming only",
+        "Move the send to a timer trigger with no client"
+      ],
+      "answer": "Use the Service Bus SDK client in the function"
+    },
+    {
+      "id": "integration-19",
+      "domain": "integration",
+      "type": "single",
+      "prompt": "An HTTP-triggered Azure Function needs to accept a JSON inference request. Which element starts the execution?",
+      "explanation": "A trigger invokes the function in response to a request. An output binding sends a value to another service.",
+      "options": [
+        "A deployment slot",
+        "The HTTP trigger",
+        "A Service Bus output binding",
+        "An application setting"
+      ],
+      "answer": "The HTTP trigger"
+    },
+    {
+      "id": "operations-45",
+      "domain": "operations",
+      "type": "order",
+      "prompt": "Put the steps for a coordinated credential rotation in order. The old and new credentials can overlap.",
+      "explanation": "Overlapping credentials and confirming new authentication before revocation reduce downtime.",
+      "options": [
+        "Refresh the app or roll it out with access to the new version",
+        "Verify successful calls using the new credential",
+        "Revoke the previous credential",
+        "Create the replacement credential and publish a new Key Vault secret version"
+      ],
+      "answer": [
+        "Create the replacement credential and publish a new Key Vault secret version",
+        "Refresh the app or roll it out with access to the new version",
+        "Verify successful calls using the new credential",
+        "Revoke the previous credential"
+      ]
+    },
+    {
+      "id": "operations-36",
+      "domain": "operations",
+      "type": "multi",
+      "prompt": "An app must read configuration values and secret values without storing cloud credentials. Which two data roles grant a managed identity the minimum relevant read permissions?",
+      "explanation": "The identity requires separate read permission for each service's data plane. Scope each grant to required resources.",
+      "options": [
+        "Key Vault Secrets User on the vault or appropriate secret scope",
+        "App Configuration Data Reader on the store",
+        "Key Vault Secrets Officer on the entire resource group",
+        "Owner on the subscription"
+      ],
+      "answer": [
+        "App Configuration Data Reader on the store",
+        "Key Vault Secrets User on the vault or appropriate secret scope"
+      ]
+    },
+    {
+      "id": "containers-41",
+      "domain": "containers",
+      "type": "order",
+      "prompt": "An AKS release needs to update the image through source-controlled manifests. Put the release steps in order.",
+      "explanation": "The image must exist before it is deployed. Rollout checks happen after Kubernetes receives the new template.",
+      "options": [
+        "Observe rollout status and readiness",
+        "Build and publish the new image",
+        "Update the Deployment manifest to reference that image",
+        "Apply the updated manifest"
+      ],
+      "answer": [
+        "Build and publish the new image",
+        "Update the Deployment manifest to reference that image",
+        "Apply the updated manifest",
+        "Observe rollout status and readiness"
+      ]
+    },
+    {
+      "id": "data-12",
+      "domain": "data",
+      "type": "single",
+      "prompt": "A Cosmos DB container receives new and updated product documents. A worker should refresh embeddings based on document changes without repeatedly scanning the whole container. What should it consume?",
+      "explanation": "The change feed exposes item changes incrementally so the worker can process relevant updates.",
+      "options": [
+        "The account activity log",
+        "The Cosmos DB account key history",
+        "The vector index configuration",
+        "The Cosmos DB change feed"
+      ],
+      "answer": "The Cosmos DB change feed"
+    },
+    {
+      "id": "data-35",
+      "domain": "data",
+      "type": "single",
+      "prompt": "A RAG assistant needs to cite the source for each retrieved chunk. What data must be preserved through retrieval?",
+      "explanation": "Citations require stable provenance from chunks back to source documents. A similarity score cannot identify that source.",
+      "options": [
+        "Document identifiers or URIs together with chunk provenance",
+        "Only the final generated answer",
+        "Only the cosine score",
+        "Only the timestamp for the API request"
+      ],
+      "answer": "Document identifiers or URIs together with chunk provenance"
+    },
+    {
+      "id": "containers-11",
+      "domain": "containers",
+      "type": "single",
+      "prompt": "Two apps run in the same Container Apps environment. Only the front end should invoke the backend over HTTP. Which backend ingress exposure avoids public access?",
+      "explanation": "Internal ingress allows access from within the Container Apps environment while keeping the backend off public ingress.",
+      "options": [
+        "External ingress with a 100 percent revision weight",
+        "External ingress with a startup probe",
+        "No ingress and an ACR Tasks trigger",
+        "Internal ingress"
+      ],
+      "answer": "Internal ingress"
+    },
+    {
+      "id": "operations-8",
+      "domain": "operations",
+      "type": "single",
+      "prompt": "A compliance policy requires that deleted Key Vault secrets cannot be permanently purged during the retention period. Which protection fits?",
+      "explanation": "Purge protection prevents permanent deletion during retention, including by principals with purge privileges.",
+      "options": [
+        "The Key Vault Reader role alone",
+        "Purge protection",
+        "A Redis TTL",
+        "An App Configuration label"
+      ],
+      "answer": "Purge protection"
+    },
+    {
+      "id": "data-38",
+      "domain": "data",
+      "type": "single",
+      "prompt": "An evaluation compares exact and approximate PostgreSQL retrieval. User-visible latency is acceptable, but the approximate search returns too few matches under a department filter. What should the team measure next?",
+      "explanation": "Approximate index filtering can reduce returned matches. Evaluate recall and candidate effort using the actual filtered workload.",
+      "caseStudy": {
+        "title": "AtlasDocs",
+        "background": "AtlasDocs runs document retrieval in Azure Database for PostgreSQL with pgvector. Callers can search only their department. An Azure Managed Redis cache stores generated summaries, while the source database remains authoritative for content updates."
+      },
+      "options": [
+        "Only total documents across all departments",
+        "Recall and result counts with representative filters while tuning candidate search settings",
+        "Embedding bytes per Git commit",
+        "Only the number of API replicas"
+      ],
+      "answer": "Recall and result counts with representative filters while tuning candidate search settings"
+    },
+    {
+      "id": "data-39",
+      "domain": "data",
+      "type": "single",
+      "prompt": "The source database remains authoritative. A cached summary occasionally persists after a product update. The team wants to reduce staleness during normal operation and bound it if invalidation fails. What should it combine?",
+      "explanation": "Event-driven invalidation removes stale values promptly, and a TTL bounds how long a missed invalidation can affect readers.",
+      "caseStudy": {
+        "title": "AtlasDocs",
+        "background": "AtlasDocs runs document retrieval in Azure Database for PostgreSQL with pgvector. Callers can search only their department. An Azure Managed Redis cache stores generated summaries, while the source database remains authoritative for content updates."
+      },
+      "options": [
+        "Persist all Redis keys permanently",
+        "Set a longer TTL and skip invalidations",
+        "Invalidate on successful writes and set a finite TTL",
+        "Generate different cache keys on each read without expiration"
+      ],
+      "answer": "Invalidate on successful writes and set a finite TTL"
+    }
+  ]
+}

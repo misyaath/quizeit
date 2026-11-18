@@ -1,0 +1,30 @@
+[
+  {
+    "id": "azure",
+    "name": "Microsoft Azure",
+    "exams": [
+      { "id": "ai-200", "name": "AI-200 · Azure AI Cloud Developer" }
+    ]
+  },
+  {
+    "id": "aws",
+    "name": "Amazon Web Services (AWS)",
+    "exams": [
+      { "id": "solutions-architect-associate", "name": "AWS Certified Solutions Architect – Associate" }
+    ]
+  },
+  {
+    "id": "google",
+    "name": "Google Cloud",
+    "exams": [
+      { "id": "associate-cloud-engineer", "name": "Associate Cloud Engineer" }
+    ]
+  },
+  {
+    "id": "custom",
+    "name": "Other topics",
+    "exams": [
+      { "id": "general-practice", "name": "General practice" }
+    ]
+  }
+]

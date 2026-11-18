@@ -1,0 +1,1065 @@
+{
+  "id": "level-03",
+  "title": "Level 3 · Implementation decisions",
+  "difficulty": 3,
+  "questions": [
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "Which resource best matches the bounded queue-driven worker requirement?",
+      "answer": "An event-driven Azure Container Apps job with a Service Bus scaler",
+      "explanation": "An event-driven job starts bounded executions in response to the queue.",
+      "options": [
+        "A public HTTP-only Container App with a fixed replica",
+        "An event-driven Azure Container Apps job with a Service Bus scaler",
+        "A Web App deployment slot that swaps after every message",
+        "A scheduled image build task"
+      ],
+      "caseStudy": {
+        "title": "EmberWorks",
+        "background": "EmberWorks receives daily equipment logs in a Python HTTP Function. Requests must return quickly with a status location. A bounded worker execution is preferable to a continuously running worker when the queue is empty. The processing team estimates that a message can outlive an individual PeekLock.\n\nThe data team stores per-company job status in Cosmos DB. The application sometimes creates a job and immediately queries status from the same SDK session. A 429 alarm occurred during a short ingestion spike. The team does not want users to see cross-company results.\n\nThe operator wants trace correlation between acceptance and background work without placing authentication headers in telemetry.",
+        "exhibits": [
+          {
+            "title": "Workload requirements",
+            "code": "HTTP p95 acceptance target: 250 ms\nWorker task duration: 3–12 minutes\nWorker capacity when queue is empty: zero\nCosmos partition key: /companyId"
+          },
+          {
+            "title": "Function sketch (Python)",
+            "code": "@app.route(route=\"jobs\", methods=[\"POST\"])\ndef submit(req):\n    job = persist_and_enqueue(req.get_json())\n    # Return an acceptance result here\n::"
+          }
+        ]
+      },
+      "id": "level-03-q01"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "Which Cosmos consistency supports a create followed by a read within the same SDK session?",
+      "answer": "Session consistency",
+      "explanation": "Session consistency provides read-your-writes within the same session when the session context is carried.",
+      "options": [
+        "A lower TTL on the record",
+        "Session consistency",
+        "Consistent prefix alone",
+        "Eventual consistency"
+      ],
+      "caseStudy": {
+        "title": "EmberWorks",
+        "background": "EmberWorks receives daily equipment logs in a Python HTTP Function. Requests must return quickly with a status location. A bounded worker execution is preferable to a continuously running worker when the queue is empty. The processing team estimates that a message can outlive an individual PeekLock.\n\nThe data team stores per-company job status in Cosmos DB. The application sometimes creates a job and immediately queries status from the same SDK session. A 429 alarm occurred during a short ingestion spike. The team does not want users to see cross-company results.\n\nThe operator wants trace correlation between acceptance and background work without placing authentication headers in telemetry.",
+        "exhibits": [
+          {
+            "title": "Workload requirements",
+            "code": "HTTP p95 acceptance target: 250 ms\nWorker task duration: 3–12 minutes\nWorker capacity when queue is empty: zero\nCosmos partition key: /companyId"
+          },
+          {
+            "title": "Function sketch (Python)",
+            "code": "@app.route(route=\"jobs\", methods=[\"POST\"])\ndef submit(req):\n    job = persist_and_enqueue(req.get_json())\n    # Return an acceptance result here\n::"
+          }
+        ]
+      },
+      "id": "level-03-q02"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "What retry behavior fits the temporary Cosmos throttling?",
+      "answer": "Honor the service's retry-after duration and bound retries",
+      "explanation": "Cosmos throttling requires a paced retry. A fresh query or stronger consistency does not add capacity.",
+      "options": [
+        "Fall back to a cross-partition query for every 429",
+        "Switch all calls to strong consistency",
+        "Retry immediately until the request succeeds",
+        "Honor the service's retry-after duration and bound retries"
+      ],
+      "caseStudy": {
+        "title": "EmberWorks",
+        "background": "EmberWorks receives daily equipment logs in a Python HTTP Function. Requests must return quickly with a status location. A bounded worker execution is preferable to a continuously running worker when the queue is empty. The processing team estimates that a message can outlive an individual PeekLock.\n\nThe data team stores per-company job status in Cosmos DB. The application sometimes creates a job and immediately queries status from the same SDK session. A 429 alarm occurred during a short ingestion spike. The team does not want users to see cross-company results.\n\nThe operator wants trace correlation between acceptance and background work without placing authentication headers in telemetry.",
+        "exhibits": [
+          {
+            "title": "Workload requirements",
+            "code": "HTTP p95 acceptance target: 250 ms\nWorker task duration: 3–12 minutes\nWorker capacity when queue is empty: zero\nCosmos partition key: /companyId"
+          },
+          {
+            "title": "Function sketch (Python)",
+            "code": "@app.route(route=\"jobs\", methods=[\"POST\"])\ndef submit(req):\n    job = persist_and_enqueue(req.get_json())\n    # Return an acceptance result here\n::"
+          }
+        ]
+      },
+      "id": "level-03-q03"
+    },
+    {
+      "domain": "integration",
+      "type": "multi",
+      "prompt": "What should the HTTP handler return before the job finishes? Select the action and its supporting safeguard.",
+      "answer": [
+        "HTTP 202 with a status URL for the authorized caller",
+        "Ensure the job is accepted durably before returning the response"
+      ],
+      "explanation": "202 Accepted with a status endpoint implements asynchronous request-reply. A tracked acceptance contract must survive a process exit immediately after replying.",
+      "options": [
+        "HTTP 200 containing a fabricated completed result",
+        "HTTP 204 with no status reference",
+        "HTTP 202 with a status URL for the authorized caller",
+        "HTTP 409 on every accepted operation",
+        "Ensure the job is accepted durably before returning the response"
+      ],
+      "caseStudy": {
+        "title": "EmberWorks",
+        "background": "EmberWorks receives daily equipment logs in a Python HTTP Function. Requests must return quickly with a status location. A bounded worker execution is preferable to a continuously running worker when the queue is empty. The processing team estimates that a message can outlive an individual PeekLock.\n\nThe data team stores per-company job status in Cosmos DB. The application sometimes creates a job and immediately queries status from the same SDK session. A 429 alarm occurred during a short ingestion spike. The team does not want users to see cross-company results.\n\nThe operator wants trace correlation between acceptance and background work without placing authentication headers in telemetry.",
+        "exhibits": [
+          {
+            "title": "Workload requirements",
+            "code": "HTTP p95 acceptance target: 250 ms\nWorker task duration: 3–12 minutes\nWorker capacity when queue is empty: zero\nCosmos partition key: /companyId"
+          },
+          {
+            "title": "Function sketch (Python)",
+            "code": "@app.route(route=\"jobs\", methods=[\"POST\"])\ndef submit(req):\n    job = persist_and_enqueue(req.get_json())\n    # Return an acceptance result here\n::"
+          }
+        ]
+      },
+      "id": "level-03-q04"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "What should the sender put into message properties for correlated traces?",
+      "answer": "OpenTelemetry propagation context such as traceparent",
+      "explanation": "Trace context links the worker span without distributing credentials.",
+      "options": [
+        "OpenTelemetry propagation context such as traceparent",
+        "The user's entire HTTP request",
+        "A generated unrelated trace ID with no link",
+        "The original bearer token"
+      ],
+      "caseStudy": {
+        "title": "EmberWorks",
+        "background": "EmberWorks receives daily equipment logs in a Python HTTP Function. Requests must return quickly with a status location. A bounded worker execution is preferable to a continuously running worker when the queue is empty. The processing team estimates that a message can outlive an individual PeekLock.\n\nThe data team stores per-company job status in Cosmos DB. The application sometimes creates a job and immediately queries status from the same SDK session. A 429 alarm occurred during a short ingestion spike. The team does not want users to see cross-company results.\n\nThe operator wants trace correlation between acceptance and background work without placing authentication headers in telemetry.",
+        "exhibits": [
+          {
+            "title": "Workload requirements",
+            "code": "HTTP p95 acceptance target: 250 ms\nWorker task duration: 3–12 minutes\nWorker capacity when queue is empty: zero\nCosmos partition key: /companyId"
+          },
+          {
+            "title": "Function sketch (Python)",
+            "code": "@app.route(route=\"jobs\", methods=[\"POST\"])\ndef submit(req):\n    job = persist_and_enqueue(req.get_json())\n    # Return an acceptance result here\n::"
+          }
+        ]
+      },
+      "id": "level-03-q05"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The desert candidate consumes 325 MiB at startup and spikes by another 120 MiB during batch processing. Using these measured values only, what minimum limit in MiB covers the combined peak?",
+      "answer": "445",
+      "explanation": "The startup allocation remains resident during the batch. Add the incremental peak before setting a real production safety margin.",
+      "options": [
+        "389",
+        "650",
+        "325",
+        "445"
+      ],
+      "exhibits": [
+        {
+          "title": "Observed Pod status",
+          "code": "Last State: Terminated\nReason: OOMKilled\nConfigured limit: 389Mi"
+        }
+      ],
+      "id": "level-03-q06"
+    },
+    {
+      "domain": "containers",
+      "type": "order",
+      "prompt": "Arrange promotion of the desert AKS image when manifests are applied after artifact validation.",
+      "answer": [
+        "Publish the candidate container image",
+        "Capture and test its manifest digest",
+        "Update the production manifest to the tested digest",
+        "Apply the manifest and verify rollout status"
+      ],
+      "explanation": "The tested digest is the release input. Updating and applying the manifest precedes rollout verification.",
+      "id": "level-03-q07"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "Which query operation keeps every failed desert request, including failures whose dependency telemetry was sampled out?",
+      "answer": "Join with kind=leftouter on OperationId with failed AppRequests on the left",
+      "explanation": "A leftouter join keeps unmatched request rows while enriching matched rows.",
+      "options": [
+        "Join with kind=leftanti to keep everything",
+        "Join with kind=inner on OperationId",
+        "Filter dependency rows by matching HTTP status with no operation identity",
+        "Join with kind=leftouter on OperationId with failed AppRequests on the left"
+      ],
+      "exhibits": [
+        {
+          "title": "KQL input",
+          "code": "let Failures = AppRequests | where AppRoleName == \"desert-api\" and Success == false;\nFailures\n| join kind=___ (AppDependencies) on OperationId"
+        }
+      ],
+      "id": "level-03-q08"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "For the desert event consumer, what should the deduplication key contain under CloudEvents if two publishers can generate the same id?",
+      "answer": "Both source and id",
+      "explanation": "CloudEvents treats the source and id combination as unique for distinct events.",
+      "options": [
+        "Only the delivery count",
+        "Only id across all sources",
+        "Only specversion and time",
+        "Both source and id"
+      ],
+      "exhibits": [
+        {
+          "title": "Event pair (JSON lines)",
+          "code": "{\"id\":\"5\",\"source\":\"/sites/desert/api\"}\n{\"id\":\"5\",\"source\":\"/sites/desert/backfill\"}"
+        }
+      ],
+      "id": "level-03-q09"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "The desert store must accept 1536-dimensional embeddings, while the old table contains 384-dimensional vectors. Which change preserves rollback?",
+      "answer": "Backfill a versioned vector(1536) column or table and pair it with the new encoder",
+      "explanation": "An index must match the encoder dimension and embedding space. Versioned storage keeps the prior model and data available.",
+      "options": [
+        "Convert vectors to a shared integer and sort by the integer",
+        "Pad and compare representations from both model spaces without validation",
+        "Backfill a versioned vector(1536) column or table and pair it with the new encoder",
+        "Write the new vectors directly to vector(384)"
+      ],
+      "id": "level-03-q10"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "The Azure Managed Redis cache for desert stores per-tenant answers. Which cache key is sufficient when changing model generations?",
+      "answer": "desert:<verified-tenant>:<model-generation>:<query-hash>",
+      "explanation": "Tenant scope and model generation are both retrieval inputs and must participate in cache identity.",
+      "options": [
+        "desert:<verified-tenant>:<query-hash>",
+        "desert:<query-hash>",
+        "desert:<model-generation>:<query-hash>",
+        "desert:<verified-tenant>:<model-generation>:<query-hash>"
+      ],
+      "id": "level-03-q11"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "The desert identity reads an App Configuration Key Vault reference successfully, but resolution of the target value fails. Which explanation requires checking the separate data-plane authorization?",
+      "answer": "The provider can read a reference, but its resolving identity lacks secret-value access on the vault",
+      "explanation": "The stored reference is a URI. Reading the referenced secret requires vault permissions for the credential used by the provider.",
+      "options": [
+        "The provider can read a reference, but its resolving identity lacks secret-value access on the vault",
+        "A Key Vault URI cannot be used as a reference value",
+        "App Configuration Data Reader automatically includes vault read access",
+        "The App Configuration label must equal the vault hostname"
+      ],
+      "id": "level-03-q12"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "Azure App Configuration must differentiate prod and test values for the same key in one store. Which combination should the lookup use?",
+      "answer": "The same key and the environment-specific label",
+      "explanation": "A key and label identify an App Configuration key-value.",
+      "options": [
+        "A versioned Key Vault secret ID as a label",
+        "The same key and the environment-specific label",
+        "The store URL alone",
+        "A filter on the API's result status code"
+      ],
+      "id": "level-03-q13"
+    },
+    {
+      "domain": "data",
+      "type": "text",
+      "prompt": "Type the Cosmos DB for NoSQL function that computes distance in the desert vector query.",
+      "answer": [
+        "VectorDistance"
+      ],
+      "explanation": "VectorDistance compares the stored vector to the query vector using the configured policy.",
+      "exhibits": [
+        {
+          "title": "Cosmos SQL",
+          "code": "SELECT TOP 8 c.id\nFROM c\nORDER BY ____ (c.embedding, @queryVector)"
+        }
+      ],
+      "id": "level-03-q14"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The desert release must survive image tag reassignment. Which image reference pins the staging artifact?",
+      "answer": "acr.azurecr.io/retrieval@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "explanation": "A manifest digest identifies immutable content. Tags resolve to whatever digest they currently reference.",
+      "options": [
+        "acr.azurecr.io/retrieval:latest",
+        "acr.azurecr.io/retrieval",
+        "acr.azurecr.io/retrieval@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "acr.azurecr.io/retrieval:stable"
+      ],
+      "exhibits": [
+        {
+          "title": "Artifact to promote",
+          "code": "tag: candidate-3\nmanifestDigest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      ],
+      "id": "level-03-q15"
+    },
+    {
+      "domain": "containers",
+      "type": "match",
+      "prompt": "Match three desert Pod states to the fastest useful investigation.",
+      "answer": [
+        "Check CPU requests and remaining allocatable node capacity",
+        "Compare selector and Pod readiness",
+        "Check app logs for the affected revision"
+      ],
+      "explanation": "The scheduler uses resource requests to fit Pods on nodes.",
+      "labels": [
+        "Pending with Insufficient cpu",
+        "Service has no ready endpoints",
+        "Revision serving elevated 5xx"
+      ],
+      "id": "level-03-q16"
+    },
+    {
+      "domain": "containers",
+      "type": "text",
+      "prompt": "The desert container listens on the port printed below. Enter the numeric Container Apps ingress targetPort.",
+      "answer": [
+        "8003"
+      ],
+      "explanation": "Ingress forwards to the internal listening port, regardless of the public HTTPS port.",
+      "exhibits": [
+        {
+          "title": "Server startup log",
+          "code": "INFO: Listening on 0.0.0.0:8003\nINFO: External endpoint uses HTTPS"
+        }
+      ],
+      "id": "level-03-q17"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "Which KQL aggregation calculates the 93th percentile of request latency grouped by ResultCode for the desert deployment?",
+      "answer": "summarize Tail = percentile(DurationMs, 93) by ResultCode",
+      "explanation": "percentile aggregates a requested quantile over each group. Multiplying individual durations does not calculate a percentile.",
+      "options": [
+        "summarize Tail = avg(DurationMs) by ResultCode",
+        "summarize Tail = percentile(DurationMs, 93) by ResultCode",
+        "summarize Tail = max(DurationMs) by ResultCode",
+        "extend Tail = DurationMs * 0.93"
+      ],
+      "id": "level-03-q18"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The desert initializer needs 45 seconds. Using a simplified startup budget of periodSeconds × failureThreshold, which threshold is the smallest that provides at least one full additional probe period beyond initialization?",
+      "answer": "10",
+      "explanation": "Round up (45 + 5)/5. This is a simplified sizing estimate. Actual probes should also allow for observed variance.",
+      "options": [
+        "14",
+        "10",
+        "9",
+        "12"
+      ],
+      "exhibits": [
+        {
+          "title": "Deployment probe fragment",
+          "code": "startupProbe:\n  httpGet: {path: /started, port: 8080}\n  periodSeconds: 5\n  failureThreshold: ___"
+        }
+      ],
+      "id": "level-03-q19"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The desert process is running but should receive traffic only after /ready succeeds. Which probe should own that endpoint?",
+      "answer": "readinessProbe",
+      "explanation": "Readiness is evaluated after startup and controls whether Pods are available for Service traffic.",
+      "options": [
+        "livenessProbe",
+        "readinessProbe",
+        "a service selector",
+        "startupProbe only"
+      ],
+      "exhibits": [
+        {
+          "title": "Endpoint behavior",
+          "code": "GET /ready → 503 until query encoder and dependencies are available\nGET /live → 200 while process can run"
+        }
+      ],
+      "id": "level-03-q20"
+    },
+    {
+      "domain": "data",
+      "type": "text",
+      "prompt": "Type the Redis SET option used in the desert command to express a 75-second expiry.",
+      "answer": [
+        "EX"
+      ],
+      "explanation": "SET with EX attaches an expiration in seconds as part of the value write.",
+      "exhibits": [
+        {
+          "title": "Redis command",
+          "code": "SET desert:summary result ____ 75"
+        }
+      ],
+      "id": "level-03-q21"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "The desert approximate index returned 6 authorized results while exact filtered search returned 8. Which experiment can improve recall without weakening the filter?",
+      "answer": "Increase HNSW candidate effort and compare approximate results to exact search under the same predicate",
+      "explanation": "Candidate tuning can improve filtered recall. Exact results from the same permitted corpus provide an appropriate reference.",
+      "options": [
+        "Evaluate only p95 latency and ignore result quality",
+        "Compare approximate recall against an unfiltered query",
+        "Remove the tenant predicate when the first search falls short",
+        "Increase HNSW candidate effort and compare approximate results to exact search under the same predicate"
+      ],
+      "id": "level-03-q22"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "The desert operation needs to reprocess a permanently failed message after fixing upstream data. Which sequence avoids losing the original on a failed send?",
+      "answer": "Receive from the dead-letter subqueue, send a corrected message, confirm acceptance, then complete the original",
+      "explanation": "Keep the dead-letter delivery until the corrected copy is accepted. Account for duplicate detection when replaying.",
+      "options": [
+        "Use ReceiveAndDelete on the dead-letter subqueue before validating the data",
+        "Complete the original, then attempt to send a corrected copy",
+        "Send a fresh unrelated payload and reset the queue",
+        "Receive from the dead-letter subqueue, send a corrected message, confirm acceptance, then complete the original"
+      ],
+      "id": "level-03-q23"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "The desert chart requires failed requests counted per 7 minutes by service role. Which query aggregation builds buckets and counts rows?",
+      "answer": "summarize Failures=count() by AppRoleName, bin(TimeGenerated, 7m)",
+      "explanation": "Group by role and binned timestamps. Grouping by raw timestamps or role only omits the requested interval grouping.",
+      "options": [
+        "summarize Failures=count() by AppRoleName, TimeGenerated",
+        "project AppRoleName, bin(TimeGenerated, 7m)",
+        "summarize Failures=count() by AppRoleName, bin(TimeGenerated, 7m)",
+        "summarize Failures=count() by AppRoleName"
+      ],
+      "id": "level-03-q24"
+    },
+    {
+      "domain": "integration",
+      "type": "text",
+      "prompt": "Enter the Python Azure Functions v2 decorator name, without @app. or parentheses, for the desert HTTP endpoint.",
+      "answer": [
+        "route"
+      ],
+      "explanation": "The route decorator configures the HTTP route and trigger.",
+      "exhibits": [
+        {
+          "title": "Function fragment (Python)",
+          "code": "@app.___(route=\"desert/jobs\", methods=[\"POST\"])\ndef submit(req):\n    return accept(req)"
+        }
+      ],
+      "id": "level-03-q25"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "In Azure App Configuration, the model and threshold for desert must be refreshed together on reading a sentinel. Which publishing order fits?",
+      "answer": "Update all dependent values, then update the sentinel",
+      "explanation": "Write the sentinel after publishing the dependent keys so a refresh sees the complete intended set.",
+      "options": [
+        "Update the sentinel first, then write values independently",
+        "Use the production values under the staging label",
+        "Update all dependent values, then update the sentinel",
+        "Republish an unchanged sentinel before each individual key write"
+      ],
+      "exhibits": [
+        {
+          "title": "App Configuration change set",
+          "code": "Key: retrieval:model, Label: desert\nKey: retrieval:threshold, Label: desert\nKey: retrieval:sentinel, Label: desert"
+        }
+      ],
+      "id": "level-03-q26"
+    },
+    {
+      "domain": "integration",
+      "type": "order",
+      "prompt": "Arrange the successful desert PeekLock path so a fault after the database write leaves the operation safe to replay.",
+      "answer": [
+        "Receive and lock the message",
+        "Validate the payload and derive the stable operation key",
+        "Commit the idempotent business result",
+        "Complete the broker delivery"
+      ],
+      "explanation": "Acknowledgment follows a durable idempotent write, preserving retry safety.",
+      "id": "level-03-q27"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "The desert PostgreSQL query ranks using negative inner product. Which HNSW operator class supports the shown operator?",
+      "answer": "vector_ip_ops",
+      "explanation": "The HNSW operator class must match the ranking operator. Cosine uses <=>, Euclidean uses <->, and negative inner product uses <#>.",
+      "options": [
+        "vector_cosine_ops",
+        "vector_l2_ops",
+        "vector_ip_ops",
+        "text_pattern_ops"
+      ],
+      "exhibits": [
+        {
+          "title": "pgvector query",
+          "code": "SELECT id FROM chunks\nWHERE tenant_id = $2\nORDER BY embedding <#> $1\nLIMIT 8;"
+        }
+      ],
+      "id": "level-03-q28"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "Which OpenTelemetry resource attribute identifies the logical desert service independently of the request operation name?",
+      "answer": "service.name",
+      "explanation": "service.name groups instances of the same logical service. service.instance.id identifies an individual instance.",
+      "options": [
+        "service.instance.id",
+        "service.name",
+        "http.request.method",
+        "server.address"
+      ],
+      "exhibits": [
+        {
+          "title": "OpenTelemetry resource attributes",
+          "code": "{\"___\": \"desert-retrieval-api\", \"deployment.environment.name\": \"production\"}"
+        }
+      ],
+      "id": "level-03-q29"
+    },
+    {
+      "domain": "data",
+      "type": "order",
+      "prompt": "Order the retrieval path for the desert assistant after the caller submits a query. Resolve scope before contacting the data tier.",
+      "answer": [
+        "Determine the verified tenant and retrieval generation",
+        "Embed the question using the selected generation encoder",
+        "Retrieve up to 8 nearest eligible rows with metadata predicates",
+        "Supply only eligible chunks and their provenance to generation"
+      ],
+      "explanation": "The retrieval scope must be established before retrieving data, and the query vector must match the index.",
+      "id": "level-03-q30"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "The desert Event Grid function receives document version 6 followed by version 5. What should the durable update predicate enforce?",
+      "answer": "Only apply an event whose version is strictly newer than the stored document version",
+      "explanation": "Idempotency protects duplicates, while monotonic version checks protect against distinct events arriving out of order.",
+      "options": [
+        "Compare only whether the event IDs differ",
+        "Only apply an event whose version is strictly newer than the stored document version",
+        "Always overwrite with the most recently delivered event",
+        "Use the delivery retry count to choose the newest document"
+      ],
+      "id": "level-03-q31"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The desert node has 3000m allocatable CPU and 1325m in existing Pod requests. How many whole new 570m Pods can the scheduler fit using CPU alone?",
+      "answer": "2",
+      "explanation": "Subtract existing requests from allocatable CPU and divide downward by the incoming request.",
+      "options": [
+        "3",
+        "1",
+        "5",
+        "2"
+      ],
+      "id": "level-03-q32"
+    },
+    {
+      "domain": "data",
+      "type": "match",
+      "prompt": "Match the three distinct Redis requirements at desert.",
+      "answer": [
+        "SET key value EX 75",
+        "DEL key",
+        "TTL key"
+      ],
+      "explanation": "EX sets expiration with the write, DEL invalidates the key, and TTL reports the remaining time.",
+      "labels": [
+        "Write a reply that expires after 75 seconds",
+        "Invalidate a reply immediately following an update",
+        "Inspect the remaining lifetime in seconds"
+      ],
+      "id": "level-03-q33"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "Each desert batch has 97 Cosmos reads that cost 5 RU each. What total RU charge should be expected if all reads complete once?",
+      "answer": "485",
+      "explanation": "Multiply the count by the RU charge per operation. Retry overhead is excluded.",
+      "options": [
+        "5",
+        "582",
+        "485",
+        "97"
+      ],
+      "exhibits": [
+        {
+          "title": "Cosmos logs",
+          "code": "completedReads=97\nx-ms-request-charge per read=5"
+        }
+      ],
+      "id": "level-03-q34"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "The desert security team needs to investigate failures without storing raw document text or bearer tokens. What should be exported?",
+      "answer": "Sanitized error categories and stable operation identifiers with approved allowlisted attributes",
+      "explanation": "Redact secrets before export and use correlation identifiers to preserve incident context.",
+      "options": [
+        "Headers and prompt text in span attributes",
+        "Raw credentials in a separate logging table keyed by operation",
+        "Sanitized error categories and stable operation identifiers with approved allowlisted attributes",
+        "Entire input and unchanged exception fields for every failure"
+      ],
+      "id": "level-03-q35"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "The desert timer starts a batch every 5 minutes. Starting at minute zero, how many scheduled starts occur in the half-open interval [0, 25)?",
+      "answer": "5",
+      "explanation": "Starts occur at zero and at the next four multiples of the period. The upper endpoint is excluded.",
+      "options": [
+        "5",
+        "12",
+        "6",
+        "4"
+      ],
+      "exhibits": [
+        {
+          "title": "Scheduling monitor excerpt",
+          "code": "periodMinutes: 5\nobserveUntilMinuteExclusive: 25"
+        }
+      ],
+      "id": "level-03-q36"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "What failure can occur when the desert worker runs this code and exits at the marked line?",
+      "answer": "The message is removed even though the database update has not happened",
+      "explanation": "The code settles the message before doing its work. Move completion after the durable, idempotent result.",
+      "options": [
+        "The successful database write is automatically rolled back by Service Bus",
+        "A duplicate is guaranteed because the lock was renewed",
+        "The message is removed even though the database update has not happened",
+        "A permanently invalid message goes to the DLQ automatically before completion"
+      ],
+      "exhibits": [
+        {
+          "title": "PeekLock worker (Python)",
+          "code": "receiver.complete_message(message)\n# Process exits here.\nwrite_result(\"desert\", message)"
+        }
+      ],
+      "id": "level-03-q37"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "The deployed desert Function tries to resolve the connection named in the decorator. Which location provides the deployed setting?",
+      "answer": "The Function App application settings using the configured connection name or identity-based prefix",
+      "explanation": "The hosted process receives application settings from the Function App. Local settings only apply during local execution.",
+      "options": [
+        "The Function App application settings using the configured connection name or identity-based prefix",
+        "The SQL schema of the function result",
+        "The Service Bus message body",
+        "The developer workstation local.settings.json without publishing settings"
+      ],
+      "exhibits": [
+        {
+          "title": "Worker function (Python)",
+          "code": "@app.service_bus_queue_trigger(arg_name=\"msg\", queue_name=\"desert-jobs\", connection=\"JobBus\")\ndef work(msg):\n    handle(msg)"
+        }
+      ],
+      "id": "level-03-q38"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "The desert updates must be processed in order for each document while unrelated documents process concurrently. What should the producer put into SessionId?",
+      "answer": "The verified tenant and stable document ID together",
+      "explanation": "Session keys group related work. A single global key over-serializes the independent documents.",
+      "options": [
+        "The same global value for all tenants and documents",
+        "The retry counter",
+        "The verified tenant and stable document ID together",
+        "A random identifier created for each send"
+      ],
+      "exhibits": [
+        {
+          "title": "Service Bus sender (Python)",
+          "code": "msg = ServiceBusMessage(body, message_id=operation_id, session_id=___)\n# Queue is session-enabled for tenant desert"
+        }
+      ],
+      "id": "level-03-q39"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "The desert app must pick up current secret versions on future fetches. Which Key Vault call avoids pinning a specific version?",
+      "answer": "client.get_secret(\"desert-db-password\")",
+      "explanation": "A versionless get resolves the current version. The application must still perform its next fetch according to its cache policy.",
+      "options": [
+        "client.get_secret(\"desert-db-password\")",
+        "client.get_deleted_secret(\"db-password\")",
+        "client.list_properties_of_secrets()",
+        "client.get_secret(\"desert-db-password\", version=\"old-version\")"
+      ],
+      "exhibits": [
+        {
+          "title": "SecretClient call (Python)",
+          "code": "client = SecretClient(vault_url=vault_url, credential=credential)\nsecret = ____"
+        }
+      ],
+      "id": "level-03-q40"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "The scheduled message was accepted by Service Bus today but must become visible to consumers tomorrow. Which operation meets that requirement?",
+      "answer": "Schedule the message for tomorrow",
+      "explanation": "Scheduled enqueue delays availability without asking consumers to hold locks.",
+      "options": [
+        "Schedule the message for tomorrow",
+        "Send it now and defer it before a receiver sees it",
+        "Extend the receiving lock duration until tomorrow",
+        "Add an Event Grid subject filter to the queue"
+      ],
+      "id": "level-03-q41"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The desert canary receives 9% of explicitly weighted ingress. What stable weight keeps the split valid?",
+      "answer": "91",
+      "explanation": "The weights for the active ingress targets must sum to 100%.",
+      "options": [
+        "0",
+        "100",
+        "91",
+        "9"
+      ],
+      "id": "level-03-q42"
+    },
+    {
+      "domain": "operations",
+      "type": "order",
+      "prompt": "Order the desert database credential rotation so existing calls can continue while the app switches. The database supports overlapping credentials.",
+      "answer": [
+        "Create the replacement credential and publish a new secret version",
+        "Refresh the app and have it fetch the replacement",
+        "Verify authenticated requests on the new credential",
+        "Revoke the previous credential"
+      ],
+      "explanation": "Keep overlap until verifying that clients can authenticate with the replacement.",
+      "id": "level-03-q43"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "The desert change feed processor is being scaled to 4 instances with a shared processor identity. Which state enables partition ownership and checkpointing?",
+      "answer": "The lease container shared by these processor instances",
+      "explanation": "A shared lease container coordinates assignment and preserves progress across instances.",
+      "options": [
+        "The cluster node hostname in each document",
+        "The vector query continuation token reused as a lock",
+        "A separate new lease container per instance",
+        "The lease container shared by these processor instances"
+      ],
+      "id": "level-03-q44"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "An Event Grid subscription should allow only desert.DocumentAccepted events with subjects under /tenant/desert/. Which configuration expresses both constraints?",
+      "answer": "Include event type desert.DocumentAccepted and set subjectBeginsWith to /tenant/desert/",
+      "explanation": "Event-type selection and a subject prefix address separate constraints. Include the ending slash to avoid adjacent prefix matches.",
+      "options": [
+        "Use subjectEndsWith /tenant/desert/ without an event-type filter",
+        "Include event type desert.DocumentAccepted and set subjectBeginsWith to /tenant/desert/",
+        "Use a subscription filter on delivery attempt only",
+        "Include event type desert.DocumentAccepted and remove subject filtering"
+      ],
+      "id": "level-03-q45"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "A desert retrieval service has 109 total DB connections and reserves 13 for other services. What pool cap per replica fits with 6 simultaneous replicas?",
+      "answer": "16",
+      "explanation": "Subtract the reserved connections, divide by the replica count and round down.",
+      "options": [
+        "16",
+        "96",
+        "17",
+        "19"
+      ],
+      "id": "level-03-q46"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "Complete the KQL filter to restrict the desert view to requests from the preceding 7 minutes.",
+      "answer": "where TimeGenerated >= ago(7m)",
+      "explanation": "ago() yields a timestamp. Keep events at or after that time using where.",
+      "options": [
+        "where TimeGenerated >= ago(7m)",
+        "where TimeGenerated == ago(7m)",
+        "where TimeGenerated <= ago(7m)",
+        "project TimeGenerated >= ago(7m)"
+      ],
+      "exhibits": [
+        {
+          "title": "Request query (KQL)",
+          "code": "AppRequests\n| ____\n| where AppRoleName == \"desert-api\""
+        }
+      ],
+      "id": "level-03-q47"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "The desert Cosmos transport gets HTTP 429. What minimum timing should its first custom retry honor before retrying?",
+      "answer": "Wait at least 450 ms as indicated by the service",
+      "explanation": "x-ms-retry-after-ms reports milliseconds. Use this hint with bounded retry behavior.",
+      "options": [
+        "Wait 0.45 ms",
+        "Retry only after changing the consistency level",
+        "Retry immediately on another client",
+        "Wait at least 450 ms as indicated by the service"
+      ],
+      "exhibits": [
+        {
+          "title": "Response headers",
+          "code": "HTTP/1.1 429 Too Many Requests\nx-ms-retry-after-ms: 450"
+        }
+      ],
+      "id": "level-03-q48"
+    },
+    {
+      "domain": "operations",
+      "type": "match",
+      "prompt": "Match the desert telemetry requirements to the appropriate signal.",
+      "answer": [
+        "Distributed traces",
+        "Latency metrics",
+        "Structured application logs"
+      ],
+      "explanation": "Traces preserve causality, metrics show aggregate trends, and logs capture selected event detail.",
+      "labels": [
+        "Follow a request across the API and worker",
+        "Watch the rolling p95 latency trend",
+        "Read a specific sanitized diagnostic event"
+      ],
+      "id": "level-03-q49"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The desert Docker image builder installs dependencies again after every application-only edit. Which Dockerfile edit fixes that without bundling build tools?",
+      "answer": "Copy dependency metadata before application code and install the dependencies in a build stage",
+      "explanation": "Docker invalidates layers downstream of a changed COPY. Separate stable dependency inputs and use a runtime stage for the output.",
+      "options": [
+        "Copy the entire repository before dependency installation",
+        "Copy dependency metadata before application code and install the dependencies in a build stage",
+        "Install build tools in the final stage at process startup",
+        "Move the application COPY below CMD but keep it before dependency installation"
+      ],
+      "exhibits": [
+        {
+          "title": "Current Dockerfile",
+          "code": "FROM python:3.12-slim\nWORKDIR /app\nCOPY . .\nRUN pip wheel -r requirements.txt -w /wheels"
+        }
+      ],
+      "id": "level-03-q50"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "The desert Cosmos Python handler has a document ID and tenant. Which SDK call performs a point read?",
+      "answer": "container.read_item(item=\"desert-3\", partition_key=\"desert\")",
+      "explanation": "A Cosmos point read uses the id and logical partition key, and avoids query fan-out.",
+      "options": [
+        "container.read()",
+        "container.query_items(\"SELECT * FROM c WHERE c.id = 'desert-3'\", enable_cross_partition_query=True)",
+        "container.read_item(item=\"desert\", partition_key=\"desert-3\")",
+        "container.read_item(item=\"desert-3\", partition_key=\"desert\")"
+      ],
+      "exhibits": [
+        {
+          "title": "Stored document",
+          "code": "{\"id\": \"desert-3\", \"accountId\": \"desert\", \"status\": \"ready\"}"
+        }
+      ],
+      "id": "level-03-q51"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "The API needs the next page from a parameterized Cosmos DB query. Assuming the same supported query and options, what should the API return to resume execution?",
+      "answer": "The Cosmos query continuation token",
+      "explanation": "Continuation tokens encode paging state. Session tokens and ETags serve different purposes.",
+      "options": [
+        "The maximum document length",
+        "The Cosmos query continuation token",
+        "The session token only",
+        "The document's ETag"
+      ],
+      "id": "level-03-q52"
+    },
+    {
+      "domain": "integration",
+      "type": "match",
+      "prompt": "Match each desert event integration need to its Azure feature.",
+      "answer": [
+        "Service Bus queue",
+        "Service Bus topic subscriptions",
+        "Event Grid subscription filter"
+      ],
+      "explanation": "Queues implement competing consumption, subscriptions implement fan-out, and Event Grid filters select notifications.",
+      "labels": [
+        "Distribute one durable command per handler delivery",
+        "Maintain independent durable copies by team",
+        "Route notifications by subject path"
+      ],
+      "id": "level-03-q53"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The desert Deployment creates Ready Pods, but the Kubernetes Service selects no Pods. Which exact selector must the Service use?",
+      "answer": "app: retrieve-desert",
+      "explanation": "A Service uses a flat map under spec.selector and matches actual Pod labels.",
+      "options": [
+        "port: 8080",
+        "app: retrieve-desert",
+        "app: search-desert",
+        "matchLabels: retrieve"
+      ],
+      "exhibits": [
+        {
+          "title": "Service and Deployment excerpts",
+          "code": "# Service\nspec:\n  selector: {app: search-desert}\n# Deployment template\nmetadata:\n  labels: {app: retrieve-desert}"
+        }
+      ],
+      "id": "level-03-q54"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "The desert worker begins a completely new trace for every Service Bus delivery. Which corrected operation associates spans with the producer?",
+      "answer": "Extract propagated context from message properties and use it as a parent or span link according to messaging semantics",
+      "explanation": "Producer context belongs in transport metadata. The receiving span uses the context to link the operations across the broker.",
+      "options": [
+        "Extract propagated context from message properties and use it as a parent or span link according to messaging semantics",
+        "Put the account credential into baggage",
+        "Derive the trace ID from message length",
+        "Copy the queue lock token into the span name"
+      ],
+      "id": "level-03-q55"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "Which Service Bus settlement is appropriate for the desert receiver? The current message should be skipped by ordinary receives and returned by sequence number later.",
+      "answer": "Defer",
+      "explanation": "Use Complete for success, Abandon for prompt redelivery, Dead-letter for permanent failures, and Defer for retrieval by sequence number.",
+      "options": [
+        "Dead-letter",
+        "Abandon",
+        "Complete",
+        "Defer"
+      ],
+      "id": "level-03-q56"
+    },
+    {
+      "domain": "operations",
+      "type": "text",
+      "prompt": "Type the W3C header name that carries the active trace and parent span identifiers for the desert API.",
+      "answer": [
+        "traceparent"
+      ],
+      "explanation": "traceparent carries the trace ID and parent span ID used to correlate the downstream span.",
+      "exhibits": [
+        {
+          "title": "Downstream HTTP headers",
+          "code": "___: 00-dddddddddddddddddddddddddddddddd-aaaaaaaaaaaaaaaa-01\naccept: application/json"
+        }
+      ],
+      "id": "level-03-q57"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "An internal-only dependency in the same Azure Container Apps environment needs HTTP ingress. The public gateway must call it without creating a second public endpoint. Which mode meets the requirement?",
+      "answer": "Enable internal ingress on the dependency",
+      "explanation": "Internal ingress exposes the app inside the environment while keeping its HTTP endpoint private.",
+      "options": [
+        "Enable internal ingress on the dependency",
+        "Disable ingress on the dependency and use its HTTP hostname anyway",
+        "Enable external ingress and rely on its new revision label",
+        "Change the dependency to a scheduled job"
+      ],
+      "id": "level-03-q58"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The desert worker scales from zero. Its queue backlog may grow during periods without HTTP traffic. Which configuration follows the backlog?",
+      "answer": "Use a Service Bus KEDA scale rule with minReplicas 0",
+      "explanation": "A queue scaler can observe the broker while the container has zero replicas. A CPU rule cannot measure a nonexistent replica.",
+      "options": [
+        "Use an HTTP rule with concurrentRequests 1",
+        "Use a CPU utilization rule without a queue trigger",
+        "Increase maxReplicas without setting an event-driven rule",
+        "Use a Service Bus KEDA scale rule with minReplicas 0"
+      ],
+      "id": "level-03-q59"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "The desert sender retried within the broker duplicate detection window. Which message property must stay unchanged on an unpartitioned queue?",
+      "answer": "message_id",
+      "explanation": "Duplicate detection uses the application-assigned MessageId. Sequence numbers and delivery counts are set by the broker.",
+      "options": [
+        "sequence_number",
+        "delivery_count",
+        "locked_until_utc",
+        "message_id"
+      ],
+      "exhibits": [
+        {
+          "title": "Service Bus retry (Python)",
+          "code": "new_msg = ServiceBusMessage(body, message_id=f\"desert:{operation_id}\")\nsender.send_messages(new_msg)"
+        }
+      ],
+      "id": "level-03-q60"
+    }
+  ]
+}

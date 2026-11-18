@@ -1,0 +1,17 @@
+x-compatible-judge0: &compatible-judge0
+  image: azure-study-judge0:1.13.1-isolate-2.7
+  build: ./docker/judge0
+
+services:
+  server:
+    <<: *compatible-judge0
+    privileged: false
+  workers:
+    <<: *compatible-judge0
+    cgroup: private
+    user: root
+    entrypoint: ['/usr/local/bin/start-cgroup-v2-worker']
+    command: []
+    cpus: 2
+    mem_limit: 2g
+    pids_limit: 256

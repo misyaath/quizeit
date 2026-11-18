@@ -1,0 +1,353 @@
+{
+  "id": "generated-1e00a58d-1869-4105-960f-59fadabc4bd7",
+  "title": "AI-200 Advanced Practice: Embeddings and Vector Search in Azure Cosmos DB for No",
+  "questions": [
+    {
+      "id": "generated-1e00a58d-1869-4105-960f-59fadabc4bd7-q1",
+      "domain": "general",
+      "type": "single",
+      "prompt": "A pilot container has a correctly configured diskANN index on /embedding and contains exactly 800 items, each with one valid 1,536-dimensional embedding. A test query uses ORDER BY VectorDistance(c.embedding, @q, false). Why can the query still perform a full scan?",
+      "options": [
+        "The corpus is below the minimum vector count required to use DiskANN.",
+        "The third argument must be true to permit use of the vector index.",
+        "DiskANN cannot index vectors with more than 505 dimensions.",
+        "The query must project c.embedding in the SELECT clause before the index can be used."
+      ],
+      "answer": "The corpus is below the minimum vector count required to use DiskANN.",
+      "explanation": "DiskANN and quantizedFlat fall back to a full scan when fewer than 1,000 vectors are indexed. DiskANN supports 1,536 dimensions, and false permits index use when the index is available. Projecting the embedding is not required. ([learn.microsoft.com](https://learn.microsoft.com/en-us/azure/cosmos-db/vector-search))"
+    },
+    {
+      "id": "generated-1e00a58d-1869-4105-960f-59fadabc4bd7-q2",
+      "domain": "general",
+      "type": "multi",
+      "prompt": "An Azure Cosmos DB for NoSQL container stores each embedding at /embedding. Its ordinary indexing policy includes /*. The team wants a dedicated DiskANN index but never filters or sorts on individual embedding coordinates. Which two changes to the indexing policy meet these requirements without excluding other metadata? Select exactly two.",
+      "options": [
+        "Add a vectorIndexes entry with path /embedding and type diskANN.",
+        "Add /embedding/* to excludedPaths.",
+        "Add a vectorIndexes entry with path /embedding/* and type diskANN.",
+        "Exclude /* and explicitly include only /embedding/*.",
+        "Add a composite index on /tenantId and /embedding/0 instead of a vector index."
+      ],
+      "answer": [
+        "Add a vectorIndexes entry with path /embedding and type diskANN.",
+        "Add /embedding/* to excludedPaths."
+      ],
+      "explanation": "The dedicated vector index uses the exact path declared in the vector embedding policy. Excluding /embedding/* from ordinary indexing avoids indexing the individual coordinates there while preserving the separate DiskANN index and ordinary metadata indexing. A wildcard is not valid in the vector index path. ([learn.microsoft.com](https://learn.microsoft.com/azure/cosmos-db/index-policy?utm_source=openai))"
+    },
+    {
+      "id": "generated-1e00a58d-1869-4105-960f-59fadabc4bd7-q3",
+      "domain": "general",
+      "type": "match",
+      "prompt": "Match each workload to the vector index type that meets its defining requirement. Use each type once: diskANN, flat, quantizedFlat. Assume the indexes are fully built.",
+      "labels": [
+        "A 384-dimensional corpus that requires exact nearest-neighbor results from the index",
+        "A 1,536-dimensional corpus that requires an exhaustive scan of compressed vectors rather than graph traversal",
+        "A 3,072-dimensional corpus with millions of candidates per query that requires graph-based approximate search"
+      ],
+      "answer": [
+        "flat",
+        "quantizedFlat",
+        "diskANN"
+      ],
+      "explanation": "flat searches uncompressed vectors exactly and supports up to 505 dimensions. quantizedFlat exhaustively searches compressed vectors, so quantization can affect recall even though the search is exhaustive. diskANN uses graph-based approximate nearest-neighbor search. Both quantizedFlat and diskANN support up to 4,096 dimensions. ([learn.microsoft.com](https://learn.microsoft.com/en-us/azure/cosmos-db/vector-search))"
+    },
+    {
+      "id": "generated-1e00a58d-1869-4105-960f-59fadabc4bd7-q4",
+      "domain": "general",
+      "type": "order",
+      "prompt": "A search service is moving from a 768-dimensional embedding model to a 1,536-dimensional model. The models use different embedding spaces. The existing container must keep serving traffic until a replacement container has passed end-to-end validation on a complete, static copy of the corpus. Put these steps in order: Switch production routing to the new container and model; Backfill the new container with embeddings generated from the source text by the new model; Provision the replacement container with its 1,536-dimensional vector policy and matching index; Validate retrieval against the completed backfill using query embeddings from the new model.",
+      "answer": [
+        "Provision the replacement container with its 1,536-dimensional vector policy and matching index",
+        "Backfill the new container with embeddings generated from the source text by the new model",
+        "Validate retrieval against the completed backfill using query embeddings from the new model",
+        "Switch production routing to the new container and model"
+      ],
+      "explanation": "Provision the destination before writing to it, then regenerate the document embeddings rather than padding or reusing vectors from the old model. Validation must compare query and document embeddings from the new model. Switching the query model and container together after validation avoids comparing vectors from different embedding spaces. ([learn.microsoft.com](https://learn.microsoft.com/en-us/azure/cosmos-db/vector-search?utm_source=openai))"
+    },
+    {
+      "id": "generated-1e00a58d-1869-4105-960f-59fadabc4bd7-q5",
+      "domain": "general",
+      "type": "text",
+      "prompt": "You are measuring DiskANN recall against an exact baseline using the same query vector, filters, distance metric, and TOP value. What Boolean literal replaces the blank in ORDER BY VectorDistance(c.embedding, @q, ___) to force brute-force evaluation? Enter only the literal.",
+      "answer": [
+        "true",
+        "TRUE"
+      ],
+      "explanation": "The third argument controls whether the query forces brute-force evaluation. true bypasses the vector index; false, the default, permits index use. Keeping the other inputs fixed makes the brute-force result a useful baseline for measuring recall. ([learn.microsoft.com](https://learn.microsoft.com/en-us/cosmos-db/query/vectordistance))"
+    },
+    {
+      "id": "generated-1e00a58d-1869-4105-960f-59fadabc4bd7-q6",
+      "domain": "general",
+      "type": "single",
+      "prompt": "An Azure Cosmos DB for NoSQL container uses /tenantId as its partition key and Euclidean distance for /embedding. The parameters @tenant and @q contain one tenant ID and a query vector. Which query returns up to five published items for that tenant, nearest first, while providing an equality predicate on the partition key for routing?",
+      "options": [
+        "SELECT TOP 5 c.id FROM c WHERE c.tenantId = @tenant AND c.status = 'published' ORDER BY VectorDistance(c.embedding, @q) ASC",
+        "SELECT TOP 5 c.id FROM c WHERE c.tenantId = @tenant AND c.status = 'published' ORDER BY VectorDistance(c.embedding, @q) DESC",
+        "SELECT TOP 5 c.id FROM c WHERE c.tenantId = @tenant OR c.status = 'published' ORDER BY VectorDistance(c.embedding, @q) ASC",
+        "SELECT TOP 5 c.id FROM c WHERE c.status = 'published' ORDER BY VectorDistance(c.embedding, @q) ASC"
+      ],
+      "answer": "SELECT TOP 5 c.id FROM c WHERE c.tenantId = @tenant AND c.status = 'published' ORDER BY VectorDistance(c.embedding, @q) ASC",
+      "explanation": "With Euclidean distance, smaller distances are nearer. AND requires both the tenant and publication predicates, and equality on /tenantId supports in-partition routing. Using OR can admit published items from other tenants; dropping the tenant predicate removes both the tenant restriction and its routing benefit. ([learn.microsoft.com](https://learn.microsoft.com/en-us/azure/cosmos-db/vector-search))"
+    },
+    {
+      "id": "generated-1e00a58d-1869-4105-960f-59fadabc4bd7-q7",
+      "domain": "general",
+      "type": "multi",
+      "prompt": "A production DiskANN query misses too many of the exact top 10 results. You can spend more RUs if needed, but must preserve the filters, embedding model, distance metric, and number of results returned. Which two actions should you take to test and validate a query-time tuning change? Select exactly two.",
+      "options": [
+        "Increase searchListSizeMultiplier while keeping the third VectorDistance argument false.",
+        "Measure recall@10 against brute-force top-10 results on representative queries, and record latency and request charge.",
+        "Set the third VectorDistance argument to true in the candidate query so the DiskANN index examines more graph neighbors.",
+        "Increase provisioned RU/s and treat the higher throughput ceiling as evidence that recall improved.",
+        "Switch from cosine to Euclidean so DiskANN considers more candidates without changing the similarity definition."
+      ],
+      "answer": [
+        "Increase searchListSizeMultiplier while keeping the third VectorDistance argument false.",
+        "Measure recall@10 against brute-force top-10 results on representative queries, and record latency and request charge."
+      ],
+      "explanation": "A larger searchListSizeMultiplier can improve DiskANN recall at the cost of additional latency and RUs. Comparing the returned IDs with the exact top 10 measures whether the change helps. Setting the third argument to true bypasses DiskANN, so it belongs in the baseline query, not the candidate query. ([learn.microsoft.com](https://learn.microsoft.com/en-us/cosmos-db/query/vectordistance))"
+    },
+    {
+      "id": "generated-1e00a58d-1869-4105-960f-59fadabc4bd7-q8",
+      "domain": "general",
+      "type": "match",
+      "prompt": "A support search must surface documents for both exact error-code terms and paraphrased symptoms. Match each hybrid-search role to one Azure Cosmos DB for NoSQL function. Use each function once: FullTextScore, RRF, VectorDistance.",
+      "labels": [
+        "Produces the lexical relevance signal from indexed support text",
+        "Produces the semantic similarity signal from document and query embeddings",
+        "Combines the lexical and semantic rankings in ORDER BY RANK"
+      ],
+      "answer": [
+        "FullTextScore",
+        "VectorDistance",
+        "RRF"
+      ],
+      "explanation": "FullTextScore supplies the lexical signal, and VectorDistance supplies the semantic signal. Reciprocal Rank Fusion (RRF) combines their rankings in ORDER BY RANK instead of treating the raw scores as directly comparable. ([learn.microsoft.com](https://learn.microsoft.com/en-us/azure/cosmos-db/gen-ai/hybrid-search?utm_source=openai))"
+    },
+    {
+      "id": "generated-1e00a58d-1869-4105-960f-59fadabc4bd7-q9",
+      "domain": "general",
+      "type": "order",
+      "prompt": "A .NET change feed processor keeps an embedding on the same item as its source text. Each text edit changes sourceRevision; the worker stores the revision represented by the embedding as embeddedRevision. The worker must skip replayed or self-generated changes that are already synchronized and must not overwrite a newer edit. For an event that requires work and whose conditional write succeeds, put these steps in order: Return success so processing can be checkpointed; Generate the embedding from the text you read; Conditionally replace the item using the ETag from that read, writing the vector and embeddedRevision together; Read the current item and check whether its sourceRevision already equals embeddedRevision.",
+      "answer": [
+        "Read the current item and check whether its sourceRevision already equals embeddedRevision",
+        "Generate the embedding from the text you read",
+        "Conditionally replace the item using the ETag from that read, writing the vector and embeddedRevision together",
+        "Return success so processing can be checkpointed"
+      ],
+      "explanation": "The revision check prevents redundant generation when an event is replayed or triggered by the worker's own write. The ETag check rejects the replacement if the item changed while the embedding was being generated. Returning success only after the write succeeds prevents the processor from checkpointing work that was not persisted. ([learn.microsoft.com](https://learn.microsoft.com/en-us/azure/cosmos-db/change-feed-processor?tabs=dotnet&utm_source=openai))"
+    },
+    {
+      "id": "generated-1e00a58d-1869-4105-960f-59fadabc4bd7-q10",
+      "domain": "general",
+      "type": "text",
+      "prompt": "A container is partitioned on /tenantId, and each search is scoped to one tenant. You want a separate DiskANN graph per tenant value. In the vectorIndexes entry {\"path\":\"/embedding\",\"type\":\"diskANN\",\"<property>\":[\"/tenantId\"]}, what exact JSON property name replaces <property>? Enter the name without quotation marks.",
+      "answer": [
+        "vectorIndexShardKey"
+      ],
+      "explanation": "vectorIndexShardKey configures how the DiskANN index is sharded. Setting it to [\"/tenantId\"] creates tenant-scoped graphs. The container partition key controls data placement and query routing; it does not by itself configure how DiskANN graphs are sharded. ([learn.microsoft.com](https://learn.microsoft.com/en-us/azure/cosmos-db/gen-ai/vector-search-performance-tips))"
+    },
+    {
+      "id": "generated-1e00a58d-1869-4105-960f-59fadabc4bd7-q11",
+      "domain": "general",
+      "type": "single",
+      "prompt": "11. An Azure Cosmos DB for NoSQL app stores each manual as one item with a variable-length chunks array. Each chunk has its own text and embedding. The app must use a native vector index to return individual chunks, and two chunks from the same manual can appear in the same top-10 result set. Which redesign meets both requirements?",
+      "options": [
+        "Keep one item per manual, configure /chunks/[]/embedding in both vector policies, and use a JOIN to return the matching chunks.",
+        "Store one item per chunk with its vector at /embedding and its parent manual ID in a separate property. Configure /embedding in both the vector embedding policy and the vector index.",
+        "Keep one item per manual, concatenate all chunk embeddings into one vector at /embedding, and split the search result into chunks after retrieval.",
+        "Keep one item per manual, index the mean of its chunk embeddings at /embedding, and retrieve the full chunks array for each matching manual."
+      ],
+      "answer": "Store one item per chunk with its vector at /embedding and its parent manual ID in a separate property. Configure /embedding in both the vector embedding policy and the vector index.",
+      "explanation": "Vector policies and vector indexes do not support wildcard paths or vector fields nested inside an array of objects. One item per chunk gives each embedding a supported path and lets Cosmos DB rank chunks independently. A concatenated or averaged vector ranks the manual as one item, not its individual chunks. ([learn.microsoft.com](https://learn.microsoft.com/en-us/azure/cosmos-db/vector-search))"
+    },
+    {
+      "id": "generated-1e00a58d-1869-4105-960f-59fadabc4bd7-q12",
+      "domain": "general",
+      "type": "multi",
+      "prompt": "12. A .NET service returns a top-50 vector search result from Azure Cosmos DB for NoSQL. One execution produces three SDK response pages: 20 items at 6.2 RU, zero items at 0.8 RU, and 30 items at 7.0 RU. The iterator reports HasMoreResults after the empty page. Which two actions correctly retrieve and meter the complete result? Select exactly two.",
+      "options": [
+        "Keep calling ReadNextAsync while HasMoreResults is true, even if a page contains no items.",
+        "Record 14.0 RU by adding the RequestCharge values from all three pages.",
+        "Stop after the empty page because it marks the end of the ranked result.",
+        "Record 13.2 RU because an empty page does not contribute to the query charge.",
+        "Restart the query after the empty page with TOP reduced to 30, then append those results to the first 20."
+      ],
+      "answer": [
+        "Keep calling ReadNextAsync while HasMoreResults is true, even if a page contains no items.",
+        "Record 14.0 RU by adding the RequestCharge values from all three pages."
+      ],
+      "explanation": "The iterator's HasMoreResults property determines whether to continue; an empty page is not the end of the result. Each response contributes its own charge, so the complete execution costs 6.2 + 0.8 + 7.0 = 14.0 RU. Restarting with a smaller TOP value would issue a new query rather than retrieve the remaining results. ([learn.microsoft.com](https://learn.microsoft.com/en-us/azure/cosmos-db/understand-request-unit-consumption?utm_source=openai))"
+    },
+    {
+      "id": "generated-1e00a58d-1869-4105-960f-59fadabc4bd7-q13",
+      "domain": "general",
+      "type": "match",
+      "prompt": "13. An exact Azure Cosmos DB for NoSQL vector search compares query vector [3, 0] with three stored, unnormalized embeddings. Match each distance function to the ID of its most similar item. Use each ID once.",
+      "labels": [
+        "Cosine",
+        "Dot product",
+        "Euclidean"
+      ],
+      "answer": [
+        "B",
+        "A",
+        "C"
+      ],
+      "explanation": "B points in exactly the same direction as the query, giving it the highest cosine similarity. A has the largest dot product: 24, compared with 3 for B and 9 for C. C has the smallest Euclidean distance: 1, compared with 2 for B and √61 for A. Because the vectors are not normalized, the three functions can select different winners. ([learn.microsoft.com](https://learn.microsoft.com/en-us/azure/cosmos-db/quickstart-create-vector-index-typescript?utm_source=openai))",
+      "exhibits": [
+        {
+          "title": "Stored embeddings",
+          "code": "{\"A\":[8,6],\"B\":[1,0],\"C\":[3,1]}"
+        }
+      ]
+    },
+    {
+      "id": "generated-1e00a58d-1869-4105-960f-59fadabc4bd7-q14",
+      "domain": "general",
+      "type": "order",
+      "prompt": "14. An ingestion worker has split a new manual into 12 text chunks and is about to generate their embeddings. It must create all 12 searchable chunk items and a manifest item in one atomic .NET SDK transactional batch. All items will share the same /documentId value, and the batch fits within service limits. The worker must finish and validate every embedding before building the batch. Order these steps: execute the batch; generate and validate the embeddings; acknowledge the ingestion job; build the partition-scoped batch; verify the batch response.",
+      "answer": [
+        "Generate and validate the embeddings.",
+        "Build the partition-scoped batch containing all 12 chunk creates and the manifest create.",
+        "Execute the batch.",
+        "Verify that the batch response reports success.",
+        "Acknowledge the ingestion job."
+      ],
+      "explanation": "Prepare the vectors before constructing the write operations. Then submit all 13 creates in one batch scoped to the manual's partition key. If any operation fails, Cosmos DB rolls back the batch, so the worker must verify success before acknowledging the job. ([learn.microsoft.com](https://learn.microsoft.com/en-us/azure/cosmos-db/transactional-batch?utm_source=openai))"
+    },
+    {
+      "id": "generated-1e00a58d-1869-4105-960f-59fadabc4bd7-q15",
+      "domain": "general",
+      "type": "text",
+      "prompt": "15. During an embedding backfill, an Azure Cosmos DB for NoSQL container has items whose embedding property is missing, null, a string, or a JSON array. An audit query must select only items where the property is an array, regardless of its length or element types. What built-in function name replaces the blank in `SELECT c.id FROM c WHERE ____(c.embedding)`? Enter only the function name.",
+      "answer": [
+        "IS_ARRAY",
+        "is_array"
+      ],
+      "explanation": "IS_ARRAY tests whether the value is a JSON array. IS_DEFINED would also accept a property explicitly set to null or a string. This audit checks only the outer type; it does not validate vector dimensions or numeric element types. ([learn.microsoft.com](https://learn.microsoft.com/en-us/cosmos-db/query/is-array?utm_source=openai))"
+    }
+  ],
+  "sources": [
+    {
+      "url": "https://learn.microsoft.com/en-us/cosmos-db/index-vector-data",
+      "title": "learn.microsoft.com"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/azure/cosmos-db/vector-search",
+      "title": "Integrated Vector Store - Azure Cosmos DB | Microsoft Learn"
+    },
+    {
+      "url": "https://learn.microsoft.com/azure/cosmos-db/index-policy",
+      "title": "learn.microsoft.com"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/azure/cosmos-db/gen-ai/vector-search-performance-tips",
+      "title": "learn.microsoft.com"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/azure/cosmos-db/nosql/how-to-manage-indexing-policy?tabs=dotnetv2%2Cpythonv3",
+      "title": "learn.microsoft.com"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/azure/cosmos-db/gen-ai/agentic-memories",
+      "title": "learn.microsoft.com"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/azure/architecture/guide/technology-choices/vector-search",
+      "title": "learn.microsoft.com"
+    },
+    {
+      "url": "https://learn.microsoft.com/azure/cosmos-db/nosql/vector-search?view=azure-devops",
+      "title": "learn.microsoft.com"
+    },
+    {
+      "url": "https://learn.microsoft.com/azure/cosmos-db/nosql/query/vectordistance",
+      "title": "learn.microsoft.com"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/training/modules/implement-vector-search-azure-cosmos-db/",
+      "title": "learn.microsoft.com"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/training/paths/develop-ai-solutions-azure-cosmos-db/",
+      "title": "learn.microsoft.com"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/azure/cosmos-db/quickstart-vector-store-python",
+      "title": "learn.microsoft.com"
+    },
+    {
+      "url": "https://learn.microsoft.com/de-at/azure/databricks/_extras/documents/reference-use-case-gen-ai-agent-for-azure.pdf",
+      "title": "learn.microsoft.com"
+    },
+    {
+      "url": "https://learn.microsoft.com/tr-tr/azure/databricks/_extras/documents/reference-architecture-databricks-on-azure.pdf",
+      "title": "learn.microsoft.com"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/azure/databricks/_extras/documents/reference-use-case-ai-for-azure.pdf",
+      "title": "learn.microsoft.com"
+    },
+    {
+      "url": "https://learn.microsoft.com/azure/databricks/_extras/documents/reference-architecture-databricks-on-azure.pdf",
+      "title": "learn.microsoft.com"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/%20Azure/databricks/_extras/documents/reference-architecture-databricks-on-azure.pdf",
+      "title": "learn.microsoft.com"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/azure/databricks/_extras/documents/reference-use-case-cat-federation-for-azure.pdf",
+      "title": "learn.microsoft.com"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/cosmos-db/indexing-policies",
+      "title": "learn.microsoft.com"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/azure/cosmos-db/index-policy?WT.mc_id=AZ-MVP-5000671",
+      "title": "learn.microsoft.com"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/azure/cosmos-db/index-policy?WT.mc_id=parveensingh.com",
+      "title": "learn.microsoft.com"
+    },
+    {
+      "url": "https://www.nexushuman.com/course/ai-200t00-develop-ai-cloud-solutions-on-microsoft-azure/download-brochure",
+      "title": "www.nexushuman.com"
+    },
+    {
+      "url": "https://aihero.blog/docs/Azure_AI_HeroNotes.pdf",
+      "title": "aihero.blog"
+    },
+    {
+      "url": "https://res.cloudinary.com/social-engine/image/upload/v1753083225/courses/MS-DP420T00_gxezop.pdf",
+      "title": "res.cloudinary.com"
+    },
+    {
+      "url": "https://www.vldb.org/pvldb/vol18/p5166-upreti.pdf",
+      "title": "www.vldb.org"
+    },
+    {
+      "url": "https://info.microsoft.com/rs/157-GQE-382/images/EN-WBNR-Other-SREVM17181.pdf",
+      "title": "info.microsoft.com"
+    },
+    {
+      "url": "https://arxiv.org/abs/2505.05885",
+      "title": "arxiv.org"
+    },
+    {
+      "url": "https://www.reddit.com/r/AzureCertification/comments/1wbi5zw/how_do_study_for_ai200/",
+      "title": "www.reddit.com"
+    },
+    {
+      "url": "https://www.reddit.com/r/AzureCertification/comments/1v64j09/what_i_need_to_do_after_i_finish_ai200_materials/",
+      "title": "www.reddit.com"
+    },
+    {
+      "url": "https://www.reddit.com/r/AZURE/comments/1cxfhpb",
+      "title": "www.reddit.com"
+    }
+  ]
+}

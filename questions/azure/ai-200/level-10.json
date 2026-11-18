@@ -1,0 +1,1105 @@
+{
+  "id": "level-10",
+  "title": "Level 10 · Production incident analysis",
+  "difficulty": 10,
+  "questions": [
+    {
+      "domain": "containers",
+      "type": "multi",
+      "prompt": "Which rollback plan restores the tested stable backend when the canary fails? Select the action and its supporting safeguard.",
+      "answer": [
+        "Shift gateway traffic back and keep the stable digest and versioned retrieval configuration paired",
+        "Verify the stable query encoder still corresponds to the stable index generation"
+      ],
+      "explanation": "Fast rollback needs both the tested image and matching model/index configuration. Traffic rollback only works if the previous deployment still uses its compatible retrieval components.",
+      "options": [
+        "Reassign the latest tag to an arbitrary older image while leaving candidate query configuration",
+        "Delete both active revisions then rebuild stable from source",
+        "Shift gateway traffic back and keep the stable digest and versioned retrieval configuration paired",
+        "Increase the candidate traffic weight to verify failures",
+        "Verify the stable query encoder still corresponds to the stable index generation"
+      ],
+      "caseStudy": {
+        "title": "AtlasLedger",
+        "background": "AtlasLedger provides a high-volume, tenant-scoped document assistant. A Container Apps HTTP gateway dispatches durable work to Service Bus. An AKS retrieval API queries Azure Database for PostgreSQL with pgvector. Stable and canary deployments run side by side during a traffic migration. During a recent retry storm, some jobs committed a result before their message locks expired but were delivered again before final acknowledgment.\n\nThe access policy forbids unfiltered chunks from entering generation. The model index must stay versioned during a migration, and query filtering is mandatory regardless of recall loss. The PostgreSQL connection budget is shared by both deployments. Operators want to compare p95 request duration by revision and distinguish delay from dependency calls.\n\nThe SRE team requires that canary rollback preserve both the tested stable image and its retrieval configuration. No rollout may cause active pods to exceed the available database connection budget.",
+        "exhibits": [
+          {
+            "title": "Rollout and connection budget",
+            "code": "Database limit: 240\nReserved outside retrieval: 48\nStable max replicas: 8\nCanary max replicas: 4\nSame pool maximum per replica on both revisions"
+          },
+          {
+            "title": "Relevant AKS manifest",
+            "code": "strategy:\n  type: RollingUpdate\n  rollingUpdate:\n    maxSurge: 2\n    maxUnavailable: 0\n# Assume at most one deployment rolls at a time."
+          },
+          {
+            "title": "PostgreSQL retrieval (SQL)",
+            "code": "SELECT doc_id, content FROM chunks\nWHERE tenant_id = $2 AND generation = $3\nORDER BY embedding <=> $1\nLIMIT 20;\n::"
+          }
+        ]
+      },
+      "id": "level-10-q01"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "What shared per-replica pool maximum respects the budget during the specified rollout surge?",
+      "answer": "13",
+      "explanation": "240 minus 48 leaves 192. Up to 8 + 4 + 2 = 14 replicas can coexist. Floor(192/14) is 13.",
+      "options": [
+        "13",
+        "16",
+        "20",
+        "17"
+      ],
+      "caseStudy": {
+        "title": "AtlasLedger",
+        "background": "AtlasLedger provides a high-volume, tenant-scoped document assistant. A Container Apps HTTP gateway dispatches durable work to Service Bus. An AKS retrieval API queries Azure Database for PostgreSQL with pgvector. Stable and canary deployments run side by side during a traffic migration. During a recent retry storm, some jobs committed a result before their message locks expired but were delivered again before final acknowledgment.\n\nThe access policy forbids unfiltered chunks from entering generation. The model index must stay versioned during a migration, and query filtering is mandatory regardless of recall loss. The PostgreSQL connection budget is shared by both deployments. Operators want to compare p95 request duration by revision and distinguish delay from dependency calls.\n\nThe SRE team requires that canary rollback preserve both the tested stable image and its retrieval configuration. No rollout may cause active pods to exceed the available database connection budget.",
+        "exhibits": [
+          {
+            "title": "Rollout and connection budget",
+            "code": "Database limit: 240\nReserved outside retrieval: 48\nStable max replicas: 8\nCanary max replicas: 4\nSame pool maximum per replica on both revisions"
+          },
+          {
+            "title": "Relevant AKS manifest",
+            "code": "strategy:\n  type: RollingUpdate\n  rollingUpdate:\n    maxSurge: 2\n    maxUnavailable: 0\n# Assume at most one deployment rolls at a time."
+          },
+          {
+            "title": "PostgreSQL retrieval (SQL)",
+            "code": "SELECT doc_id, content FROM chunks\nWHERE tenant_id = $2 AND generation = $3\nORDER BY embedding <=> $1\nLIMIT 20;\n::"
+          }
+        ]
+      },
+      "id": "level-10-q02"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "A selective filter cuts approximate results below 20 even though many authorized rows exist. Which safe response preserves authorization and improves quality?",
+      "answer": "Keep tenant and generation predicates, tune ANN candidates, and compare against exact filtered search",
+      "explanation": "Candidate tuning can improve filtered recall, while authorization predicates remain part of retrieval.",
+      "options": [
+        "Run an unfiltered ANN search and send the returned text straight to generation",
+        "Drop the tenant predicate whenever fewer than 20 chunks are retrieved",
+        "Keep tenant and generation predicates, tune ANN candidates, and compare against exact filtered search",
+        "Compare candidate vectors from every generation then filter by tenant after the answer is generated"
+      ],
+      "caseStudy": {
+        "title": "AtlasLedger",
+        "background": "AtlasLedger provides a high-volume, tenant-scoped document assistant. A Container Apps HTTP gateway dispatches durable work to Service Bus. An AKS retrieval API queries Azure Database for PostgreSQL with pgvector. Stable and canary deployments run side by side during a traffic migration. During a recent retry storm, some jobs committed a result before their message locks expired but were delivered again before final acknowledgment.\n\nThe access policy forbids unfiltered chunks from entering generation. The model index must stay versioned during a migration, and query filtering is mandatory regardless of recall loss. The PostgreSQL connection budget is shared by both deployments. Operators want to compare p95 request duration by revision and distinguish delay from dependency calls.\n\nThe SRE team requires that canary rollback preserve both the tested stable image and its retrieval configuration. No rollout may cause active pods to exceed the available database connection budget.",
+        "exhibits": [
+          {
+            "title": "Rollout and connection budget",
+            "code": "Database limit: 240\nReserved outside retrieval: 48\nStable max replicas: 8\nCanary max replicas: 4\nSame pool maximum per replica on both revisions"
+          },
+          {
+            "title": "Relevant AKS manifest",
+            "code": "strategy:\n  type: RollingUpdate\n  rollingUpdate:\n    maxSurge: 2\n    maxUnavailable: 0\n# Assume at most one deployment rolls at a time."
+          },
+          {
+            "title": "PostgreSQL retrieval (SQL)",
+            "code": "SELECT doc_id, content FROM chunks\nWHERE tenant_id = $2 AND generation = $3\nORDER BY embedding <=> $1\nLIMIT 20;\n::"
+          }
+        ]
+      },
+      "id": "level-10-q03"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "What protects the post-commit lock-loss path during a burst?",
+      "answer": "Store a durable idempotency key with the result transaction and complete after commit",
+      "explanation": "Lock renewal reduces retries but cannot prevent all of them. The durable key avoids repeating the committed side effect.",
+      "options": [
+        "Complete before committing so retries stop",
+        "Renew the lock and remove all idempotency logic",
+        "Store a durable idempotency key with the result transaction and complete after commit",
+        "Use a new business key for redelivered messages"
+      ],
+      "caseStudy": {
+        "title": "AtlasLedger",
+        "background": "AtlasLedger provides a high-volume, tenant-scoped document assistant. A Container Apps HTTP gateway dispatches durable work to Service Bus. An AKS retrieval API queries Azure Database for PostgreSQL with pgvector. Stable and canary deployments run side by side during a traffic migration. During a recent retry storm, some jobs committed a result before their message locks expired but were delivered again before final acknowledgment.\n\nThe access policy forbids unfiltered chunks from entering generation. The model index must stay versioned during a migration, and query filtering is mandatory regardless of recall loss. The PostgreSQL connection budget is shared by both deployments. Operators want to compare p95 request duration by revision and distinguish delay from dependency calls.\n\nThe SRE team requires that canary rollback preserve both the tested stable image and its retrieval configuration. No rollout may cause active pods to exceed the available database connection budget.",
+        "exhibits": [
+          {
+            "title": "Rollout and connection budget",
+            "code": "Database limit: 240\nReserved outside retrieval: 48\nStable max replicas: 8\nCanary max replicas: 4\nSame pool maximum per replica on both revisions"
+          },
+          {
+            "title": "Relevant AKS manifest",
+            "code": "strategy:\n  type: RollingUpdate\n  rollingUpdate:\n    maxSurge: 2\n    maxUnavailable: 0\n# Assume at most one deployment rolls at a time."
+          },
+          {
+            "title": "PostgreSQL retrieval (SQL)",
+            "code": "SELECT doc_id, content FROM chunks\nWHERE tenant_id = $2 AND generation = $3\nORDER BY embedding <=> $1\nLIMIT 20;\n::"
+          }
+        ]
+      },
+      "id": "level-10-q04"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "Which investigation separates a canary regression from upstream request mix?",
+      "answer": "Calculate p95 by revision and operation, then correlate slow operations with dependency spans",
+      "explanation": "Group comparable requests before correlating with dependency data so traffic mix does not hide or exaggerate a regression.",
+      "options": [
+        "Count all traces without separating revisions",
+        "Calculate p95 by revision and operation, then correlate slow operations with dependency spans",
+        "Choose the slowest single request and treat it as typical",
+        "Compare aggregate mean duration across the whole system"
+      ],
+      "caseStudy": {
+        "title": "AtlasLedger",
+        "background": "AtlasLedger provides a high-volume, tenant-scoped document assistant. A Container Apps HTTP gateway dispatches durable work to Service Bus. An AKS retrieval API queries Azure Database for PostgreSQL with pgvector. Stable and canary deployments run side by side during a traffic migration. During a recent retry storm, some jobs committed a result before their message locks expired but were delivered again before final acknowledgment.\n\nThe access policy forbids unfiltered chunks from entering generation. The model index must stay versioned during a migration, and query filtering is mandatory regardless of recall loss. The PostgreSQL connection budget is shared by both deployments. Operators want to compare p95 request duration by revision and distinguish delay from dependency calls.\n\nThe SRE team requires that canary rollback preserve both the tested stable image and its retrieval configuration. No rollout may cause active pods to exceed the available database connection budget.",
+        "exhibits": [
+          {
+            "title": "Rollout and connection budget",
+            "code": "Database limit: 240\nReserved outside retrieval: 48\nStable max replicas: 8\nCanary max replicas: 4\nSame pool maximum per replica on both revisions"
+          },
+          {
+            "title": "Relevant AKS manifest",
+            "code": "strategy:\n  type: RollingUpdate\n  rollingUpdate:\n    maxSurge: 2\n    maxUnavailable: 0\n# Assume at most one deployment rolls at a time."
+          },
+          {
+            "title": "PostgreSQL retrieval (SQL)",
+            "code": "SELECT doc_id, content FROM chunks\nWHERE tenant_id = $2 AND generation = $3\nORDER BY embedding <=> $1\nLIMIT 20;\n::"
+          }
+        ]
+      },
+      "id": "level-10-q05"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "The meridian chart requires failed requests counted per 14 minutes by service role. Which query aggregation builds buckets and counts rows?",
+      "answer": "summarize Failures=count() by AppRoleName, bin(TimeGenerated, 14m)",
+      "explanation": "Group by role and binned timestamps. Grouping by raw timestamps or role only omits the requested interval grouping.",
+      "options": [
+        "summarize Failures=count() by AppRoleName",
+        "summarize Failures=count() by AppRoleName, bin(TimeGenerated, 14m)",
+        "project AppRoleName, bin(TimeGenerated, 14m)",
+        "summarize Failures=count() by AppRoleName, TimeGenerated"
+      ],
+      "id": "level-10-q06"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "Which KQL aggregation calculates the 92th percentile of request latency grouped by AppRoleName for the meridian deployment?",
+      "answer": "summarize Tail = percentile(DurationMs, 92) by AppRoleName",
+      "explanation": "percentile aggregates a requested quantile over each group. Multiplying individual durations does not calculate a percentile.",
+      "options": [
+        "extend Tail = DurationMs * 0.92",
+        "summarize Tail = avg(DurationMs) by AppRoleName",
+        "summarize Tail = max(DurationMs) by AppRoleName",
+        "summarize Tail = percentile(DurationMs, 92) by AppRoleName"
+      ],
+      "id": "level-10-q07"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "The meridian PostgreSQL query ranks using cosine distance. Which HNSW operator class supports the shown operator?",
+      "answer": "vector_cosine_ops",
+      "explanation": "The HNSW operator class must match the ranking operator. Cosine uses <=>, Euclidean uses <->, and negative inner product uses <#>.",
+      "options": [
+        "text_pattern_ops",
+        "vector_cosine_ops",
+        "vector_l2_ops",
+        "vector_ip_ops"
+      ],
+      "exhibits": [
+        {
+          "title": "pgvector query",
+          "code": "SELECT id FROM chunks\nWHERE tenant_id = $2\nORDER BY embedding <=> $1\nLIMIT 15;"
+        }
+      ],
+      "id": "level-10-q08"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The meridian worker scales from zero. Its queue backlog may grow during periods without HTTP traffic. Which configuration follows the backlog?",
+      "answer": "Use a Service Bus KEDA scale rule with minReplicas 0",
+      "explanation": "A queue scaler can observe the broker while the container has zero replicas. A CPU rule cannot measure a nonexistent replica.",
+      "options": [
+        "Increase maxReplicas without setting an event-driven rule",
+        "Use a Service Bus KEDA scale rule with minReplicas 0",
+        "Use an HTTP rule with concurrentRequests 1",
+        "Use a CPU utilization rule without a queue trigger"
+      ],
+      "id": "level-10-q09"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "In Azure App Configuration, the model and threshold for meridian must be refreshed together on reading a sentinel. Which publishing order fits?",
+      "answer": "Update all dependent values, then update the sentinel",
+      "explanation": "Write the sentinel after publishing the dependent keys so a refresh sees the complete intended set.",
+      "options": [
+        "Update all dependent values, then update the sentinel",
+        "Update the sentinel first, then write values independently",
+        "Republish an unchanged sentinel before each individual key write",
+        "Use the production values under the staging label"
+      ],
+      "exhibits": [
+        {
+          "title": "App Configuration change set",
+          "code": "Key: retrieval:model, Label: meridian\nKey: retrieval:threshold, Label: meridian\nKey: retrieval:sentinel, Label: meridian"
+        }
+      ],
+      "id": "level-10-q10"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "What failure can occur when the meridian worker runs this code and exits at the marked line?",
+      "answer": "The message is removed even though the database update has not happened",
+      "explanation": "The code settles the message before doing its work. Move completion after the durable, idempotent result.",
+      "options": [
+        "The message is removed even though the database update has not happened",
+        "A permanently invalid message goes to the DLQ automatically before completion",
+        "A duplicate is guaranteed because the lock was renewed",
+        "The successful database write is automatically rolled back by Service Bus"
+      ],
+      "exhibits": [
+        {
+          "title": "PeekLock worker (Python)",
+          "code": "receiver.complete_message(message)\n# Process exits here.\nwrite_result(\"meridian\", message)"
+        }
+      ],
+      "id": "level-10-q11"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "Which query operation keeps every failed meridian request, including failures whose dependency telemetry was sampled out?",
+      "answer": "Join with kind=leftouter on OperationId with failed AppRequests on the left",
+      "explanation": "A leftouter join keeps unmatched request rows while enriching matched rows.",
+      "options": [
+        "Join with kind=leftanti to keep everything",
+        "Join with kind=leftouter on OperationId with failed AppRequests on the left",
+        "Filter dependency rows by matching HTTP status with no operation identity",
+        "Join with kind=inner on OperationId"
+      ],
+      "exhibits": [
+        {
+          "title": "KQL input",
+          "code": "let Failures = AppRequests | where AppRoleName == \"meridian-api\" and Success == false;\nFailures\n| join kind=___ (AppDependencies) on OperationId"
+        }
+      ],
+      "id": "level-10-q12"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The meridian Pod reports CrashLoopBackOff with OOMKilled. Which first move tests the most specific failure cause?",
+      "answer": "Check memory usage and the container memory limit",
+      "explanation": "OOMKilled points to memory pressure or the enforced memory budget.",
+      "options": [
+        "Disable all health checks for healthy peers",
+        "Check memory usage and the container memory limit",
+        "Change the Docker tag without inspecting Pod events",
+        "Change the application load-balancer DNS name"
+      ],
+      "exhibits": [
+        {
+          "title": "AKS status",
+          "code": "Container state: CrashLoopBackOff with OOMKilled\nCheck requested for deployment/meridian-api"
+        }
+      ],
+      "id": "level-10-q13"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "Complete the KQL filter to restrict the meridian view to requests from the preceding 14 minutes.",
+      "answer": "where TimeGenerated >= ago(14m)",
+      "explanation": "ago() yields a timestamp. Keep events at or after that time using where.",
+      "options": [
+        "where TimeGenerated >= ago(14m)",
+        "where TimeGenerated == ago(14m)",
+        "project TimeGenerated >= ago(14m)",
+        "where TimeGenerated <= ago(14m)"
+      ],
+      "exhibits": [
+        {
+          "title": "Request query (KQL)",
+          "code": "AppRequests\n| ____\n| where AppRoleName == \"meridian-api\""
+        }
+      ],
+      "id": "level-10-q14"
+    },
+    {
+      "domain": "integration",
+      "type": "text",
+      "prompt": "Enter the Python Azure Functions v2 decorator name, without @app. or parentheses, for the meridian HTTP endpoint.",
+      "answer": [
+        "route"
+      ],
+      "explanation": "The route decorator configures the HTTP route and trigger.",
+      "exhibits": [
+        {
+          "title": "Function fragment (Python)",
+          "code": "@app.___(route=\"meridian/jobs\", methods=[\"POST\"])\ndef submit(req):\n    return accept(req)"
+        }
+      ],
+      "id": "level-10-q15"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "Query A must allow exact search over a tiny set of authorized rows. Query B may use ANN over a large eligible partition. What decision uses the right performance baseline?",
+      "answer": "Benchmark exact filtered scans for the small authorized result set and ANN with recall/latency checks for the larger one",
+      "explanation": "Selective exact search can be efficient. Larger datasets can benefit from ANN when tuned against the correct filtered exact reference.",
+      "options": [
+        "Benchmark exact filtered scans for the small authorized result set and ANN with recall/latency checks for the larger one",
+        "Use no access predicate in either query to improve performance",
+        "Use estimated total-table cardinality as the result count for both queries",
+        "Force the same global ANN HNSW search effort for all workloads without comparison"
+      ],
+      "id": "level-10-q16"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "Error traces are retained for two service revisions, but the team needs an unsampled availability estimate for each. Which signal should be the numerator and denominator?",
+      "answer": "Use request/failure metrics with matching scope and dimensions, then use traces to explain representative failures",
+      "explanation": "Counters with matching dimensions support rates. Sampled traces are diagnostic records with their own selection effects.",
+      "options": [
+        "Count retained failure spans and divide by the total rows in the dependency table",
+        "Use repeated sampling until canary and stable totals appear equal",
+        "Use request/failure metrics with matching scope and dimensions, then use traces to explain representative failures",
+        "Use trace count alone as availability"
+      ],
+      "id": "level-10-q17"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The meridian process is running but should receive traffic only after /healthz/ready succeeds. Which probe should own that endpoint?",
+      "answer": "readinessProbe",
+      "explanation": "Readiness is evaluated after startup and controls whether Pods are available for Service traffic.",
+      "options": [
+        "startupProbe only",
+        "livenessProbe",
+        "a service selector",
+        "readinessProbe"
+      ],
+      "exhibits": [
+        {
+          "title": "Endpoint behavior",
+          "code": "GET /healthz/ready → 503 until query encoder and dependencies are available\nGET /live → 200 while process can run"
+        }
+      ],
+      "id": "level-10-q18"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The meridian node has 4400m allocatable CPU and 1850m in existing Pod requests. How many whole new 850m Pods can the scheduler fit using CPU alone?",
+      "answer": "3",
+      "explanation": "Subtract existing requests from allocatable CPU and divide downward by the incoming request.",
+      "options": [
+        "2",
+        "4",
+        "3",
+        "5"
+      ],
+      "id": "level-10-q19"
+    },
+    {
+      "domain": "data",
+      "type": "text",
+      "prompt": "Type the Redis SET option used in the meridian command to express a 180-second expiry.",
+      "answer": [
+        "EX"
+      ],
+      "explanation": "SET with EX attaches an expiration in seconds as part of the value write.",
+      "exhibits": [
+        {
+          "title": "Redis command",
+          "code": "SET meridian:summary result ____ 180"
+        }
+      ],
+      "id": "level-10-q20"
+    },
+    {
+      "domain": "integration",
+      "type": "multi",
+      "prompt": "The meridian Function uses identity-based delivery from one queue. Which two requirements let it process while supporting clean retries?",
+      "answer": [
+        "Grant the Function identity Azure Service Bus Data Receiver on the applicable resource",
+        "Make the durable result idempotent using the stable operation key"
+      ],
+      "explanation": "The Service Bus receiver needs receive permission, and idempotency protects the durable side effect across redelivery.",
+      "options": [
+        "Grant the Function identity Azure Service Bus Data Receiver on the applicable resource",
+        "Make the durable result idempotent using the stable operation key",
+        "Treat temporary broker retries as permanently invalid data",
+        "Grant the identity Data Sender alone",
+        "Generate a fresh business key on every delivery"
+      ],
+      "id": "level-10-q21"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "The meridian sender retried within the broker duplicate detection window. Which message property must stay unchanged on an unpartitioned queue?",
+      "answer": "message_id",
+      "explanation": "Duplicate detection uses the application-assigned MessageId. Sequence numbers and delivery counts are set by the broker.",
+      "options": [
+        "locked_until_utc",
+        "sequence_number",
+        "delivery_count",
+        "message_id"
+      ],
+      "exhibits": [
+        {
+          "title": "Service Bus retry (Python)",
+          "code": "new_msg = ServiceBusMessage(body, message_id=f\"meridian:{operation_id}\")\nsender.send_messages(new_msg)"
+        }
+      ],
+      "id": "level-10-q22"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "The deployed meridian Function tries to resolve the connection named in the decorator. Which location provides the deployed setting?",
+      "answer": "The Function App application settings using the configured connection name or identity-based prefix",
+      "explanation": "The hosted process receives application settings from the Function App. Local settings only apply during local execution.",
+      "options": [
+        "The Function App application settings using the configured connection name or identity-based prefix",
+        "The SQL schema of the function result",
+        "The Service Bus message body",
+        "The developer workstation local.settings.json without publishing settings"
+      ],
+      "exhibits": [
+        {
+          "title": "Worker function (Python)",
+          "code": "@app.service_bus_queue_trigger(arg_name=\"msg\", queue_name=\"meridian-jobs\", connection=\"JobBus\")\ndef work(msg):\n    handle(msg)"
+        }
+      ],
+      "id": "level-10-q23"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "Each meridian batch has 160 Cosmos reads that cost 12 RU each. What total RU charge should be expected if all reads complete once?",
+      "answer": "1920",
+      "explanation": "Multiply the count by the RU charge per operation. Retry overhead is excluded.",
+      "options": [
+        "1920",
+        "2080",
+        "160",
+        "12"
+      ],
+      "exhibits": [
+        {
+          "title": "Cosmos logs",
+          "code": "completedReads=160\nx-ms-request-charge per read=12"
+        }
+      ],
+      "id": "level-10-q24"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "An Event Grid subscription should allow only meridian.DocumentAccepted events with subjects under /tenant/meridian/. Which configuration expresses both constraints?",
+      "answer": "Include event type meridian.DocumentAccepted and set subjectBeginsWith to /tenant/meridian/",
+      "explanation": "Event-type selection and a subject prefix address separate constraints. Include the ending slash to avoid adjacent prefix matches.",
+      "options": [
+        "Include event type meridian.DocumentAccepted and set subjectBeginsWith to /tenant/meridian/",
+        "Include event type meridian.DocumentAccepted and remove subject filtering",
+        "Use a subscription filter on delivery attempt only",
+        "Use subjectEndsWith /tenant/meridian/ without an event-type filter"
+      ],
+      "id": "level-10-q25"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "The meridian Cosmos Python handler has a document ID and tenant. Which SDK call performs a point read?",
+      "answer": "container.read_item(item=\"meridian-10\", partition_key=\"meridian\")",
+      "explanation": "A Cosmos point read uses the id and logical partition key, and avoids query fan-out.",
+      "options": [
+        "container.read_item(item=\"meridian-10\", partition_key=\"meridian\")",
+        "container.query_items(\"SELECT * FROM c WHERE c.id = 'meridian-10'\", enable_cross_partition_query=True)",
+        "container.read_item(item=\"meridian\", partition_key=\"meridian-10\")",
+        "container.read()"
+      ],
+      "exhibits": [
+        {
+          "title": "Stored document",
+          "code": "{\"id\": \"meridian-10\", \"tenantId\": \"meridian\", \"status\": \"ready\"}"
+        }
+      ],
+      "id": "level-10-q26"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "A Python batch handler commits three document results and fails on a fourth. Retrying the batch can repeat successful messages. Which design supports safe partial success when settlement is independent per message?",
+      "answer": "Use durable version-aware idempotency per document and settle a message only after that message's durable result",
+      "explanation": "Bound retries to an operation-specific durable key and acknowledge each message only after its own successful commit.",
+      "options": [
+        "Use only the batch timestamp as a unique business key for each document",
+        "Set a volatile batch flag once the first document succeeds",
+        "Use durable version-aware idempotency per document and settle a message only after that message's durable result",
+        "Complete all four messages when the first appears successful"
+      ],
+      "id": "level-10-q27"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "The meridian enqueue handler completes in 216 ms, but a worker takes minutes. Which HTTP contract preserves tracked asynchronous work?",
+      "answer": "Persist the operation, enqueue it, then return 202 with an authorized status URL",
+      "explanation": "A 202 response can carry polling metadata after durable acceptance. The caller can track completion without holding a request open.",
+      "options": [
+        "Return a success response before job acceptance is durable",
+        "Persist the operation, enqueue it, then return 202 with an authorized status URL",
+        "Wait synchronously for the full worker execution",
+        "Return 200 and discard operation state"
+      ],
+      "id": "level-10-q28"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "The meridian approximate index returned 13 authorized results while exact filtered search returned 15. Which experiment can improve recall without weakening the filter?",
+      "answer": "Increase HNSW candidate effort and compare approximate results to exact search under the same predicate",
+      "explanation": "Candidate tuning can improve filtered recall. Exact results from the same permitted corpus provide an appropriate reference.",
+      "options": [
+        "Compare approximate recall against an unfiltered query",
+        "Increase HNSW candidate effort and compare approximate results to exact search under the same predicate",
+        "Remove the tenant predicate when the first search falls short",
+        "Evaluate only p95 latency and ignore result quality"
+      ],
+      "id": "level-10-q29"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The meridian candidate consumes 570 MiB at startup and spikes by another 176 MiB during batch processing. Using these measured values only, what minimum limit in MiB covers the combined peak?",
+      "answer": "746",
+      "explanation": "The startup allocation remains resident during the batch. Add the incremental peak before setting a real production safety margin.",
+      "options": [
+        "570",
+        "1140",
+        "746",
+        "634"
+      ],
+      "exhibits": [
+        {
+          "title": "Observed Pod status",
+          "code": "Last State: Terminated\nReason: OOMKilled\nConfigured limit: 634Mi"
+        }
+      ],
+      "id": "level-10-q30"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The meridian release must survive image tag reassignment. Which image reference pins the staging artifact?",
+      "answer": "acr.azurecr.io/retrieval@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "explanation": "A manifest digest identifies immutable content. Tags resolve to whatever digest they currently reference.",
+      "options": [
+        "acr.azurecr.io/retrieval:stable",
+        "acr.azurecr.io/retrieval",
+        "acr.azurecr.io/retrieval@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "acr.azurecr.io/retrieval:latest"
+      ],
+      "exhibits": [
+        {
+          "title": "Artifact to promote",
+          "code": "tag: candidate-10\nmanifestDigest: sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
+      ],
+      "id": "level-10-q31"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "Initiating a node drain and a rolling Deployment update simultaneously could violate the availability objective. A PodDisruptionBudget already exists. Which conclusion should guide the rollout?",
+      "answer": "Account for Deployment maxUnavailable separately because the Deployment rollout itself is governed by its strategy, while the PDB constrains voluntary evictions",
+      "explanation": "A PDB protects against supported voluntary eviction operations. Deployment rollout has its own availability settings.",
+      "options": [
+        "Assume a PDB automatically limits Deployment rollout and every involuntary node loss",
+        "Rely on a liveness probe to serialize every application change",
+        "Account for Deployment maxUnavailable separately because the Deployment rollout itself is governed by its strategy, while the PDB constrains voluntary evictions",
+        "Remove readiness probes so all terminating Pods remain available"
+      ],
+      "id": "level-10-q32"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "The meridian store must accept 1024-dimensional embeddings, while the old table contains 1536-dimensional vectors. Which change preserves rollback?",
+      "answer": "Backfill a versioned vector(1024) column or table and pair it with the new encoder",
+      "explanation": "An index must match the encoder dimension and embedding space. Versioned storage keeps the prior model and data available.",
+      "options": [
+        "Pad and compare representations from both model spaces without validation",
+        "Write the new vectors directly to vector(1536)",
+        "Backfill a versioned vector(1024) column or table and pair it with the new encoder",
+        "Convert vectors to a shared integer and sort by the integer"
+      ],
+      "id": "level-10-q33"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "A Function reads work from Service Bus and emits a downstream event. A crash occurs after durable DB work but before emitting the downstream event. What pattern lets a retry preserve both stages without duplicating side effects?",
+      "answer": "Commit the result and an outbox row together, and have an idempotent dispatcher retry delivery",
+      "explanation": "The transactional outbox bridges the durable store and asynchronous sending. Idempotent dispatch and consumption handle duplicate delivery.",
+      "options": [
+        "Rely on broker duplicate detection alone to make PostgreSQL and event publishing atomic",
+        "Use in-memory flags shared across all scaled Function instances",
+        "Complete the Service Bus message first and perform both writes afterward",
+        "Commit the result and an outbox row together, and have an idempotent dispatcher retry delivery"
+      ],
+      "id": "level-10-q34"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "The meridian updates must be processed in order for each document while unrelated documents process concurrently. What should the producer put into SessionId?",
+      "answer": "The verified tenant and stable document ID together",
+      "explanation": "Session keys group related work. A single global key over-serializes the independent documents.",
+      "options": [
+        "The verified tenant and stable document ID together",
+        "The retry counter",
+        "A random identifier created for each send",
+        "The same global value for all tenants and documents"
+      ],
+      "exhibits": [
+        {
+          "title": "Service Bus sender (Python)",
+          "code": "msg = ServiceBusMessage(body, message_id=operation_id, session_id=___)\n# Queue is session-enabled for tenant meridian"
+        }
+      ],
+      "id": "level-10-q35"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "For the meridian event consumer, what should the deduplication key contain under CloudEvents if two publishers can generate the same id?",
+      "answer": "Both source and id",
+      "explanation": "CloudEvents treats the source and id combination as unique for distinct events.",
+      "options": [
+        "Only the delivery count",
+        "Only specversion and time",
+        "Only id across all sources",
+        "Both source and id"
+      ],
+      "exhibits": [
+        {
+          "title": "Event pair (JSON lines)",
+          "code": "{\"id\":\"12\",\"source\":\"/sites/meridian/api\"}\n{\"id\":\"12\",\"source\":\"/sites/meridian/backfill\"}"
+        }
+      ],
+      "id": "level-10-q36"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The meridian deployment has 260 usable database connections, 13 steady replicas and maxSurge 4. What is the maximum equal per-Pod connection pool size that respects the rollout budget?",
+      "answer": "15",
+      "explanation": "During rollout up to replicas plus surge Pods can coexist. Divide the usable connections by that maximum and round down.",
+      "options": [
+        "16",
+        "20",
+        "14",
+        "15"
+      ],
+      "exhibits": [
+        {
+          "title": "Deployment excerpts",
+          "code": "replicas: 13\nstrategy:\n  rollingUpdate:\n    maxSurge: 4\n    maxUnavailable: 0"
+        }
+      ],
+      "id": "level-10-q37"
+    },
+    {
+      "domain": "operations",
+      "type": "order",
+      "prompt": "Order the meridian database credential rotation so existing calls can continue while the app switches. The database supports overlapping credentials.",
+      "answer": [
+        "Create the replacement credential and publish a new secret version",
+        "Refresh the app and have it fetch the replacement",
+        "Verify authenticated requests on the new credential",
+        "Revoke the previous credential"
+      ],
+      "explanation": "Keep overlap until verifying that clients can authenticate with the replacement.",
+      "id": "level-10-q38"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "Which OpenTelemetry resource attribute identifies the logical meridian service independently of the request operation name?",
+      "answer": "service.name",
+      "explanation": "service.name groups instances of the same logical service. service.instance.id identifies an individual instance.",
+      "options": [
+        "service.instance.id",
+        "http.request.method",
+        "server.address",
+        "service.name"
+      ],
+      "exhibits": [
+        {
+          "title": "OpenTelemetry resource attributes",
+          "code": "{\"___\": \"meridian-retrieval-api\", \"deployment.environment.name\": \"production\"}"
+        }
+      ],
+      "id": "level-10-q39"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "The meridian operation needs to reprocess a permanently failed message after fixing upstream data. Which sequence avoids losing the original on a failed send?",
+      "answer": "Receive from the dead-letter subqueue, send a corrected message, confirm acceptance, then complete the original",
+      "explanation": "Keep the dead-letter delivery until the corrected copy is accepted. Account for duplicate detection when replaying.",
+      "options": [
+        "Use ReceiveAndDelete on the dead-letter subqueue before validating the data",
+        "Complete the original, then attempt to send a corrected copy",
+        "Send a fresh unrelated payload and reset the queue",
+        "Receive from the dead-letter subqueue, send a corrected message, confirm acceptance, then complete the original"
+      ],
+      "id": "level-10-q40"
+    },
+    {
+      "domain": "data",
+      "type": "multi",
+      "prompt": "The meridian service has 195 available database connections including all simultaneously active workloads. It may run 13 replicas. Which two controls avoid connection saturation and help confirm operating headroom?",
+      "answer": [
+        "Cap each replica pool at 15 or fewer connections",
+        "Measure peak pool wait time and active connections during scale-out"
+      ],
+      "explanation": "Pool caps protect the shared database. Peak observed connections and wait time show contention under surge conditions.",
+      "options": [
+        "Cap each replica pool at 15 or fewer connections",
+        "Measure peak pool wait time and active connections during scale-out",
+        "Open a separate connection for every query and disable pooling",
+        "Allow at least 16 connections in every pool",
+        "Measure vector dimensions only"
+      ],
+      "id": "level-10-q41"
+    },
+    {
+      "domain": "data",
+      "type": "match",
+      "prompt": "Match the three distinct Redis requirements at meridian.",
+      "answer": [
+        "SET key value EX 180",
+        "DEL key",
+        "TTL key"
+      ],
+      "explanation": "EX sets expiration with the write, DEL invalidates the key, and TTL reports the remaining time.",
+      "labels": [
+        "Write a reply that expires after 180 seconds",
+        "Invalidate a reply immediately following an update",
+        "Inspect the remaining lifetime in seconds"
+      ],
+      "id": "level-10-q42"
+    },
+    {
+      "domain": "operations",
+      "type": "text",
+      "prompt": "Type the W3C header name that carries the active trace and parent span identifiers for the meridian API.",
+      "answer": [
+        "traceparent"
+      ],
+      "explanation": "traceparent carries the trace ID and parent span ID used to correlate the downstream span.",
+      "exhibits": [
+        {
+          "title": "Downstream HTTP headers",
+          "code": "___: 00-dddddddddddddddddddddddddddddddd-aaaaaaaaaaaaaaaa-01\naccept: application/json"
+        }
+      ],
+      "id": "level-10-q43"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "A scheduler requires 650m CPU and 1 GiB memory per new Pod. Node A has 900m CPU and 768 MiB free; node B has 500m CPU and 2 GiB free. How many additional Pods fit without changing requests or adding nodes?",
+      "answer": "0",
+      "explanation": "The scheduler fits both resource requests on the same node. A fails memory and B fails CPU, even though the sums look sufficient.",
+      "options": [
+        "2",
+        "0",
+        "3",
+        "1"
+      ],
+      "exhibits": [
+        {
+          "title": "Resource snapshot",
+          "code": "node-a free requests: cpu=900m memory=768Mi\nnode-b free requests: cpu=500m memory=2048Mi\npod request: cpu=650m memory=1Gi"
+        }
+      ],
+      "id": "level-10-q44"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "The meridian change feed processor is being scaled to 11 instances with a shared processor identity. Which state enables partition ownership and checkpointing?",
+      "answer": "The lease container shared by these processor instances",
+      "explanation": "A shared lease container coordinates assignment and preserves progress across instances.",
+      "options": [
+        "The lease container shared by these processor instances",
+        "The cluster node hostname in each document",
+        "A separate new lease container per instance",
+        "The vector query continuation token reused as a lock"
+      ],
+      "id": "level-10-q45"
+    },
+    {
+      "domain": "data",
+      "type": "order",
+      "prompt": "Order the retrieval path for the meridian assistant after the caller submits a query. Resolve scope before contacting the data tier.",
+      "answer": [
+        "Determine the verified tenant and retrieval generation",
+        "Embed the question using the selected generation encoder",
+        "Retrieve up to 15 nearest eligible rows with metadata predicates",
+        "Supply only eligible chunks and their provenance to generation"
+      ],
+      "explanation": "The retrieval scope must be established before retrieving data, and the query vector must match the index.",
+      "id": "level-10-q46"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "The meridian Cosmos transport gets HTTP 429. What minimum timing should its first custom retry honor before retrying?",
+      "answer": "Wait at least 1500 ms as indicated by the service",
+      "explanation": "x-ms-retry-after-ms reports milliseconds. Use this hint with bounded retry behavior.",
+      "options": [
+        "Wait 1.5 ms",
+        "Retry only after changing the consistency level",
+        "Wait at least 1500 ms as indicated by the service",
+        "Retry immediately on another client"
+      ],
+      "exhibits": [
+        {
+          "title": "Response headers",
+          "code": "HTTP/1.1 429 Too Many Requests\nx-ms-retry-after-ms: 1500"
+        }
+      ],
+      "id": "level-10-q47"
+    },
+    {
+      "domain": "integration",
+      "type": "order",
+      "prompt": "Arrange the successful meridian PeekLock path so a fault after the database write leaves the operation safe to replay.",
+      "answer": [
+        "Receive and lock the message",
+        "Validate the payload and derive the stable operation key",
+        "Commit the idempotent business result",
+        "Complete the broker delivery"
+      ],
+      "explanation": "Acknowledgment follows a durable idempotent write, preserving retry safety.",
+      "id": "level-10-q48"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "The Azure Managed Redis cache for meridian stores per-tenant answers. Which cache key is sufficient when changing model generations?",
+      "answer": "meridian:<verified-tenant>:<model-generation>:<query-hash>",
+      "explanation": "Tenant scope and model generation are both retrieval inputs and must participate in cache identity.",
+      "options": [
+        "meridian:<model-generation>:<query-hash>",
+        "meridian:<verified-tenant>:<model-generation>:<query-hash>",
+        "meridian:<query-hash>",
+        "meridian:<verified-tenant>:<query-hash>"
+      ],
+      "id": "level-10-q49"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "An AKS worker receives storage errors after rotating its managed identity's federated credential. Its current service account is worker in namespace rag, but the federation was created for namespace default. What exact correction preserves the identity boundary?",
+      "answer": "Set the federated subject to system:serviceaccount:rag:worker for the intended issuer and audience",
+      "explanation": "The projected token subject must match the federated credential, including both namespace and service account.",
+      "options": [
+        "Install the resource owner’s API key in all namespaces",
+        "Add an Azure role assignment but leave the mismatched subject",
+        "Set the subject to the node pool name",
+        "Set the federated subject to system:serviceaccount:rag:worker for the intended issuer and audience"
+      ],
+      "exhibits": [
+        {
+          "title": "Federation evidence",
+          "code": "issuer: cluster OIDC issuer\nobserved subject: system:serviceaccount:rag:worker\nfederated subject: system:serviceaccount:default:worker"
+        }
+      ],
+      "id": "level-10-q50"
+    },
+    {
+      "domain": "containers",
+      "type": "text",
+      "prompt": "The meridian container listens on the port printed below. Enter the numeric Container Apps ingress targetPort.",
+      "answer": [
+        "8010"
+      ],
+      "explanation": "Ingress forwards to the internal listening port, regardless of the public HTTPS port.",
+      "exhibits": [
+        {
+          "title": "Server startup log",
+          "code": "INFO: Listening on 0.0.0.0:8010\nINFO: External endpoint uses HTTPS"
+        }
+      ],
+      "id": "level-10-q51"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "A PostgreSQL canary changes the query encoder and index generation behind App Configuration. Some clients refresh while stale replicas continue serving. What invariant prevents cross-generation search and stale-cache reuse?",
+      "answer": "Read one generation per request and use that generation for both the encoder/index pair and the tenant-scoped cache key",
+      "explanation": "A request-scoped generation couples compatible retrieval components and cache identity through an overlapping migration.",
+      "options": [
+        "Read one generation per request and use that generation for both the encoder/index pair and the tenant-scoped cache key",
+        "Read the current encoder setting and previous index setting independently and reuse cache entries globally",
+        "Send the same vector to all generations and prefer whichever returns first",
+        "Disable the metadata filter for rare cross-generation cache misses"
+      ],
+      "id": "level-10-q52"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The meridian Deployment creates Ready Pods, but the Kubernetes Service selects no Pods. Which exact selector must the Service use?",
+      "answer": "app: retrieve-meridian",
+      "explanation": "A Service uses a flat map under spec.selector and matches actual Pod labels.",
+      "options": [
+        "app: retrieve-meridian",
+        "port: 8080",
+        "matchLabels: retrieve",
+        "app: search-meridian"
+      ],
+      "exhibits": [
+        {
+          "title": "Service and Deployment excerpts",
+          "code": "# Service\nspec:\n  selector: {app: search-meridian}\n# Deployment template\nmetadata:\n  labels: {app: retrieve-meridian}"
+        }
+      ],
+      "id": "level-10-q53"
+    },
+    {
+      "domain": "operations",
+      "type": "multi",
+      "prompt": "The meridian canary has a slower p95 but migration traffic mixes different request types. Which two analysis changes help isolate the regression?",
+      "answer": [
+        "Group the latency percentile by revision and request operation",
+        "Examine dependency spans for the affected operations and revisions"
+      ],
+      "explanation": "Keep like-for-like cohorts, then inspect downstream contributions to the observed request time.",
+      "options": [
+        "Compare a single application-wide mean",
+        "Discard failures before identifying affected operations",
+        "Select the maximum latency sample from unrelated services",
+        "Group the latency percentile by revision and request operation",
+        "Examine dependency spans for the affected operations and revisions"
+      ],
+      "id": "level-10-q54"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The meridian Docker image builder installs dependencies again after every application-only edit. Which Dockerfile edit fixes that without bundling build tools?",
+      "answer": "Copy dependency metadata before application code and install the dependencies in a build stage",
+      "explanation": "Docker invalidates layers downstream of a changed COPY. Separate stable dependency inputs and use a runtime stage for the output.",
+      "options": [
+        "Copy dependency metadata before application code and install the dependencies in a build stage",
+        "Move the application COPY below CMD but keep it before dependency installation",
+        "Install build tools in the final stage at process startup",
+        "Copy the entire repository before dependency installation"
+      ],
+      "exhibits": [
+        {
+          "title": "Current Dockerfile",
+          "code": "FROM python:3.12-slim\nWORKDIR /app\nCOPY . .\nRUN pip wheel -r requirements.txt -w /wheels"
+        }
+      ],
+      "id": "level-10-q55"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The meridian initializer needs 108 seconds. Using a simplified startup budget of periodSeconds × failureThreshold, which threshold is the smallest that provides at least one full additional probe period beyond initialization?",
+      "answer": "12",
+      "explanation": "Round up (108 + 10)/10. This is a simplified sizing estimate. Actual probes should also allow for observed variance.",
+      "options": [
+        "10",
+        "15",
+        "13",
+        "12"
+      ],
+      "exhibits": [
+        {
+          "title": "Deployment probe fragment",
+          "code": "startupProbe:\n  httpGet: {path: /started, port: 8080}\n  periodSeconds: 10\n  failureThreshold: ___"
+        }
+      ],
+      "id": "level-10-q56"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "The meridian Event Grid function receives document version 13 followed by version 12. What should the durable update predicate enforce?",
+      "answer": "Only apply an event whose version is strictly newer than the stored document version",
+      "explanation": "Idempotency protects duplicates, while monotonic version checks protect against distinct events arriving out of order.",
+      "options": [
+        "Compare only whether the event IDs differ",
+        "Always overwrite with the most recently delivered event",
+        "Only apply an event whose version is strictly newer than the stored document version",
+        "Use the delivery retry count to choose the newest document"
+      ],
+      "id": "level-10-q57"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "The meridian app must pick up current secret versions on future fetches. Which Key Vault call avoids pinning a specific version?",
+      "answer": "client.get_secret(\"meridian-db-password\")",
+      "explanation": "A versionless get resolves the current version. The application must still perform its next fetch according to its cache policy.",
+      "options": [
+        "client.get_deleted_secret(\"db-password\")",
+        "client.get_secret(\"meridian-db-password\", version=\"old-version\")",
+        "client.list_properties_of_secrets()",
+        "client.get_secret(\"meridian-db-password\")"
+      ],
+      "exhibits": [
+        {
+          "title": "SecretClient call (Python)",
+          "code": "client = SecretClient(vault_url=vault_url, credential=credential)\nsecret = ____"
+        }
+      ],
+      "id": "level-10-q58"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "The meridian worker begins a completely new trace for every Service Bus delivery. Which corrected operation associates spans with the producer?",
+      "answer": "Extract propagated context from message properties and use it as a parent or span link according to messaging semantics",
+      "explanation": "Producer context belongs in transport metadata. The receiving span uses the context to link the operations across the broker.",
+      "options": [
+        "Copy the queue lock token into the span name",
+        "Derive the trace ID from message length",
+        "Put the account credential into baggage",
+        "Extract propagated context from message properties and use it as a parent or span link according to messaging semantics"
+      ],
+      "id": "level-10-q59"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "The meridian security team needs to investigate failures without storing raw document text or bearer tokens. What should be exported?",
+      "answer": "Sanitized error categories and stable operation identifiers with approved allowlisted attributes",
+      "explanation": "Redact secrets before export and use correlation identifiers to preserve incident context.",
+      "options": [
+        "Sanitized error categories and stable operation identifiers with approved allowlisted attributes",
+        "Headers and prompt text in span attributes",
+        "Entire input and unchanged exception fields for every failure",
+        "Raw credentials in a separate logging table keyed by operation"
+      ],
+      "id": "level-10-q60"
+    }
+  ]
+}

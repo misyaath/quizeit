@@ -1,0 +1,362 @@
+{
+  "id": "generated-008d85f0-050c-47ae-9d24-99e308b8a485",
+  "title": "AI-200 Expert Practice: PostgreSQL pgvector and Azure Managed Redis — Questions ",
+  "questions": [
+    {
+      "id": "generated-008d85f0-050c-47ae-9d24-99e308b8a485-q1",
+      "domain": "general",
+      "type": "single",
+      "prompt": "An Azure Database for PostgreSQL table has an HNSW index on embedding with vector_cosine_ops. A retrieval endpoint must return the 12 closest chunks and expose cosine similarity, not distance, to its caller. The current query returns the right scores, but its plan sorts a sequential scan. Which replacement for the ORDER BY clause preserves the ranking and makes the existing index eligible to supply the order? Assume all vectors are nonzero and there are no ties.",
+      "options": [
+        "ORDER BY embedding <=> $1::vector ASC",
+        "ORDER BY embedding <=> $1::vector DESC",
+        "ORDER BY -(embedding <=> $1::vector) DESC",
+        "ORDER BY embedding <-> $1::vector ASC"
+      ],
+      "answer": "ORDER BY embedding <=> $1::vector ASC",
+      "explanation": "The SELECT list can still compute similarity. For index ordering, use the cosine operator directly: smaller distance means greater similarity. Negating the distance and sorting descending is mathematically equivalent, but it orders by an expression rather than by the indexed distance operator. ([github.com](https://github.com/pgvector/pgvector/blob/master/README.md?plain=1&utm_source=openai))",
+      "exhibits": [
+        {
+          "title": "Current retrieval query",
+          "code": "SELECT id, 1 - (embedding <=> $1::vector) AS similarity\nFROM chunks\nORDER BY similarity DESC\nLIMIT 12;"
+        }
+      ]
+    },
+    {
+      "id": "generated-008d85f0-050c-47ae-9d24-99e308b8a485-q2",
+      "domain": "general",
+      "type": "multi",
+      "prompt": "A pgvector 0.8+ query uses a global HNSW index, applies WHERE collection_id = 41, and requests 20 rows. It returns six, although an exact search finds 900 eligible rows with valid embeddings. Iterative scans are off. Without changing the index or weakening the filter, which TWO changes can independently allow more eligible rows to be found?",
+      "options": [
+        "Increase hnsw.ef_search for this query.",
+        "Enable hnsw.iterative_scan = strict_order for this query.",
+        "Increase hnsw.max_scan_tuples while leaving iterative scans off.",
+        "Increase ivfflat.probes for this query.",
+        "Move the collection filter outside a subquery that first takes the global nearest 20."
+      ],
+      "answer": [
+        "Increase hnsw.ef_search for this query.",
+        "Enable hnsw.iterative_scan = strict_order for this query."
+      ],
+      "explanation": "A selective filter can reject most candidates from the initial HNSW search. A larger ef_search broadens that search; iterative scanning can continue after candidates are rejected. Raising an iterative-scan ceiling does not activate iteration. Neither correct change guarantees the exact nearest 20. ([github.com](https://github.com/pgvector/pgvector/blob/master/README.md?plain=1&utm_source=openai))"
+    },
+    {
+      "id": "generated-008d85f0-050c-47ae-9d24-99e308b8a485-q3",
+      "domain": "general",
+      "type": "match",
+      "prompt": "A team mirrors embeddings from PostgreSQL into an Azure Managed Redis hash index. Match each observation to the contract violation that explains it. Use each diagnosis once: reversed score polarity; mismatched coordinate width; incompatible embedding spaces; incorrect metric assumption.",
+      "labels": [
+        "The Redis field is FLOAT32 DIM 768. The exporter sends 768 binary double-precision coordinates, and Redis rejects the query blob for its length.",
+        "The nearest IDs agree across stores, but the app rejects an identical nonzero vector because its Redis COSINE result is below the app's minimum similarity of 0.95.",
+        "Both stores hold model A's document vectors. Only Redis receives query vectors from independently trained model B; dimensions match, but relevance collapses.",
+        "On the same non-unit vectors, the app expects PostgreSQL inner-product ranking to reproduce Redis COSINE ranking. High-magnitude documents change rank."
+      ],
+      "answer": [
+        "mismatched coordinate width",
+        "reversed score polarity",
+        "incompatible embedding spaces",
+        "incorrect metric assumption"
+      ],
+      "explanation": "FLOAT32 needs four bytes per coordinate, not eight. Redis COSINE returns distance, so an identical vector scores near zero. Equal dimensions establish shape compatibility, not a shared coordinate system. Finally, cosine divides out vector magnitudes; raw inner product does not. ([redis.io](https://redis.io/docs/latest/develop/ai/search-and-query/vectors/?utm_source=openai))"
+    },
+    {
+      "id": "generated-008d85f0-050c-47ae-9d24-99e308b8a485-q4",
+      "domain": "general",
+      "type": "order",
+      "prompt": "A legal-search service uses binary-quantized pgvector retrieval to save index memory but promises results ranked by cosine distance on the original vectors. Its query encoder accepts text, its candidate search accepts only a binary query, and its reranker accepts only candidate IDs plus the full-precision query. Order the operations for one request. Assume at least 80 eligible documents and no ties.",
+      "answer": [
+        "Encode the request text into a full-precision query vector and retain it.",
+        "Binary-quantize the query vector using the same transformation used by the candidate index.",
+        "Retrieve 80 candidate IDs using Hamming distance in the binary index.",
+        "Score those IDs by cosine distance between their original vectors and the retained query vector.",
+        "Return the 10 candidate IDs with the smallest full-precision distances."
+      ],
+      "explanation": "The binary search chooses which documents the reranker can see. The final ranking is exact within those 80 candidates, not necessarily across the corpus: reranking cannot recover a true neighbor omitted by candidate generation. ([github.com](https://github.com/pgvector/pgvector/blob/master/README.md?plain=1&utm_source=openai))"
+    },
+    {
+      "id": "generated-008d85f0-050c-47ae-9d24-99e308b8a485-q5",
+      "domain": "general",
+      "type": "text",
+      "prompt": "A migration test requires PostgreSQL and Redis adapters to emit the same similarity value for one vector pair. Both vectors have unit L2 norm. PostgreSQL evaluates document_embedding <#> query_embedding to -0.84. The Redis adapter uses COSINE distance. What Redis distance should the test expect, rounded to two decimal places?",
+      "answer": [
+        "0.16",
+        ".16"
+      ],
+      "explanation": "pgvector's <#> is negative inner product, so the dot product is 0.84. For unit vectors that is also cosine similarity. Redis COSINE distance is therefore 1 − 0.84 = 0.16. ([github.com](https://github.com/pgvector/pgvector/blob/master/README.md?plain=1&utm_source=openai))"
+    },
+    {
+      "id": "generated-008d85f0-050c-47ae-9d24-99e308b8a485-q6",
+      "domain": "general",
+      "type": "single",
+      "prompt": "An Azure Managed Redis semantic cache uses a FLAT vector index and an indexed TAG field named scope. The caller is authorized only for scope east. The app asks for the globally nearest cached prompt, then validates its scope and distance. It records a miss if either check fails. An east entry is at distance 0.04, a west entry is at 0.01, and the maximum accepted distance is 0.05. Which change returns the correct hit even if arbitrarily many west entries are closer?",
+      "options": [
+        "Restrict the KNN query to @scope:{east}, request the nearest eligible entry, and validate its distance before serving it.",
+        "Request the two globally nearest entries, discard west entries, and apply the distance threshold.",
+        "Apply the distance threshold globally, take the single nearest entry that passes, and then validate its scope.",
+        "Replace FLAT with HNSW and increase the search breadth until the global nearest result is stable."
+      ],
+      "answer": "Restrict the KNN query to @scope:{east}, request the nearest eligible entry, and validate its distance before serving it.",
+      "explanation": "The target is the nearest entry within east, not the nearest entry overall. Putting scope inside the query defines the right candidate population. Any fixed global shortlist can be filled entirely by closer west entries, even when an acceptable east entry exists. ([redis.io](https://redis.io/docs/latest/develop/ai/search-and-query/advanced-concepts/query_syntax/?utm_source=openai))"
+    },
+    {
+      "id": "generated-008d85f0-050c-47ae-9d24-99e308b8a485-q7",
+      "domain": "general",
+      "type": "multi",
+      "prompt": "A Redis client serializes query embeddings for an Azure Managed Redis hash index declared FLOAT32 DIM 1536. The serializer must adapt model output represented as 64-bit floats. Which TWO release tests together check both the required byte count and that Redis interprets the coordinates as intended?",
+      "options": [
+        "Assert that the blob actually passed to the Redis query contains exactly 6,144 bytes.",
+        "Against independently encoded FLAT fixtures e1 and e2, query with 3e1 + 4e2 and verify COSINE distances of approximately 0.4 and 0.2 respectively.",
+        "Assert that the serialized blob contains 1,536 bytes, one per dimension.",
+        "Store and query the same serializer-produced nonzero blob and accept a zero self-distance as proof of correct coordinate encoding.",
+        "Verify only that a JSON rendering of the source array contains 1,536 numbers."
+      ],
+      "answer": [
+        "Assert that the blob actually passed to the Redis query contains exactly 6,144 bytes.",
+        "Against independently encoded FLAT fixtures e1 and e2, query with 3e1 + 4e2 and verify COSINE distances of approximately 0.4 and 0.2 respectively."
+      ],
+      "explanation": "The payload needs 1,536 × 4 bytes. Length alone cannot detect swapped coordinates. With orthogonal unit basis fixtures, the query has norm 5, so the expected distances are 1 − 3/5 and 1 − 4/5. Independently encoded fixtures avoid the blind spot of comparing a faulty encoding with itself. ([redis.io](https://redis.io/docs/latest/develop/ai/search-and-query/vectors/?utm_source=openai))"
+    },
+    {
+      "id": "generated-008d85f0-050c-47ae-9d24-99e308b8a485-q8",
+      "domain": "general",
+      "type": "match",
+      "prompt": "A retrieval benchmark compares a Redis result set with an exact pgvector baseline. Match each observed failure to the correction that isolates it. Use each correction once: align corpus snapshots; define a tie policy; measure set overlap; align eligibility predicates.",
+      "labels": [
+        "Every apparent Redis miss is a document committed after the Redis export watermark but before the PostgreSQL benchmark query.",
+        "Both stores return nine identical IDs. Their tenth IDs differ, but both have exactly the cutoff distance and either is valid under the product contract.",
+        "Both stores return the same ten distinct IDs in different orders. The evaluator reports zero recall because no ID occupies its reference position.",
+        "The reference query includes archived documents, while the Redis query and production contract both require status=active."
+      ],
+      "answer": [
+        "align corpus snapshots",
+        "define a tie policy",
+        "measure set overlap",
+        "align eligibility predicates"
+      ],
+      "explanation": "An exact baseline is useful only if it searches the same data under the same conditions. A cutoff tie needs an explicit scoring rule. Recall@10 measures how many reference IDs were recovered, not whether they appeared in the same positions; a positional metric answers a different question. ([github.com](https://github.com/pgvector/pgvector/blob/master/README.md?plain=1&utm_source=openai))"
+    },
+    {
+      "id": "generated-008d85f0-050c-47ae-9d24-99e308b8a485-q9",
+      "domain": "general",
+      "type": "order",
+      "prompt": "A live service is replacing embedding model A with incompatible model B. PostgreSQL remains authoritative; Azure Managed Redis holds reusable answers. The migration log retains writes from a chosen snapshot boundary. The release requires snapshot backfill before log replay, a caught-up B store before shadow testing, and a passing shadow test before cutover. Order the release gates without mixing embedding spaces or losing writes.",
+      "answer": [
+        "Establish a consistent PostgreSQL snapshot and its matching change-log position while model A continues serving.",
+        "Build the isolated B vector store from that snapshot using model B document embeddings.",
+        "Replay subsequent changes into the B store through the validation watermark and keep change processing active.",
+        "Shadow B-encoded requests against the B store and a separate B Redis namespace; verify quality and freshness.",
+        "Switch the serving configuration as one unit to the B query encoder, B vector store, and B cache namespace."
+      ],
+      "explanation": "The log position defines where replay must start so writes made during backfill are not lost. Shadow testing then exercises the same encoder, store, and cache namespace intended for production. Switching only the encoder would compare B queries with A vectors; switching only the store would leave the inverse mismatch."
+    },
+    {
+      "id": "generated-008d85f0-050c-47ae-9d24-99e308b8a485-q10",
+      "domain": "general",
+      "type": "text",
+      "prompt": "For each of 100 requests, an exact pgvector search identifies ten distinct relevant chunk IDs. An Azure Managed Redis candidate stage supplies up to 40 IDs per request to a reranker. Across all requests, those candidate sets contain 873 of the 1,000 reference request–chunk pairs. The reranker may return ten IDs per request but cannot introduce a missing candidate. What is the highest possible micro-averaged recall@10 after reranking? Give a percentage to one decimal place.",
+      "answer": [
+        "87.3%",
+        "87.3",
+        "87.3 percent"
+      ],
+      "explanation": "Even a perfect reranker can recover only the 873 reference pairs present among its candidates. Each request has at most ten such pairs, so all recovered pairs fit in its ten output slots. The attainable ceiling is 873 ÷ 1,000 × 100 = 87.3%."
+    },
+    {
+      "id": "generated-008d85f0-050c-47ae-9d24-99e308b8a485-q11",
+      "domain": "general",
+      "type": "single",
+      "prompt": "11. A service ranks each document by the distance of its closest chunk. Its Azure Managed Redis adapter returns exact chunk neighbors from a FLAT index in ascending distance. Its PostgreSQL reference query groups all chunks by document, orders by MIN(distance), and takes five documents. Both adapters read the same immutable corpus; distances are unique, and at least five documents exist. Which Redis stopping rule guarantees the same five documents without assuming a bound on chunks per document?",
+      "options": [
+        "Fetch the first 25 chunks and rank the distinct documents represented in that prefix.",
+        "Increase K until doubling it leaves the set of observed document IDs unchanged once, then return up to five documents.",
+        "Increase K until the sorted prefix contains five distinct document IDs, then return the first five IDs in order of first appearance.",
+        "Increase K until five documents each have two hits, then rank those documents by their closest hit."
+      ],
+      "answer": "Increase K until the sorted prefix contains five distinct document IDs, then return the first five IDs in order of first appearance.",
+      "explanation": "A document's first appearance in an exact distance ordering is its minimum chunk distance. At the fifth distinct ID, every unseen document has a worse minimum. One document could occupy the first 50 positions, so neither a fixed prefix nor an unchanged ID set proves completion. Requiring two hits would exclude a document with a single excellent chunk. ([redis.io](https://redis.io/docs/latest/develop/interact/search-and-query/query/vector-search//?utm_source=openai))"
+    },
+    {
+      "id": "generated-008d85f0-050c-47ae-9d24-99e308b8a485-q12",
+      "domain": "general",
+      "type": "multi",
+      "prompt": "12. PostgreSQL is authoritative for chunk embeddings. An outbox worker projects changes into Azure Managed Redis. Each chunk has a strictly increasing revision; delivery can repeat or reorder events, including deletes. After a worker crash, unacknowledged events are retried. Which TWO design choices together prevent lost committed changes and prevent a delayed update from resurrecting a deleted embedding?",
+      "options": [
+        "Commit the chunk mutation and its outbox event in the same PostgreSQL transaction.",
+        "After committing the chunk mutation, insert the outbox event in a second transaction before replying to the writer.",
+        "Atomically apply only revisions newer than the stored Redis revision; on deletion, retain a nonsearchable revision marker for as long as an older event can arrive.",
+        "On deletion, remove both the embedding and its revision; treat a missing Redis key as eligible for any incoming revision.",
+        "Deduplicate by event UUID and otherwise apply each previously unseen event in arrival order."
+      ],
+      "answer": [
+        "Commit the chunk mutation and its outbox event in the same PostgreSQL transaction.",
+        "Atomically apply only revisions newer than the stored Redis revision; on deletion, retain a nonsearchable revision marker for as long as an older event can arrive."
+      ],
+      "explanation": "One commit eliminates the crash window in which a chunk changes but no event records it. At the destination, suppose delete revision 9 arrives before update revision 8. Retaining revision 9 lets the worker reject 8 even if it has never seen that event's UUID. The revision check and mutation must be atomic so concurrent workers cannot both pass the check against an old value."
+    },
+    {
+      "id": "generated-008d85f0-050c-47ae-9d24-99e308b8a485-q13",
+      "domain": "general",
+      "type": "match",
+      "prompt": "13. A pgvector service uses IVFFlat for one corpus and HNSW for another. Match each tuning request to the single parameter that directly controls it. Use each parameter once.",
+      "labels": [
+        "Keep the IVFFlat index unchanged, but search more of its partitions for a particular request.",
+        "Rebuild IVFFlat so that the same training corpus is divided into more partitions.",
+        "Keep the HNSW graph unchanged, but widen the initial candidate search for a particular request.",
+        "Keep HNSW's connection limit unchanged, but consider more candidates when constructing the graph."
+      ],
+      "answer": [
+        "ivfflat.probes",
+        "lists",
+        "hnsw.ef_search",
+        "ef_construction"
+      ],
+      "explanation": "For IVFFlat, lists determines how many partitions exist; probes determines how many a query visits. For HNSW, ef_search sets the query-time candidate-list size, while ef_construction sets the construction-time candidate-list size. Raising ef_construction is distinct from raising m, which controls graph connectivity. ([github.com](https://github.com/pgvector/pgvector/blob/master/README.md?utm_source=openai))"
+    },
+    {
+      "id": "generated-008d85f0-050c-47ae-9d24-99e308b8a485-q14",
+      "domain": "general",
+      "type": "order",
+      "prompt": "14. A service must rebuild an empty Redis vector projection while its PostgreSQL pgvector table continues to receive writes. Its replication API returns a consistent snapshot S and a matching change-stream position P. Events after P are retained. The bulk loader performs unconditional writes, so it must not overlap replay. A routing controller requires a fresh barrier B issued after bulk loading finishes and permits cutover only after replay through B. Order the operations so no committed change is skipped or overwritten by an older snapshot row.",
+      "answer": [
+        "Acquire snapshot S and its matching stream position P.",
+        "Populate the shadow Redis projection from S and wait for all bulk writes to complete.",
+        "Request the fresh source-stream barrier B.",
+        "Replay committed changes after P in source order through B, including deletes, and confirm they have been applied.",
+        "Route reads to the shadow projection and continue consuming changes after B."
+      ],
+      "explanation": "S supplies the baseline, while P identifies where its delta begins. Starting replay at B would omit writes made during loading. Replaying before the loader finishes could let a late snapshot write resurrect a deleted row. Confirmation through B establishes the cutover watermark; continued consumption handles later commits."
+    },
+    {
+      "id": "generated-008d85f0-050c-47ae-9d24-99e308b8a485-q15",
+      "domain": "general",
+      "type": "text",
+      "prompt": "15. A hybrid retriever fuses PostgreSQL lexical results with Azure Managed Redis vector results. For each document it adds 1/(60 + rank) from each list, using one-based ranks and zero contribution for absence. Document A is first in the lexical list and absent from the vector list. Document B is ranked r in both lists. Ties go to A. What is the largest integer r for which B ranks ahead of A?",
+      "answer": [
+        "61"
+      ],
+      "explanation": "A scores 1/61. B wins only if 2/(60 + r) > 1/61, which simplifies to 122 > 60 + r, or r < 62. At rank 62 the scores tie, so 61 is the last winning rank."
+    }
+  ],
+  "sources": [
+    {
+      "url": "https://learn.microsoft.com/credentials/certifications/resources/study-guides/ai-200?WT.mc_id=studentamb_165290",
+      "title": "learn.microsoft.com"
+    },
+    {
+      "url": "https://github.com/pgvector/pgvector",
+      "title": "github.com"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/azure/redis/overview-vector-similarity",
+      "title": "learn.microsoft.com"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-gb/training/courses/ai-200t00",
+      "title": "learn.microsoft.com"
+    },
+    {
+      "url": "https://learn.microsoft.com/azure/redis/tutorial-semantic-cache",
+      "title": "learn.microsoft.com"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/azure/databricks/vector-search/vector-search",
+      "title": "learn.microsoft.com"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/azure/search/vector-search-ranking",
+      "title": "learn.microsoft.com"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/azure/well-architected/service-guides/azure-managed-redis",
+      "title": "learn.microsoft.com"
+    },
+    {
+      "url": "https://learn.microsoft.com/azure/redis/redis-modules",
+      "title": "learn.microsoft.com"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/training/modules/implement-vector-storage-azure-managed-redis/",
+      "title": "learn.microsoft.com"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/azure/architecture/guide/technology-choices/vector-search",
+      "title": "learn.microsoft.com"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/azure/redis/tutorial-agent-memory",
+      "title": "learn.microsoft.com"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/services-hub/unified/health/assessment_prereq_docs/ama/prereqsadsassessment.pdf",
+      "title": "learn.microsoft.com"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-au/azure/databricks/_extras/documents/reference-use-case-gen-ai-rag-for-azure.pdf",
+      "title": "learn.microsoft.com"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/credentials/certifications/resources/study-guides/ab-200",
+      "title": "learn.microsoft.com"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/credentials/certifications/exams/ai-200",
+      "title": "learn.microsoft.com"
+    },
+    {
+      "url": "https://github.com/pgvector/pgvector/blob/master/README.md?plain=1",
+      "title": "github.com"
+    },
+    {
+      "url": "https://github.com/pgvector/pgvector/blob/master/test/sql/hnsw_vector.sql",
+      "title": "github.com"
+    },
+    {
+      "url": "https://redis.io/docs/latest/interact/search-and-query/advanced-concepts/vectors/",
+      "title": "redis.io"
+    },
+    {
+      "url": "https://access.crunchydata.com/documentation/pgvector/latest/pdf/pgvector.pdf",
+      "title": "access.crunchydata.com"
+    },
+    {
+      "url": "https://redis.io/docs/latest/commands/ft.hybrid/",
+      "title": "redis.io"
+    },
+    {
+      "url": "https://github.com/pgvector/pgvector/blob/master/src/hnsw.c",
+      "title": "github.com"
+    },
+    {
+      "url": "https://redis.io/docs/latest/develop/ai/search-and-query/vectors/",
+      "title": "redis.io"
+    },
+    {
+      "url": "https://redis.io/docs/latest/develop/ai/search-and-query/advanced-concepts/query_syntax/",
+      "title": "redis.io"
+    },
+    {
+      "url": "https://github.com/pgvector/pgvector?ref=nirvana-labs.ghost.io",
+      "title": "github.com"
+    },
+    {
+      "url": "https://pgvector.app/hnsw/",
+      "title": "pgvector.app"
+    },
+    {
+      "url": "https://www.postgresql.eu/events/nordicpgday2025/sessions/session/6246/slides/647/2025_PGVECTOR_NordicPGDay.pdf",
+      "title": "www.postgresql.eu"
+    },
+    {
+      "url": "https://access.crunchydata.com/documentation/pgvector/0.6.0/pdf/pgvector.pdf",
+      "title": "access.crunchydata.com"
+    },
+    {
+      "url": "https://docs.tecnisys.com.br/pgsys-ecosystem/pdf/pgvector/0.8.0/pgvector-0.8.0.pdf",
+      "title": "docs.tecnisys.com.br"
+    },
+    {
+      "url": "https://redis.io/resources/vss-cheat-sheet.pdf",
+      "title": "redis.io"
+    }
+  ]
+}

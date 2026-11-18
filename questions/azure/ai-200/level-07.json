@@ -1,0 +1,1091 @@
+{
+  "id": "level-07",
+  "title": "Level 7 · Performance and scale",
+  "difficulty": 7,
+  "questions": [
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "Which artifact reference should production use to ensure it matches staging?",
+      "answer": "The tested manifest digest sha256:BBBB…",
+      "explanation": "A digest refers to the tested manifest even if someone changed candidate afterward.",
+      "options": [
+        "Any tag in the same repository",
+        "The OCI registry hostname without a repository",
+        "The tested manifest digest sha256:BBBB…",
+        "The current meaning of candidate"
+      ],
+      "caseStudy": {
+        "title": "TundraDesk",
+        "background": "TundraDesk offers multilingual support over documents mirrored into multiple regions. Search uses Cosmos DB for NoSQL, with documents partitioned by /tenantId. The assistant queries one tenant at a time. Users sometimes edit policy text and immediately ask for a new answer in the same session.\n\nThe container delivery pipeline uses a mutable candidate tag. Release engineering needs to guarantee that the tested artifact is the one promoted. Indexing notifications are delivered by Event Grid and can repeat or arrive out of order. Any version lower than the last stored version must be ignored.\n\nThe team observes that one tenant saturates its partition while total account usage looks modest. They also need a query that measures error volume per five-minute interval, split by service role.",
+        "exhibits": [
+          {
+            "title": "Cosmos request sample",
+            "code": "partition key /tenantId, request tenant northwind\nnormalized RU consumption for tenant's physical partition: 100%\nother observed partitions: 10–25%"
+          },
+          {
+            "title": "Related metrics",
+            "code": "api version 3: candidate tag points to sha256:AAAA...\nstaging tested sha256:BBBB...\n::"
+          }
+        ]
+      },
+      "id": "level-07-q01"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "Which comparison distinguishes tenant skew from account-wide saturation?",
+      "answer": "Normalized RU consumption by partition and throttling for the tenant's partition bounds",
+      "explanation": "Partition-level utilization shows a hot partition that account-level averages can hide.",
+      "options": [
+        "Average CPU across all app replicas only",
+        "Normalized RU consumption by partition and throttling for the tenant's partition bounds",
+        "Number of account regions",
+        "Redis TTL metrics"
+      ],
+      "caseStudy": {
+        "title": "TundraDesk",
+        "background": "TundraDesk offers multilingual support over documents mirrored into multiple regions. Search uses Cosmos DB for NoSQL, with documents partitioned by /tenantId. The assistant queries one tenant at a time. Users sometimes edit policy text and immediately ask for a new answer in the same session.\n\nThe container delivery pipeline uses a mutable candidate tag. Release engineering needs to guarantee that the tested artifact is the one promoted. Indexing notifications are delivered by Event Grid and can repeat or arrive out of order. Any version lower than the last stored version must be ignored.\n\nThe team observes that one tenant saturates its partition while total account usage looks modest. They also need a query that measures error volume per five-minute interval, split by service role.",
+        "exhibits": [
+          {
+            "title": "Cosmos request sample",
+            "code": "partition key /tenantId, request tenant northwind\nnormalized RU consumption for tenant's physical partition: 100%\nother observed partitions: 10–25%"
+          },
+          {
+            "title": "Related metrics",
+            "code": "api version 3: candidate tag points to sha256:AAAA...\nstaging tested sha256:BBBB...\n::"
+          }
+        ]
+      },
+      "id": "level-07-q02"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "Which pattern reduces query fan-out while preserving authorization?",
+      "answer": "Pass the authenticated tenant partition key and retain a tenant predicate in retrieval",
+      "explanation": "Scoping dispatch to one logical partition avoids fan-out and an explicit tenant predicate helps guard retrieval behavior.",
+      "options": [
+        "Use eventual consistency and omit tenant filtering",
+        "Shard application cache by region alone",
+        "Filter unauthorized chunks in a model prompt after querying all partitions",
+        "Pass the authenticated tenant partition key and retain a tenant predicate in retrieval"
+      ],
+      "caseStudy": {
+        "title": "TundraDesk",
+        "background": "TundraDesk offers multilingual support over documents mirrored into multiple regions. Search uses Cosmos DB for NoSQL, with documents partitioned by /tenantId. The assistant queries one tenant at a time. Users sometimes edit policy text and immediately ask for a new answer in the same session.\n\nThe container delivery pipeline uses a mutable candidate tag. Release engineering needs to guarantee that the tested artifact is the one promoted. Indexing notifications are delivered by Event Grid and can repeat or arrive out of order. Any version lower than the last stored version must be ignored.\n\nThe team observes that one tenant saturates its partition while total account usage looks modest. They also need a query that measures error volume per five-minute interval, split by service role.",
+        "exhibits": [
+          {
+            "title": "Cosmos request sample",
+            "code": "partition key /tenantId, request tenant northwind\nnormalized RU consumption for tenant's physical partition: 100%\nother observed partitions: 10–25%"
+          },
+          {
+            "title": "Related metrics",
+            "code": "api version 3: candidate tag points to sha256:AAAA...\nstaging tested sha256:BBBB...\n::"
+          }
+        ]
+      },
+      "id": "level-07-q03"
+    },
+    {
+      "domain": "integration",
+      "type": "multi",
+      "prompt": "What combination protects Event Grid-triggered writes from both retries and out-of-order delivery? Select the action and its supporting safeguard.",
+      "answer": [
+        "Deduplicate by source and event id, and conditionally write only newer document versions",
+        "Pass the same event IDs through retries"
+      ],
+      "explanation": "Deduplication handles repeated events. Version checks handle reordered distinct events. Stable publisher identity helps the receiver distinguish retries of an event from other events.",
+      "options": [
+        "Set retry count to zero and always overwrite",
+        "Only sort events by received time",
+        "Pass the same event IDs through retries",
+        "Only use a new random event key for every delivery",
+        "Deduplicate by source and event id, and conditionally write only newer document versions"
+      ],
+      "caseStudy": {
+        "title": "TundraDesk",
+        "background": "TundraDesk offers multilingual support over documents mirrored into multiple regions. Search uses Cosmos DB for NoSQL, with documents partitioned by /tenantId. The assistant queries one tenant at a time. Users sometimes edit policy text and immediately ask for a new answer in the same session.\n\nThe container delivery pipeline uses a mutable candidate tag. Release engineering needs to guarantee that the tested artifact is the one promoted. Indexing notifications are delivered by Event Grid and can repeat or arrive out of order. Any version lower than the last stored version must be ignored.\n\nThe team observes that one tenant saturates its partition while total account usage looks modest. They also need a query that measures error volume per five-minute interval, split by service role.",
+        "exhibits": [
+          {
+            "title": "Cosmos request sample",
+            "code": "partition key /tenantId, request tenant northwind\nnormalized RU consumption for tenant's physical partition: 100%\nother observed partitions: 10–25%"
+          },
+          {
+            "title": "Related metrics",
+            "code": "api version 3: candidate tag points to sha256:AAAA...\nstaging tested sha256:BBBB...\n::"
+          }
+        ]
+      },
+      "id": "level-07-q04"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "What KQL aggregation fits failed request counts by role and five-minute bucket?",
+      "answer": "summarize count() by AppRoleName, bin(TimeGenerated, 5m)",
+      "explanation": "After filtering failures, grouping on role and a five-minute bin produces the required time-series buckets.",
+      "options": [
+        "project count() by bin(TimeGenerated, 5m)",
+        "summarize count() by AppRoleName, bin(TimeGenerated, 5m)",
+        "summarize count() by AppRoleName, TimeGenerated",
+        "where TimeGenerated == 5m"
+      ],
+      "caseStudy": {
+        "title": "TundraDesk",
+        "background": "TundraDesk offers multilingual support over documents mirrored into multiple regions. Search uses Cosmos DB for NoSQL, with documents partitioned by /tenantId. The assistant queries one tenant at a time. Users sometimes edit policy text and immediately ask for a new answer in the same session.\n\nThe container delivery pipeline uses a mutable candidate tag. Release engineering needs to guarantee that the tested artifact is the one promoted. Indexing notifications are delivered by Event Grid and can repeat or arrive out of order. Any version lower than the last stored version must be ignored.\n\nThe team observes that one tenant saturates its partition while total account usage looks modest. They also need a query that measures error volume per five-minute interval, split by service role.",
+        "exhibits": [
+          {
+            "title": "Cosmos request sample",
+            "code": "partition key /tenantId, request tenant northwind\nnormalized RU consumption for tenant's physical partition: 100%\nother observed partitions: 10–25%"
+          },
+          {
+            "title": "Related metrics",
+            "code": "api version 3: candidate tag points to sha256:AAAA...\nstaging tested sha256:BBBB...\n::"
+          }
+        ]
+      },
+      "id": "level-07-q05"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The harbor initializer needs 81 seconds. Using a simplified startup budget of periodSeconds × failureThreshold, which threshold is the smallest that provides at least one full additional probe period beyond initialization?",
+      "answer": "18",
+      "explanation": "Round up (81 + 5)/5. This is a simplified sizing estimate. Actual probes should also allow for observed variance.",
+      "options": [
+        "16",
+        "19",
+        "21",
+        "18"
+      ],
+      "exhibits": [
+        {
+          "title": "Deployment probe fragment",
+          "code": "startupProbe:\n  httpGet: {path: /started, port: 8080}\n  periodSeconds: 5\n  failureThreshold: ___"
+        }
+      ],
+      "id": "level-07-q06"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "The harbor chart requires failed requests counted per 11 minutes by service role. Which query aggregation builds buckets and counts rows?",
+      "answer": "summarize Failures=count() by AppRoleName, bin(TimeGenerated, 11m)",
+      "explanation": "Group by role and binned timestamps. Grouping by raw timestamps or role only omits the requested interval grouping.",
+      "options": [
+        "project AppRoleName, bin(TimeGenerated, 11m)",
+        "summarize Failures=count() by AppRoleName, TimeGenerated",
+        "summarize Failures=count() by AppRoleName",
+        "summarize Failures=count() by AppRoleName, bin(TimeGenerated, 11m)"
+      ],
+      "id": "level-07-q07"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "The Azure Managed Redis cache for harbor stores per-tenant answers. Which cache key is sufficient when changing model generations?",
+      "answer": "harbor:<verified-tenant>:<model-generation>:<query-hash>",
+      "explanation": "Tenant scope and model generation are both retrieval inputs and must participate in cache identity.",
+      "options": [
+        "harbor:<verified-tenant>:<query-hash>",
+        "harbor:<query-hash>",
+        "harbor:<verified-tenant>:<model-generation>:<query-hash>",
+        "harbor:<model-generation>:<query-hash>"
+      ],
+      "id": "level-07-q08"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "During a tenant-specific migration, PostgreSQL switches from a full scan to an HNSW index. Which stage of the testing plan isolates whether the low recall comes from filtering instead of changed embedding quality?",
+      "answer": "Compare approximate and exact rankings using the same query vector, generation, predicate and eligible rows",
+      "explanation": "Keeping model and permitted corpus constant isolates ANN and filtering effects.",
+      "options": [
+        "Evaluate only queries without a tenant predicate",
+        "Compare raw distance scores across two different embedding spaces",
+        "Compare approximate and exact rankings using the same query vector, generation, predicate and eligible rows",
+        "Change the model, remove filters and compare p95 latency"
+      ],
+      "id": "level-07-q09"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "What failure can occur when the harbor worker runs this code and exits at the marked line?",
+      "answer": "The message is removed even though the database update has not happened",
+      "explanation": "The code settles the message before doing its work. Move completion after the durable, idempotent result.",
+      "options": [
+        "A duplicate is guaranteed because the lock was renewed",
+        "The successful database write is automatically rolled back by Service Bus",
+        "The message is removed even though the database update has not happened",
+        "A permanently invalid message goes to the DLQ automatically before completion"
+      ],
+      "exhibits": [
+        {
+          "title": "PeekLock worker (Python)",
+          "code": "receiver.complete_message(message)\n# Process exits here.\nwrite_result(\"harbor\", message)"
+        }
+      ],
+      "id": "level-07-q10"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The harbor Docker image builder installs dependencies again after every application-only edit. Which Dockerfile edit fixes that without bundling build tools?",
+      "answer": "Copy dependency metadata before application code and install the dependencies in a build stage",
+      "explanation": "Docker invalidates layers downstream of a changed COPY. Separate stable dependency inputs and use a runtime stage for the output.",
+      "options": [
+        "Move the application COPY below CMD but keep it before dependency installation",
+        "Copy the entire repository before dependency installation",
+        "Install build tools in the final stage at process startup",
+        "Copy dependency metadata before application code and install the dependencies in a build stage"
+      ],
+      "exhibits": [
+        {
+          "title": "Current Dockerfile",
+          "code": "FROM python:3.12-slim\nWORKDIR /app\nCOPY . .\nRUN pip wheel -r requirements.txt -w /wheels"
+        }
+      ],
+      "id": "level-07-q11"
+    },
+    {
+      "domain": "integration",
+      "type": "order",
+      "prompt": "Arrange the successful harbor PeekLock path so a fault after the database write leaves the operation safe to replay.",
+      "answer": [
+        "Receive and lock the message",
+        "Validate the payload and derive the stable operation key",
+        "Commit the idempotent business result",
+        "Complete the broker delivery"
+      ],
+      "explanation": "Acknowledgment follows a durable idempotent write, preserving retry safety.",
+      "id": "level-07-q12"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "The harbor sender retried within the broker duplicate detection window. Which message property must stay unchanged on an unpartitioned queue?",
+      "answer": "message_id",
+      "explanation": "Duplicate detection uses the application-assigned MessageId. Sequence numbers and delivery counts are set by the broker.",
+      "options": [
+        "sequence_number",
+        "locked_until_utc",
+        "delivery_count",
+        "message_id"
+      ],
+      "exhibits": [
+        {
+          "title": "Service Bus retry (Python)",
+          "code": "new_msg = ServiceBusMessage(body, message_id=f\"harbor:{operation_id}\")\nsender.send_messages(new_msg)"
+        }
+      ],
+      "id": "level-07-q13"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "The deployed harbor Function tries to resolve the connection named in the decorator. Which location provides the deployed setting?",
+      "answer": "The Function App application settings using the configured connection name or identity-based prefix",
+      "explanation": "The hosted process receives application settings from the Function App. Local settings only apply during local execution.",
+      "options": [
+        "The Service Bus message body",
+        "The SQL schema of the function result",
+        "The Function App application settings using the configured connection name or identity-based prefix",
+        "The developer workstation local.settings.json without publishing settings"
+      ],
+      "exhibits": [
+        {
+          "title": "Worker function (Python)",
+          "code": "@app.service_bus_queue_trigger(arg_name=\"msg\", queue_name=\"harbor-jobs\", connection=\"JobBus\")\ndef work(msg):\n    handle(msg)"
+        }
+      ],
+      "id": "level-07-q14"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The harbor release must survive image tag reassignment. Which image reference pins the staging artifact?",
+      "answer": "acr.azurecr.io/retrieval@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "explanation": "A manifest digest identifies immutable content. Tags resolve to whatever digest they currently reference.",
+      "options": [
+        "acr.azurecr.io/retrieval",
+        "acr.azurecr.io/retrieval:latest",
+        "acr.azurecr.io/retrieval@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "acr.azurecr.io/retrieval:stable"
+      ],
+      "exhibits": [
+        {
+          "title": "Artifact to promote",
+          "code": "tag: candidate-7\nmanifestDigest: sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
+      ],
+      "id": "level-07-q15"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "The harbor Event Grid function receives document version 10 followed by version 9. What should the durable update predicate enforce?",
+      "answer": "Only apply an event whose version is strictly newer than the stored document version",
+      "explanation": "Idempotency protects duplicates, while monotonic version checks protect against distinct events arriving out of order.",
+      "options": [
+        "Only apply an event whose version is strictly newer than the stored document version",
+        "Compare only whether the event IDs differ",
+        "Use the delivery retry count to choose the newest document",
+        "Always overwrite with the most recently delivered event"
+      ],
+      "id": "level-07-q16"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "Which OpenTelemetry resource attribute identifies the logical harbor service independently of the request operation name?",
+      "answer": "service.name",
+      "explanation": "service.name groups instances of the same logical service. service.instance.id identifies an individual instance.",
+      "options": [
+        "service.name",
+        "server.address",
+        "service.instance.id",
+        "http.request.method"
+      ],
+      "exhibits": [
+        {
+          "title": "OpenTelemetry resource attributes",
+          "code": "{\"___\": \"harbor-retrieval-api\", \"deployment.environment.name\": \"production\"}"
+        }
+      ],
+      "id": "level-07-q17"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The harbor process is running but should receive traffic only after /healthz/ready succeeds. Which probe should own that endpoint?",
+      "answer": "readinessProbe",
+      "explanation": "Readiness is evaluated after startup and controls whether Pods are available for Service traffic.",
+      "options": [
+        "startupProbe only",
+        "livenessProbe",
+        "readinessProbe",
+        "a service selector"
+      ],
+      "exhibits": [
+        {
+          "title": "Endpoint behavior",
+          "code": "GET /healthz/ready → 503 until query encoder and dependencies are available\nGET /live → 200 while process can run"
+        }
+      ],
+      "id": "level-07-q18"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The harbor worker scales from zero. Its queue backlog may grow during periods without HTTP traffic. Which configuration follows the backlog?",
+      "answer": "Use a Service Bus KEDA scale rule with minReplicas 0",
+      "explanation": "A queue scaler can observe the broker while the container has zero replicas. A CPU rule cannot measure a nonexistent replica.",
+      "options": [
+        "Increase maxReplicas without setting an event-driven rule",
+        "Use a Service Bus KEDA scale rule with minReplicas 0",
+        "Use a CPU utilization rule without a queue trigger",
+        "Use an HTTP rule with concurrentRequests 1"
+      ],
+      "id": "level-07-q19"
+    },
+    {
+      "domain": "operations",
+      "type": "order",
+      "prompt": "Order the harbor database credential rotation so existing calls can continue while the app switches. The database supports overlapping credentials.",
+      "answer": [
+        "Create the replacement credential and publish a new secret version",
+        "Refresh the app and have it fetch the replacement",
+        "Verify authenticated requests on the new credential",
+        "Revoke the previous credential"
+      ],
+      "explanation": "Keep overlap until verifying that clients can authenticate with the replacement.",
+      "id": "level-07-q20"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "Which KQL aggregation calculates the 97th percentile of request latency grouped by AppRoleName for the harbor deployment?",
+      "answer": "summarize Tail = percentile(DurationMs, 97) by AppRoleName",
+      "explanation": "percentile aggregates a requested quantile over each group. Multiplying individual durations does not calculate a percentile.",
+      "options": [
+        "summarize Tail = avg(DurationMs) by AppRoleName",
+        "summarize Tail = max(DurationMs) by AppRoleName",
+        "extend Tail = DurationMs * 0.97",
+        "summarize Tail = percentile(DurationMs, 97) by AppRoleName"
+      ],
+      "id": "level-07-q21"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The harbor deployment has 209 usable database connections, 10 steady replicas and maxSurge 3. What is the maximum equal per-Pod connection pool size that respects the rollout budget?",
+      "answer": "16",
+      "explanation": "During rollout up to replicas plus surge Pods can coexist. Divide the usable connections by that maximum and round down.",
+      "options": [
+        "20",
+        "17",
+        "15",
+        "16"
+      ],
+      "exhibits": [
+        {
+          "title": "Deployment excerpts",
+          "code": "replicas: 10\nstrategy:\n  rollingUpdate:\n    maxSurge: 3\n    maxUnavailable: 0"
+        }
+      ],
+      "id": "level-07-q22"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "Complete the KQL filter to restrict the harbor view to requests from the preceding 11 minutes.",
+      "answer": "where TimeGenerated >= ago(11m)",
+      "explanation": "ago() yields a timestamp. Keep events at or after that time using where.",
+      "options": [
+        "where TimeGenerated >= ago(11m)",
+        "project TimeGenerated >= ago(11m)",
+        "where TimeGenerated <= ago(11m)",
+        "where TimeGenerated == ago(11m)"
+      ],
+      "exhibits": [
+        {
+          "title": "Request query (KQL)",
+          "code": "AppRequests\n| ____\n| where AppRoleName == \"harbor-api\""
+        }
+      ],
+      "id": "level-07-q23"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "The harbor Cosmos transport gets HTTP 429. What minimum timing should its first custom retry honor before retrying?",
+      "answer": "Wait at least 1050 ms as indicated by the service",
+      "explanation": "x-ms-retry-after-ms reports milliseconds. Use this hint with bounded retry behavior.",
+      "options": [
+        "Wait at least 1050 ms as indicated by the service",
+        "Retry only after changing the consistency level",
+        "Wait 1.05 ms",
+        "Retry immediately on another client"
+      ],
+      "exhibits": [
+        {
+          "title": "Response headers",
+          "code": "HTTP/1.1 429 Too Many Requests\nx-ms-retry-after-ms: 1050"
+        }
+      ],
+      "id": "level-07-q24"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The harbor candidate consumes 465 MiB at startup and spikes by another 152 MiB during batch processing. Using these measured values only, what minimum limit in MiB covers the combined peak?",
+      "answer": "617",
+      "explanation": "The startup allocation remains resident during the batch. Add the incremental peak before setting a real production safety margin.",
+      "options": [
+        "617",
+        "529",
+        "930",
+        "465"
+      ],
+      "exhibits": [
+        {
+          "title": "Observed Pod status",
+          "code": "Last State: Terminated\nReason: OOMKilled\nConfigured limit: 529Mi"
+        }
+      ],
+      "id": "level-07-q25"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "In Azure App Configuration, the model and threshold for harbor must be refreshed together on reading a sentinel. Which publishing order fits?",
+      "answer": "Update all dependent values, then update the sentinel",
+      "explanation": "Write the sentinel after publishing the dependent keys so a refresh sees the complete intended set.",
+      "options": [
+        "Use the production values under the staging label",
+        "Update all dependent values, then update the sentinel",
+        "Republish an unchanged sentinel before each individual key write",
+        "Update the sentinel first, then write values independently"
+      ],
+      "exhibits": [
+        {
+          "title": "App Configuration change set",
+          "code": "Key: retrieval:model, Label: harbor\nKey: retrieval:threshold, Label: harbor\nKey: retrieval:sentinel, Label: harbor"
+        }
+      ],
+      "id": "level-07-q26"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "The harbor PostgreSQL query ranks using cosine distance. Which HNSW operator class supports the shown operator?",
+      "answer": "vector_cosine_ops",
+      "explanation": "The HNSW operator class must match the ranking operator. Cosine uses <=>, Euclidean uses <->, and negative inner product uses <#>.",
+      "options": [
+        "vector_ip_ops",
+        "text_pattern_ops",
+        "vector_cosine_ops",
+        "vector_l2_ops"
+      ],
+      "exhibits": [
+        {
+          "title": "pgvector query",
+          "code": "SELECT id FROM chunks\nWHERE tenant_id = $2\nORDER BY embedding <=> $1\nLIMIT 12;"
+        }
+      ],
+      "id": "level-07-q27"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "Each harbor batch has 133 Cosmos reads that cost 9 RU each. What total RU charge should be expected if all reads complete once?",
+      "answer": "1197",
+      "explanation": "Multiply the count by the RU charge per operation. Retry overhead is excluded.",
+      "options": [
+        "9",
+        "133",
+        "1330",
+        "1197"
+      ],
+      "exhibits": [
+        {
+          "title": "Cosmos logs",
+          "code": "completedReads=133\nx-ms-request-charge per read=9"
+        }
+      ],
+      "id": "level-07-q28"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "A Python app running on AKS exchanges a projected ServiceAccount token for an Entra token. Pods use the correct ServiceAccount but no projected token or injected workload identity environment appears. Which manifest omission explains this?",
+      "answer": "The workload identity label is missing from spec.template.metadata.labels",
+      "explanation": "The webhook mutates labeled Pods. A label only on the Deployment object is not inherited by the Pod template.",
+      "options": [
+        "The workload identity label is missing from spec.template.metadata.labels",
+        "The Service has ClusterIP instead of LoadBalancer",
+        "The workload identity label is present on the Pod template",
+        "The Service account name was set on the Pod template"
+      ],
+      "exhibits": [
+        {
+          "title": "AKS manifest excerpt",
+          "code": "metadata:\n  labels: {azure.workload.identity/use: \"true\"}\nspec:\n  template:\n    metadata:\n      labels: {app: ingest}\n    spec:\n      serviceAccountName: ingest-identity"
+        }
+      ],
+      "id": "level-07-q29"
+    },
+    {
+      "domain": "integration",
+      "type": "multi",
+      "prompt": "The harbor Function uses identity-based delivery from one queue. Which two requirements let it process while supporting clean retries?",
+      "answer": [
+        "Grant the Function identity Azure Service Bus Data Receiver on the applicable resource",
+        "Make the durable result idempotent using the stable operation key"
+      ],
+      "explanation": "The Service Bus receiver needs receive permission, and idempotency protects the durable side effect across redelivery.",
+      "options": [
+        "Grant the identity Data Sender alone",
+        "Generate a fresh business key on every delivery",
+        "Treat temporary broker retries as permanently invalid data",
+        "Make the durable result idempotent using the stable operation key",
+        "Grant the Function identity Azure Service Bus Data Receiver on the applicable resource"
+      ],
+      "id": "level-07-q30"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "For the harbor event consumer, what should the deduplication key contain under CloudEvents if two publishers can generate the same id?",
+      "answer": "Both source and id",
+      "explanation": "CloudEvents treats the source and id combination as unique for distinct events.",
+      "options": [
+        "Only the delivery count",
+        "Only id across all sources",
+        "Only specversion and time",
+        "Both source and id"
+      ],
+      "exhibits": [
+        {
+          "title": "Event pair (JSON lines)",
+          "code": "{\"id\":\"9\",\"source\":\"/sites/harbor/api\"}\n{\"id\":\"9\",\"source\":\"/sites/harbor/backfill\"}"
+        }
+      ],
+      "id": "level-07-q31"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "The harbor approximate index returned 10 authorized results while exact filtered search returned 12. Which experiment can improve recall without weakening the filter?",
+      "answer": "Increase HNSW candidate effort and compare approximate results to exact search under the same predicate",
+      "explanation": "Candidate tuning can improve filtered recall. Exact results from the same permitted corpus provide an appropriate reference.",
+      "options": [
+        "Increase HNSW candidate effort and compare approximate results to exact search under the same predicate",
+        "Evaluate only p95 latency and ignore result quality",
+        "Remove the tenant predicate when the first search falls short",
+        "Compare approximate recall against an unfiltered query"
+      ],
+      "id": "level-07-q32"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The harbor Deployment creates Ready Pods, but the Kubernetes Service selects no Pods. Which exact selector must the Service use?",
+      "answer": "app: retrieve-harbor",
+      "explanation": "A Service uses a flat map under spec.selector and matches actual Pod labels.",
+      "options": [
+        "port: 8080",
+        "matchLabels: retrieve",
+        "app: retrieve-harbor",
+        "app: search-harbor"
+      ],
+      "exhibits": [
+        {
+          "title": "Service and Deployment excerpts",
+          "code": "# Service\nspec:\n  selector: {app: search-harbor}\n# Deployment template\nmetadata:\n  labels: {app: retrieve-harbor}"
+        }
+      ],
+      "id": "level-07-q33"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "The harbor worker begins a completely new trace for every Service Bus delivery. Which corrected operation associates spans with the producer?",
+      "answer": "Extract propagated context from message properties and use it as a parent or span link according to messaging semantics",
+      "explanation": "Producer context belongs in transport metadata. The receiving span uses the context to link the operations across the broker.",
+      "options": [
+        "Put the account credential into baggage",
+        "Copy the queue lock token into the span name",
+        "Extract propagated context from message properties and use it as a parent or span link according to messaging semantics",
+        "Derive the trace ID from message length"
+      ],
+      "id": "level-07-q34"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "During a rollout the app must retain at least four available Pods. Its Deployment has four replicas, maxSurge 1 and maxUnavailable 0. A fifth Pod sits Pending because the node pool is full. What changes directly enable this rollout while keeping the availability floor?",
+      "answer": "Provide schedulable surge capacity while retaining maxUnavailable 0",
+      "explanation": "Zero unavailability prevents deleting an available old Pod before a replacement is ready. The extra Pod requires actual scheduling capacity.",
+      "options": [
+        "Remove readiness checks to force the Pending Pod Ready",
+        "Scale the Deployment to zero before changing the image",
+        "Set maxUnavailable 1 and remove one old Pod",
+        "Provide schedulable surge capacity while retaining maxUnavailable 0"
+      ],
+      "exhibits": [
+        {
+          "title": "Deployment strategy and event",
+          "code": "replicas: 4\nstrategy: {rollingUpdate: {maxSurge: 1, maxUnavailable: 0}}\nEvent: 0/3 nodes are available: Insufficient cpu."
+        }
+      ],
+      "id": "level-07-q35"
+    },
+    {
+      "domain": "integration",
+      "type": "text",
+      "prompt": "Enter the Python Azure Functions v2 decorator name, without @app. or parentheses, for the harbor HTTP endpoint.",
+      "answer": [
+        "route"
+      ],
+      "explanation": "The route decorator configures the HTTP route and trigger.",
+      "exhibits": [
+        {
+          "title": "Function fragment (Python)",
+          "code": "@app.___(route=\"harbor/jobs\", methods=[\"POST\"])\ndef submit(req):\n    return accept(req)"
+        }
+      ],
+      "id": "level-07-q36"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "An Event Grid subscription should allow only harbor.DocumentAccepted events with subjects under /tenant/harbor/. Which configuration expresses both constraints?",
+      "answer": "Include event type harbor.DocumentAccepted and set subjectBeginsWith to /tenant/harbor/",
+      "explanation": "Event-type selection and a subject prefix address separate constraints. Include the ending slash to avoid adjacent prefix matches.",
+      "options": [
+        "Use a subscription filter on delivery attempt only",
+        "Include event type harbor.DocumentAccepted and remove subject filtering",
+        "Use subjectEndsWith /tenant/harbor/ without an event-type filter",
+        "Include event type harbor.DocumentAccepted and set subjectBeginsWith to /tenant/harbor/"
+      ],
+      "id": "level-07-q37"
+    },
+    {
+      "domain": "data",
+      "type": "text",
+      "prompt": "Type the Redis SET option used in the harbor command to express a 135-second expiry.",
+      "answer": [
+        "EX"
+      ],
+      "explanation": "SET with EX attaches an expiration in seconds as part of the value write.",
+      "exhibits": [
+        {
+          "title": "Redis command",
+          "code": "SET harbor:summary result ____ 135"
+        }
+      ],
+      "id": "level-07-q38"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The harbor node has 3800m allocatable CPU and 1625m in existing Pod requests. How many whole new 730m Pods can the scheduler fit using CPU alone?",
+      "answer": "2",
+      "explanation": "Subtract existing requests from allocatable CPU and divide downward by the incoming request.",
+      "options": [
+        "1",
+        "5",
+        "3",
+        "2"
+      ],
+      "id": "level-07-q39"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "The harbor enqueue handler completes in 162 ms, but a worker takes minutes. Which HTTP contract preserves tracked asynchronous work?",
+      "answer": "Persist the operation, enqueue it, then return 202 with an authorized status URL",
+      "explanation": "A 202 response can carry polling metadata after durable acceptance. The caller can track completion without holding a request open.",
+      "options": [
+        "Wait synchronously for the full worker execution",
+        "Return a success response before job acceptance is durable",
+        "Persist the operation, enqueue it, then return 202 with an authorized status URL",
+        "Return 200 and discard operation state"
+      ],
+      "id": "level-07-q40"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "A team sees lock losses on messages that wait in a large prefetch buffer. The consumer is healthy but slow. What is the most targeted initial change?",
+      "answer": "Reduce prefetch and measure per-message wait time against the lock duration",
+      "explanation": "Messages held in the prefetch buffer are already locked. A smaller buffer can reduce pre-handler lock time.",
+      "options": [
+        "Move settlement before durable processing",
+        "Increase prefetch to reserve even more waiting messages",
+        "Reduce prefetch and measure per-message wait time against the lock duration",
+        "Disable duplicate detection and keep the existing buffer"
+      ],
+      "id": "level-07-q41"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "The harbor updates must be processed in order for each document while unrelated documents process concurrently. What should the producer put into SessionId?",
+      "answer": "The verified tenant and stable document ID together",
+      "explanation": "Session keys group related work. A single global key over-serializes the independent documents.",
+      "options": [
+        "The verified tenant and stable document ID together",
+        "The same global value for all tenants and documents",
+        "The retry counter",
+        "A random identifier created for each send"
+      ],
+      "exhibits": [
+        {
+          "title": "Service Bus sender (Python)",
+          "code": "msg = ServiceBusMessage(body, message_id=operation_id, session_id=___)\n# Queue is session-enabled for tenant harbor"
+        }
+      ],
+      "id": "level-07-q42"
+    },
+    {
+      "domain": "data",
+      "type": "order",
+      "prompt": "Order the retrieval path for the harbor assistant after the caller submits a query. Resolve scope before contacting the data tier.",
+      "answer": [
+        "Determine the verified tenant and retrieval generation",
+        "Embed the question using the selected generation encoder",
+        "Retrieve up to 12 nearest eligible rows with metadata predicates",
+        "Supply only eligible chunks and their provenance to generation"
+      ],
+      "explanation": "The retrieval scope must be established before retrieving data, and the query vector must match the index.",
+      "id": "level-07-q43"
+    },
+    {
+      "domain": "data",
+      "type": "match",
+      "prompt": "Match the three distinct Redis requirements at harbor.",
+      "answer": [
+        "SET key value EX 135",
+        "DEL key",
+        "TTL key"
+      ],
+      "explanation": "EX sets expiration with the write, DEL invalidates the key, and TTL reports the remaining time.",
+      "labels": [
+        "Write a reply that expires after 135 seconds",
+        "Invalidate a reply immediately following an update",
+        "Inspect the remaining lifetime in seconds"
+      ],
+      "id": "level-07-q44"
+    },
+    {
+      "domain": "data",
+      "type": "multi",
+      "prompt": "The harbor service has 165 available database connections including all simultaneously active workloads. It may run 10 replicas. Which two controls avoid connection saturation and help confirm operating headroom?",
+      "answer": [
+        "Cap each replica pool at 16 or fewer connections",
+        "Measure peak pool wait time and active connections during scale-out"
+      ],
+      "explanation": "Pool caps protect the shared database. Peak observed connections and wait time show contention under surge conditions.",
+      "options": [
+        "Open a separate connection for every query and disable pooling",
+        "Measure vector dimensions only",
+        "Allow at least 17 connections in every pool",
+        "Measure peak pool wait time and active connections during scale-out",
+        "Cap each replica pool at 16 or fewer connections"
+      ],
+      "id": "level-07-q45"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "The harbor Cosmos Python handler has a document ID and tenant. Which SDK call performs a point read?",
+      "answer": "container.read_item(item=\"harbor-7\", partition_key=\"harbor\")",
+      "explanation": "A Cosmos point read uses the id and logical partition key, and avoids query fan-out.",
+      "options": [
+        "container.read_item(item=\"harbor-7\", partition_key=\"harbor\")",
+        "container.query_items(\"SELECT * FROM c WHERE c.id = 'harbor-7'\", enable_cross_partition_query=True)",
+        "container.read()",
+        "container.read_item(item=\"harbor\", partition_key=\"harbor-7\")"
+      ],
+      "exhibits": [
+        {
+          "title": "Stored document",
+          "code": "{\"id\": \"harbor-7\", \"tenantId\": \"harbor\", \"status\": \"ready\"}"
+        }
+      ],
+      "id": "level-07-q46"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "The harbor operation needs to reprocess a permanently failed message after fixing upstream data. Which sequence avoids losing the original on a failed send?",
+      "answer": "Receive from the dead-letter subqueue, send a corrected message, confirm acceptance, then complete the original",
+      "explanation": "Keep the dead-letter delivery until the corrected copy is accepted. Account for duplicate detection when replaying.",
+      "options": [
+        "Complete the original, then attempt to send a corrected copy",
+        "Use ReceiveAndDelete on the dead-letter subqueue before validating the data",
+        "Send a fresh unrelated payload and reset the queue",
+        "Receive from the dead-letter subqueue, send a corrected message, confirm acceptance, then complete the original"
+      ],
+      "id": "level-07-q47"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "A Key Vault token is obtained using managed identity, but a PostgreSQL Entra login uses that same token and rejects the audience. What corrects the login without changing the identity?",
+      "answer": "Acquire a new access token for the PostgreSQL resource and present it to the database connection",
+      "explanation": "Access tokens are scoped to a resource audience. The same identity can request a different token for another service.",
+      "options": [
+        "Reuse the Key Vault token and increase the database timeout",
+        "Disable encrypted database connections",
+        "Acquire a new access token for the PostgreSQL resource and present it to the database connection",
+        "Change the database hostname to the Key Vault endpoint"
+      ],
+      "id": "level-07-q48"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "The harbor app must pick up current secret versions on future fetches. Which Key Vault call avoids pinning a specific version?",
+      "answer": "client.get_secret(\"harbor-db-password\")",
+      "explanation": "A versionless get resolves the current version. The application must still perform its next fetch according to its cache policy.",
+      "options": [
+        "client.get_secret(\"harbor-db-password\")",
+        "client.get_secret(\"harbor-db-password\", version=\"old-version\")",
+        "client.list_properties_of_secrets()",
+        "client.get_deleted_secret(\"db-password\")"
+      ],
+      "exhibits": [
+        {
+          "title": "SecretClient call (Python)",
+          "code": "client = SecretClient(vault_url=vault_url, credential=credential)\nsecret = ____"
+        }
+      ],
+      "id": "level-07-q49"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "The harbor change feed processor is being scaled to 8 instances with a shared processor identity. Which state enables partition ownership and checkpointing?",
+      "answer": "The lease container shared by these processor instances",
+      "explanation": "A shared lease container coordinates assignment and preserves progress across instances.",
+      "options": [
+        "The vector query continuation token reused as a lock",
+        "The cluster node hostname in each document",
+        "The lease container shared by these processor instances",
+        "A separate new lease container per instance"
+      ],
+      "id": "level-07-q50"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "Which query operation keeps every failed harbor request, including failures whose dependency telemetry was sampled out?",
+      "answer": "Join with kind=leftouter on OperationId with failed AppRequests on the left",
+      "explanation": "A leftouter join keeps unmatched request rows while enriching matched rows.",
+      "options": [
+        "Join with kind=leftanti to keep everything",
+        "Join with kind=leftouter on OperationId with failed AppRequests on the left",
+        "Join with kind=inner on OperationId",
+        "Filter dependency rows by matching HTTP status with no operation identity"
+      ],
+      "exhibits": [
+        {
+          "title": "KQL input",
+          "code": "let Failures = AppRequests | where AppRoleName == \"harbor-api\" and Success == false;\nFailures\n| join kind=___ (AppDependencies) on OperationId"
+        }
+      ],
+      "id": "level-07-q51"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The harbor Pod reports Pending with Insufficient cpu. Which first move tests the most specific failure cause?",
+      "answer": "Check CPU requests and remaining allocatable node capacity",
+      "explanation": "The scheduler uses resource requests to fit Pods on nodes.",
+      "options": [
+        "Change the application load-balancer DNS name",
+        "Change the Docker tag without inspecting Pod events",
+        "Disable all health checks for healthy peers",
+        "Check CPU requests and remaining allocatable node capacity"
+      ],
+      "exhibits": [
+        {
+          "title": "AKS status",
+          "code": "Container state: Pending with Insufficient cpu\nCheck requested for deployment/harbor-api"
+        }
+      ],
+      "id": "level-07-q52"
+    },
+    {
+      "domain": "containers",
+      "type": "text",
+      "prompt": "The harbor container listens on the port printed below. Enter the numeric Container Apps ingress targetPort.",
+      "answer": [
+        "8007"
+      ],
+      "explanation": "Ingress forwards to the internal listening port, regardless of the public HTTPS port.",
+      "exhibits": [
+        {
+          "title": "Server startup log",
+          "code": "INFO: Listening on 0.0.0.0:8007\nINFO: External endpoint uses HTTPS"
+        }
+      ],
+      "id": "level-07-q53"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "A Function that forwards payloads through an output binding needs conditional retry decisions when the destination rejects a send. Which implementation gives the handler direct access to the send exception?",
+      "answer": "Use the Azure Service Bus SDK with an explicit send and exception handling",
+      "explanation": "Using a client SDK lets code observe the send result directly, unlike a binding-driven write handled outside the handler.",
+      "options": [
+        "Move the Function to a larger host while leaving the operation opaque",
+        "Use the Azure Service Bus SDK with an explicit send and exception handling",
+        "Switch the existing trigger to HTTP and preserve the same output binding",
+        "Keep the output binding and catch only JSON parsing exceptions"
+      ],
+      "id": "level-07-q54"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "A pgvector 0.8+ query needs strict distance ordering and better candidate coverage under a selective authorized predicate. Which change fits?",
+      "answer": "Use SET LOCAL hnsw.iterative_scan = strict_order in the query transaction",
+      "explanation": "Strict-order iteration automatically scans more candidates within configured limits while respecting distance ordering.",
+      "options": [
+        "Remove the authorization predicate and rely on prompt instructions",
+        "Use SET LOCAL hnsw.iterative_scan = strict_order in the query transaction",
+        "Use relaxed_order and assume the returned rows are strictly sorted",
+        "Replace ORDER BY distance with ORDER BY tenant ID"
+      ],
+      "exhibits": [
+        {
+          "title": "Observed plan summary",
+          "code": "Index Scan using tenant_free_hnsw\nRows Removed by Filter: 36\nRows delivered: 4\nRequested LIMIT: 12"
+        }
+      ],
+      "id": "level-07-q55"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "AKS delivery must complete within its Deployment progress deadline. Candidate Pods cannot pull a renamed image and old Pods keep serving. What provides both fast diagnosis and a safe operational response?",
+      "answer": "Inspect failed Pod pull events and explicitly roll back to the previously known digest if promotion cannot be repaired in time",
+      "explanation": "Deployment status can report stalled progress. Explicit rollback or a repaired image is required; a progress deadline does not itself roll back the workload.",
+      "options": [
+        "Inspect failed Pod pull events and explicitly roll back to the previously known digest if promotion cannot be repaired in time",
+        "Wait for Kubernetes to guarantee an automatic rollback at the progress deadline",
+        "Delete all old Pods so candidates pull sooner",
+        "Adjust only the Service targetPort to change registry connectivity"
+      ],
+      "id": "level-07-q56"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "The harbor security team needs to investigate failures without storing raw document text or bearer tokens. What should be exported?",
+      "answer": "Sanitized error categories and stable operation identifiers with approved allowlisted attributes",
+      "explanation": "Redact secrets before export and use correlation identifiers to preserve incident context.",
+      "options": [
+        "Headers and prompt text in span attributes",
+        "Sanitized error categories and stable operation identifiers with approved allowlisted attributes",
+        "Entire input and unchanged exception fields for every failure",
+        "Raw credentials in a separate logging table keyed by operation"
+      ],
+      "id": "level-07-q57"
+    },
+    {
+      "domain": "operations",
+      "type": "text",
+      "prompt": "Type the W3C header name that carries the active trace and parent span identifiers for the harbor API.",
+      "answer": [
+        "traceparent"
+      ],
+      "explanation": "traceparent carries the trace ID and parent span ID used to correlate the downstream span.",
+      "exhibits": [
+        {
+          "title": "Downstream HTTP headers",
+          "code": "___: 00-dddddddddddddddddddddddddddddddd-aaaaaaaaaaaaaaaa-01\naccept: application/json"
+        }
+      ],
+      "id": "level-07-q58"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "The harbor store must accept 1536-dimensional embeddings, while the old table contains 384-dimensional vectors. Which change preserves rollback?",
+      "answer": "Backfill a versioned vector(1536) column or table and pair it with the new encoder",
+      "explanation": "An index must match the encoder dimension and embedding space. Versioned storage keeps the prior model and data available.",
+      "options": [
+        "Convert vectors to a shared integer and sort by the integer",
+        "Backfill a versioned vector(1536) column or table and pair it with the new encoder",
+        "Write the new vectors directly to vector(384)",
+        "Pad and compare representations from both model spaces without validation"
+      ],
+      "id": "level-07-q59"
+    },
+    {
+      "domain": "operations",
+      "type": "multi",
+      "prompt": "The harbor canary has a slower p95 but migration traffic mixes different request types. Which two analysis changes help isolate the regression?",
+      "answer": [
+        "Group the latency percentile by revision and request operation",
+        "Examine dependency spans for the affected operations and revisions"
+      ],
+      "explanation": "Keep like-for-like cohorts, then inspect downstream contributions to the observed request time.",
+      "options": [
+        "Discard failures before identifying affected operations",
+        "Compare a single application-wide mean",
+        "Select the maximum latency sample from unrelated services",
+        "Examine dependency spans for the affected operations and revisions",
+        "Group the latency percentile by revision and request operation"
+      ],
+      "id": "level-07-q60"
+    }
+  ]
+}

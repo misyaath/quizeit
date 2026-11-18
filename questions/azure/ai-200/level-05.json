@@ -1,0 +1,1075 @@
+{
+  "id": "level-05",
+  "title": "Level 5 · Production constraints",
+  "difficulty": 5,
+  "questions": [
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "Which AKS manifest arrangement limits the identity binding to the application workload?",
+      "answer": "Use a dedicated ServiceAccount referenced by the Pods and the workload identity pod label",
+      "explanation": "Workload identity maps an intended Kubernetes service account to a federated identity, limiting the application's identity binding.",
+      "options": [
+        "Use a dedicated ServiceAccount referenced by the Pods and the workload identity pod label",
+        "Put the database password in Deployment annotations",
+        "Annotate the Service resource with a client secret",
+        "Give every Pod the same shared node credential"
+      ],
+      "caseStudy": {
+        "title": "MosaicMed",
+        "background": "MosaicMed offers a retrieval assistant over public product instructions and private partner policy documents. Its AKS API uses workload identity to retrieve endpoint credentials. The team requires that all retrieval and cache operations use verified partner access scope. The service stores no personal medical records.\n\nRecent deployment logs show that the Pods are healthy, but after scaling from two to eight, the PostgreSQL connection budget was exceeded. The maximum pool size is configured per replica. Thirty database connections must remain reserved for other workloads. A new event routing rule should handle updates only under private partner paths.\n\nA recent credential rotation used a versioned secret URI. The process is long-lived and must discover a new secret version without redeploying images.",
+        "exhibits": [
+          {
+            "title": "Capacity notes",
+            "code": "PostgreSQL connection limit: 150\nReserved for other clients: 30\nMaximum API replicas: 8\nCurrent pool max_size per replica: 25"
+          },
+          {
+            "title": "Example event (JSON)",
+            "code": "{\"eventType\":\"Mosaic.DocumentUpdated\",\"subject\":\"/partner/private/p42/docs/55\"}\n::"
+          }
+        ]
+      },
+      "id": "level-05-q01"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "With the stated maximum replicas, what is the largest integer pool size per replica within the available budget?",
+      "answer": "15",
+      "explanation": "The API has 120 connections available. At eight replicas, 120 divided by eight is 15.",
+      "options": [
+        "19",
+        "25",
+        "18",
+        "15"
+      ],
+      "caseStudy": {
+        "title": "MosaicMed",
+        "background": "MosaicMed offers a retrieval assistant over public product instructions and private partner policy documents. Its AKS API uses workload identity to retrieve endpoint credentials. The team requires that all retrieval and cache operations use verified partner access scope. The service stores no personal medical records.\n\nRecent deployment logs show that the Pods are healthy, but after scaling from two to eight, the PostgreSQL connection budget was exceeded. The maximum pool size is configured per replica. Thirty database connections must remain reserved for other workloads. A new event routing rule should handle updates only under private partner paths.\n\nA recent credential rotation used a versioned secret URI. The process is long-lived and must discover a new secret version without redeploying images.",
+        "exhibits": [
+          {
+            "title": "Capacity notes",
+            "code": "PostgreSQL connection limit: 150\nReserved for other clients: 30\nMaximum API replicas: 8\nCurrent pool max_size per replica: 25"
+          },
+          {
+            "title": "Example event (JSON)",
+            "code": "{\"eventType\":\"Mosaic.DocumentUpdated\",\"subject\":\"/partner/private/p42/docs/55\"}\n::"
+          }
+        ]
+      },
+      "id": "level-05-q02"
+    },
+    {
+      "domain": "data",
+      "type": "multi",
+      "prompt": "What absolutely must be checked before reusing a cached answer? Select the action and its supporting safeguard.",
+      "answer": [
+        "That the key includes the verified caller scope and all response-changing inputs",
+        "Verify scope before querying the shared cache"
+      ],
+      "explanation": "Authorization scope must constrain reuse independently of semantic similarity. A cache hit must never bypass verification of the caller's access scope.",
+      "options": [
+        "That its expiration is longer than the database timeout",
+        "That the embedding has an identical float count",
+        "That the key includes the verified caller scope and all response-changing inputs",
+        "Verify scope before querying the shared cache",
+        "That a similar query text exists in a Redis index"
+      ],
+      "caseStudy": {
+        "title": "MosaicMed",
+        "background": "MosaicMed offers a retrieval assistant over public product instructions and private partner policy documents. Its AKS API uses workload identity to retrieve endpoint credentials. The team requires that all retrieval and cache operations use verified partner access scope. The service stores no personal medical records.\n\nRecent deployment logs show that the Pods are healthy, but after scaling from two to eight, the PostgreSQL connection budget was exceeded. The maximum pool size is configured per replica. Thirty database connections must remain reserved for other workloads. A new event routing rule should handle updates only under private partner paths.\n\nA recent credential rotation used a versioned secret URI. The process is long-lived and must discover a new secret version without redeploying images.",
+        "exhibits": [
+          {
+            "title": "Capacity notes",
+            "code": "PostgreSQL connection limit: 150\nReserved for other clients: 30\nMaximum API replicas: 8\nCurrent pool max_size per replica: 25"
+          },
+          {
+            "title": "Example event (JSON)",
+            "code": "{\"eventType\":\"Mosaic.DocumentUpdated\",\"subject\":\"/partner/private/p42/docs/55\"}\n::"
+          }
+        ]
+      },
+      "id": "level-05-q03"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "Which Event Grid rule selects only updates under the indicated path?",
+      "answer": "An included event type plus subjectBeginsWith /partner/private/",
+      "explanation": "The event-type inclusion and anchored path prefix together enforce both conditions.",
+      "options": [
+        "A subject prefix of /partner/ and no event type filter",
+        "An HTTP subscriber route that accepts all events",
+        "A subject suffix of /partner/private/",
+        "An included event type plus subjectBeginsWith /partner/private/"
+      ],
+      "caseStudy": {
+        "title": "MosaicMed",
+        "background": "MosaicMed offers a retrieval assistant over public product instructions and private partner policy documents. Its AKS API uses workload identity to retrieve endpoint credentials. The team requires that all retrieval and cache operations use verified partner access scope. The service stores no personal medical records.\n\nRecent deployment logs show that the Pods are healthy, but after scaling from two to eight, the PostgreSQL connection budget was exceeded. The maximum pool size is configured per replica. Thirty database connections must remain reserved for other workloads. A new event routing rule should handle updates only under private partner paths.\n\nA recent credential rotation used a versioned secret URI. The process is long-lived and must discover a new secret version without redeploying images.",
+        "exhibits": [
+          {
+            "title": "Capacity notes",
+            "code": "PostgreSQL connection limit: 150\nReserved for other clients: 30\nMaximum API replicas: 8\nCurrent pool max_size per replica: 25"
+          },
+          {
+            "title": "Example event (JSON)",
+            "code": "{\"eventType\":\"Mosaic.DocumentUpdated\",\"subject\":\"/partner/private/p42/docs/55\"}\n::"
+          }
+        ]
+      },
+      "id": "level-05-q04"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "How can the running app pick up rotations without an image redeployment?",
+      "answer": "Use an unversioned secret lookup and refresh its cached secret on a bounded interval",
+      "explanation": "An unversioned lookup resolves the latest version. The process must refresh its local secret cache.",
+      "options": [
+        "Read the Key Vault resource tags hourly",
+        "Refresh App Configuration but always use a version-pinned URI",
+        "Continue using the original versioned URI",
+        "Use an unversioned secret lookup and refresh its cached secret on a bounded interval"
+      ],
+      "caseStudy": {
+        "title": "MosaicMed",
+        "background": "MosaicMed offers a retrieval assistant over public product instructions and private partner policy documents. Its AKS API uses workload identity to retrieve endpoint credentials. The team requires that all retrieval and cache operations use verified partner access scope. The service stores no personal medical records.\n\nRecent deployment logs show that the Pods are healthy, but after scaling from two to eight, the PostgreSQL connection budget was exceeded. The maximum pool size is configured per replica. Thirty database connections must remain reserved for other workloads. A new event routing rule should handle updates only under private partner paths.\n\nA recent credential rotation used a versioned secret URI. The process is long-lived and must discover a new secret version without redeploying images.",
+        "exhibits": [
+          {
+            "title": "Capacity notes",
+            "code": "PostgreSQL connection limit: 150\nReserved for other clients: 30\nMaximum API replicas: 8\nCurrent pool max_size per replica: 25"
+          },
+          {
+            "title": "Example event (JSON)",
+            "code": "{\"eventType\":\"Mosaic.DocumentUpdated\",\"subject\":\"/partner/private/p42/docs/55\"}\n::"
+          }
+        ]
+      },
+      "id": "level-05-q05"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "The frontier security team needs to investigate failures without storing raw document text or bearer tokens. What should be exported?",
+      "answer": "Sanitized error categories and stable operation identifiers with approved allowlisted attributes",
+      "explanation": "Redact secrets before export and use correlation identifiers to preserve incident context.",
+      "options": [
+        "Headers and prompt text in span attributes",
+        "Raw credentials in a separate logging table keyed by operation",
+        "Sanitized error categories and stable operation identifiers with approved allowlisted attributes",
+        "Entire input and unchanged exception fields for every failure"
+      ],
+      "id": "level-05-q06"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "The frontier Cosmos Python handler has a document ID and tenant. Which SDK call performs a point read?",
+      "answer": "container.read_item(item=\"frontier-5\", partition_key=\"frontier\")",
+      "explanation": "A Cosmos point read uses the id and logical partition key, and avoids query fan-out.",
+      "options": [
+        "container.query_items(\"SELECT * FROM c WHERE c.id = 'frontier-5'\", enable_cross_partition_query=True)",
+        "container.read()",
+        "container.read_item(item=\"frontier-5\", partition_key=\"frontier\")",
+        "container.read_item(item=\"frontier\", partition_key=\"frontier-5\")"
+      ],
+      "exhibits": [
+        {
+          "title": "Stored document",
+          "code": "{\"id\": \"frontier-5\", \"customerId\": \"frontier\", \"status\": \"ready\"}"
+        }
+      ],
+      "id": "level-05-q07"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The frontier Docker image builder installs dependencies again after every application-only edit. Which Dockerfile edit fixes that without bundling build tools?",
+      "answer": "Copy dependency metadata before application code and install the dependencies in a build stage",
+      "explanation": "Docker invalidates layers downstream of a changed COPY. Separate stable dependency inputs and use a runtime stage for the output.",
+      "options": [
+        "Copy the entire repository before dependency installation",
+        "Move the application COPY below CMD but keep it before dependency installation",
+        "Install build tools in the final stage at process startup",
+        "Copy dependency metadata before application code and install the dependencies in a build stage"
+      ],
+      "exhibits": [
+        {
+          "title": "Current Dockerfile",
+          "code": "FROM python:3.12-slim\nWORKDIR /app\nCOPY . .\nRUN pip wheel -r requirements.txt -w /wheels"
+        }
+      ],
+      "id": "level-05-q08"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "Which query operation keeps every failed frontier request, including failures whose dependency telemetry was sampled out?",
+      "answer": "Join with kind=leftouter on OperationId with failed AppRequests on the left",
+      "explanation": "A leftouter join keeps unmatched request rows while enriching matched rows.",
+      "options": [
+        "Join with kind=leftouter on OperationId with failed AppRequests on the left",
+        "Join with kind=leftanti to keep everything",
+        "Filter dependency rows by matching HTTP status with no operation identity",
+        "Join with kind=inner on OperationId"
+      ],
+      "exhibits": [
+        {
+          "title": "KQL input",
+          "code": "let Failures = AppRequests | where AppRoleName == \"frontier-api\" and Success == false;\nFailures\n| join kind=___ (AppDependencies) on OperationId"
+        }
+      ],
+      "id": "level-05-q09"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "What failure can occur when the frontier worker runs this code and exits at the marked line?",
+      "answer": "The message is removed even though the database update has not happened",
+      "explanation": "The code settles the message before doing its work. Move completion after the durable, idempotent result.",
+      "options": [
+        "The successful database write is automatically rolled back by Service Bus",
+        "A permanently invalid message goes to the DLQ automatically before completion",
+        "A duplicate is guaranteed because the lock was renewed",
+        "The message is removed even though the database update has not happened"
+      ],
+      "exhibits": [
+        {
+          "title": "PeekLock worker (Python)",
+          "code": "receiver.complete_message(message)\n# Process exits here.\nwrite_result(\"frontier\", message)"
+        }
+      ],
+      "id": "level-05-q10"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "Complete the KQL filter to restrict the frontier view to requests from the preceding 9 minutes.",
+      "answer": "where TimeGenerated >= ago(9m)",
+      "explanation": "ago() yields a timestamp. Keep events at or after that time using where.",
+      "options": [
+        "where TimeGenerated == ago(9m)",
+        "project TimeGenerated >= ago(9m)",
+        "where TimeGenerated >= ago(9m)",
+        "where TimeGenerated <= ago(9m)"
+      ],
+      "exhibits": [
+        {
+          "title": "Request query (KQL)",
+          "code": "AppRequests\n| ____\n| where AppRoleName == \"frontier-api\""
+        }
+      ],
+      "id": "level-05-q11"
+    },
+    {
+      "domain": "integration",
+      "type": "multi",
+      "prompt": "The frontier Function uses identity-based delivery from one queue. Which two requirements let it process while supporting clean retries?",
+      "answer": [
+        "Grant the Function identity Azure Service Bus Data Receiver on the applicable resource",
+        "Make the durable result idempotent using the stable operation key"
+      ],
+      "explanation": "The Service Bus receiver needs receive permission, and idempotency protects the durable side effect across redelivery.",
+      "options": [
+        "Grant the identity Data Sender alone",
+        "Grant the Function identity Azure Service Bus Data Receiver on the applicable resource",
+        "Make the durable result idempotent using the stable operation key",
+        "Treat temporary broker retries as permanently invalid data",
+        "Generate a fresh business key on every delivery"
+      ],
+      "id": "level-05-q12"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The frontier worker scales from zero. Its queue backlog may grow during periods without HTTP traffic. Which configuration follows the backlog?",
+      "answer": "Use a Service Bus KEDA scale rule with minReplicas 0",
+      "explanation": "A queue scaler can observe the broker while the container has zero replicas. A CPU rule cannot measure a nonexistent replica.",
+      "options": [
+        "Use a Service Bus KEDA scale rule with minReplicas 0",
+        "Use an HTTP rule with concurrentRequests 1",
+        "Increase maxReplicas without setting an event-driven rule",
+        "Use a CPU utilization rule without a queue trigger"
+      ],
+      "id": "level-05-q13"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "The frontier app must pick up current secret versions on future fetches. Which Key Vault call avoids pinning a specific version?",
+      "answer": "client.get_secret(\"frontier-db-password\")",
+      "explanation": "A versionless get resolves the current version. The application must still perform its next fetch according to its cache policy.",
+      "options": [
+        "client.get_secret(\"frontier-db-password\")",
+        "client.get_secret(\"frontier-db-password\", version=\"old-version\")",
+        "client.get_deleted_secret(\"db-password\")",
+        "client.list_properties_of_secrets()"
+      ],
+      "exhibits": [
+        {
+          "title": "SecretClient call (Python)",
+          "code": "client = SecretClient(vault_url=vault_url, credential=credential)\nsecret = ____"
+        }
+      ],
+      "id": "level-05-q14"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "A 768-dimensional Cosmos corpus is expected to reach millions of vectors. Which policy is designed for large approximate search on a matching path?",
+      "answer": "diskANN on /embedding with a matching 768-dimensional embedding policy",
+      "explanation": "DiskANN is designed for large approximate workloads and supports 768 dimensions. The flat vector policy is limited to 505 dimensions.",
+      "options": [
+        "An ordinary range index with no vector definition",
+        "diskANN on /embedding with a matching 768-dimensional embedding policy",
+        "flat with dimensions 768",
+        "Exclude /embedding from the vector policy and use text ORDER BY"
+      ],
+      "exhibits": [
+        {
+          "title": "Vector indexing policy excerpt",
+          "code": "{\"vectorIndexes\":[{\"path\":\"/embedding\",\"type\":\"____\"}]}"
+        }
+      ],
+      "id": "level-05-q15"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "The frontier chart requires failed requests counted per 9 minutes by service role. Which query aggregation builds buckets and counts rows?",
+      "answer": "summarize Failures=count() by AppRoleName, bin(TimeGenerated, 9m)",
+      "explanation": "Group by role and binned timestamps. Grouping by raw timestamps or role only omits the requested interval grouping.",
+      "options": [
+        "project AppRoleName, bin(TimeGenerated, 9m)",
+        "summarize Failures=count() by AppRoleName, bin(TimeGenerated, 9m)",
+        "summarize Failures=count() by AppRoleName, TimeGenerated",
+        "summarize Failures=count() by AppRoleName"
+      ],
+      "id": "level-05-q16"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The frontier Deployment creates Ready Pods, but the Kubernetes Service selects no Pods. Which exact selector must the Service use?",
+      "answer": "app: retrieve-frontier",
+      "explanation": "A Service uses a flat map under spec.selector and matches actual Pod labels.",
+      "options": [
+        "matchLabels: retrieve",
+        "app: search-frontier",
+        "port: 8080",
+        "app: retrieve-frontier"
+      ],
+      "exhibits": [
+        {
+          "title": "Service and Deployment excerpts",
+          "code": "# Service\nspec:\n  selector: {app: search-frontier}\n# Deployment template\nmetadata:\n  labels: {app: retrieve-frontier}"
+        }
+      ],
+      "id": "level-05-q17"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "The frontier approximate index returned 8 authorized results while exact filtered search returned 10. Which experiment can improve recall without weakening the filter?",
+      "answer": "Increase HNSW candidate effort and compare approximate results to exact search under the same predicate",
+      "explanation": "Candidate tuning can improve filtered recall. Exact results from the same permitted corpus provide an appropriate reference.",
+      "options": [
+        "Remove the tenant predicate when the first search falls short",
+        "Evaluate only p95 latency and ignore result quality",
+        "Compare approximate recall against an unfiltered query",
+        "Increase HNSW candidate effort and compare approximate results to exact search under the same predicate"
+      ],
+      "id": "level-05-q18"
+    },
+    {
+      "domain": "operations",
+      "type": "order",
+      "prompt": "Order the frontier database credential rotation so existing calls can continue while the app switches. The database supports overlapping credentials.",
+      "answer": [
+        "Create the replacement credential and publish a new secret version",
+        "Refresh the app and have it fetch the replacement",
+        "Verify authenticated requests on the new credential",
+        "Revoke the previous credential"
+      ],
+      "explanation": "Keep overlap until verifying that clients can authenticate with the replacement.",
+      "id": "level-05-q19"
+    },
+    {
+      "domain": "data",
+      "type": "order",
+      "prompt": "Order the retrieval path for the frontier assistant after the caller submits a query. Resolve scope before contacting the data tier.",
+      "answer": [
+        "Determine the verified tenant and retrieval generation",
+        "Embed the question using the selected generation encoder",
+        "Retrieve up to 10 nearest eligible rows with metadata predicates",
+        "Supply only eligible chunks and their provenance to generation"
+      ],
+      "explanation": "The retrieval scope must be established before retrieving data, and the query vector must match the index.",
+      "id": "level-05-q20"
+    },
+    {
+      "domain": "integration",
+      "type": "text",
+      "prompt": "Enter the Python Azure Functions v2 decorator name, without @app. or parentheses, for the frontier HTTP endpoint.",
+      "answer": [
+        "route"
+      ],
+      "explanation": "The route decorator configures the HTTP route and trigger.",
+      "exhibits": [
+        {
+          "title": "Function fragment (Python)",
+          "code": "@app.___(route=\"frontier/jobs\", methods=[\"POST\"])\ndef submit(req):\n    return accept(req)"
+        }
+      ],
+      "id": "level-05-q21"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "The frontier PostgreSQL query ranks using Euclidean distance. Which HNSW operator class supports the shown operator?",
+      "answer": "vector_l2_ops",
+      "explanation": "The HNSW operator class must match the ranking operator. Cosine uses <=>, Euclidean uses <->, and negative inner product uses <#>.",
+      "options": [
+        "vector_ip_ops",
+        "vector_l2_ops",
+        "vector_cosine_ops",
+        "text_pattern_ops"
+      ],
+      "exhibits": [
+        {
+          "title": "pgvector query",
+          "code": "SELECT id FROM chunks\nWHERE tenant_id = $2\nORDER BY embedding <-> $1\nLIMIT 10;"
+        }
+      ],
+      "id": "level-05-q22"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "Event Grid delivery repeatedly fails and eventually exhausts its retry policy. Which configuration retains the undeliverable events for later inspection?",
+      "answer": "Configure a dead-letter storage destination for the event subscription",
+      "explanation": "Dead-letter storage retains events that Event Grid could not deliver.",
+      "options": [
+        "Enable Service Bus duplicate detection on an unrelated queue",
+        "Increase the Function's maximum page size only",
+        "Return HTTP 200 for failed events and discard them",
+        "Configure a dead-letter storage destination for the event subscription"
+      ],
+      "id": "level-05-q23"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "In Azure App Configuration, the model and threshold for frontier must be refreshed together on reading a sentinel. Which publishing order fits?",
+      "answer": "Update all dependent values, then update the sentinel",
+      "explanation": "Write the sentinel after publishing the dependent keys so a refresh sees the complete intended set.",
+      "options": [
+        "Use the production values under the staging label",
+        "Republish an unchanged sentinel before each individual key write",
+        "Update the sentinel first, then write values independently",
+        "Update all dependent values, then update the sentinel"
+      ],
+      "exhibits": [
+        {
+          "title": "App Configuration change set",
+          "code": "Key: retrieval:model, Label: frontier\nKey: retrieval:threshold, Label: frontier\nKey: retrieval:sentinel, Label: frontier"
+        }
+      ],
+      "id": "level-05-q24"
+    },
+    {
+      "domain": "operations",
+      "type": "text",
+      "prompt": "Type the W3C header name that carries the active trace and parent span identifiers for the frontier API.",
+      "answer": [
+        "traceparent"
+      ],
+      "explanation": "traceparent carries the trace ID and parent span ID used to correlate the downstream span.",
+      "exhibits": [
+        {
+          "title": "Downstream HTTP headers",
+          "code": "___: 00-dddddddddddddddddddddddddddddddd-aaaaaaaaaaaaaaaa-01\naccept: application/json"
+        }
+      ],
+      "id": "level-05-q25"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The frontier release must survive image tag reassignment. Which image reference pins the staging artifact?",
+      "answer": "acr.azurecr.io/retrieval@sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "explanation": "A manifest digest identifies immutable content. Tags resolve to whatever digest they currently reference.",
+      "options": [
+        "acr.azurecr.io/retrieval@sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "acr.azurecr.io/retrieval:latest",
+        "acr.azurecr.io/retrieval:stable",
+        "acr.azurecr.io/retrieval"
+      ],
+      "exhibits": [
+        {
+          "title": "Artifact to promote",
+          "code": "tag: candidate-5\nmanifestDigest: sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        }
+      ],
+      "id": "level-05-q26"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "The frontier operation needs to reprocess a permanently failed message after fixing upstream data. Which sequence avoids losing the original on a failed send?",
+      "answer": "Receive from the dead-letter subqueue, send a corrected message, confirm acceptance, then complete the original",
+      "explanation": "Keep the dead-letter delivery until the corrected copy is accepted. Account for duplicate detection when replaying.",
+      "options": [
+        "Use ReceiveAndDelete on the dead-letter subqueue before validating the data",
+        "Send a fresh unrelated payload and reset the queue",
+        "Complete the original, then attempt to send a corrected copy",
+        "Receive from the dead-letter subqueue, send a corrected message, confirm acceptance, then complete the original"
+      ],
+      "id": "level-05-q27"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The frontier process is running but should receive traffic only after /internal/readiness succeeds. Which probe should own that endpoint?",
+      "answer": "readinessProbe",
+      "explanation": "Readiness is evaluated after startup and controls whether Pods are available for Service traffic.",
+      "options": [
+        "livenessProbe",
+        "startupProbe only",
+        "readinessProbe",
+        "a service selector"
+      ],
+      "exhibits": [
+        {
+          "title": "Endpoint behavior",
+          "code": "GET /internal/readiness → 503 until query encoder and dependencies are available\nGET /live → 200 while process can run"
+        }
+      ],
+      "id": "level-05-q28"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "The frontier enqueue handler completes in 126 ms, but a worker takes minutes. Which HTTP contract preserves tracked asynchronous work?",
+      "answer": "Persist the operation, enqueue it, then return 202 with an authorized status URL",
+      "explanation": "A 202 response can carry polling metadata after durable acceptance. The caller can track completion without holding a request open.",
+      "options": [
+        "Return 200 and discard operation state",
+        "Wait synchronously for the full worker execution",
+        "Persist the operation, enqueue it, then return 202 with an authorized status URL",
+        "Return a success response before job acceptance is durable"
+      ],
+      "id": "level-05-q29"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The frontier candidate consumes 395 MiB at startup and spikes by another 136 MiB during batch processing. Using these measured values only, what minimum limit in MiB covers the combined peak?",
+      "answer": "531",
+      "explanation": "The startup allocation remains resident during the batch. Add the incremental peak before setting a real production safety margin.",
+      "options": [
+        "395",
+        "790",
+        "459",
+        "531"
+      ],
+      "exhibits": [
+        {
+          "title": "Observed Pod status",
+          "code": "Last State: Terminated\nReason: OOMKilled\nConfigured limit: 459Mi"
+        }
+      ],
+      "id": "level-05-q30"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The frontier initializer needs 63 seconds. Using a simplified startup budget of periodSeconds × failureThreshold, which threshold is the smallest that provides at least one full additional probe period beyond initialization?",
+      "answer": "14",
+      "explanation": "Round up (63 + 5)/5. This is a simplified sizing estimate. Actual probes should also allow for observed variance.",
+      "options": [
+        "12",
+        "14",
+        "15",
+        "17"
+      ],
+      "exhibits": [
+        {
+          "title": "Deployment probe fragment",
+          "code": "startupProbe:\n  httpGet: {path: /started, port: 8080}\n  periodSeconds: 5\n  failureThreshold: ___"
+        }
+      ],
+      "id": "level-05-q31"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "The deployed frontier Function tries to resolve the connection named in the decorator. Which location provides the deployed setting?",
+      "answer": "The Function App application settings using the configured connection name or identity-based prefix",
+      "explanation": "The hosted process receives application settings from the Function App. Local settings only apply during local execution.",
+      "options": [
+        "The developer workstation local.settings.json without publishing settings",
+        "The Service Bus message body",
+        "The SQL schema of the function result",
+        "The Function App application settings using the configured connection name or identity-based prefix"
+      ],
+      "exhibits": [
+        {
+          "title": "Worker function (Python)",
+          "code": "@app.service_bus_queue_trigger(arg_name=\"msg\", queue_name=\"frontier-jobs\", connection=\"JobBus\")\ndef work(msg):\n    handle(msg)"
+        }
+      ],
+      "id": "level-05-q32"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The frontier node has 3400m allocatable CPU and 1475m in existing Pod requests. How many whole new 650m Pods can the scheduler fit using CPU alone?",
+      "answer": "2",
+      "explanation": "Subtract existing requests from allocatable CPU and divide downward by the incoming request.",
+      "options": [
+        "1",
+        "2",
+        "5",
+        "3"
+      ],
+      "id": "level-05-q33"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "Event Grid must filter numeric urgency from the event's data object. The subject contains only the document path. What subscriber setting is appropriate?",
+      "answer": "An advanced filter against data.urgency with a numeric operator",
+      "explanation": "Advanced filters can target event payload properties, unlike a subject filter.",
+      "options": [
+        "An advanced filter against data.urgency with a numeric operator",
+        "A string suffix using the request's HTTP status",
+        "A Service Bus receiver prefetch setting",
+        "An included event-type filter that tries to match the JSON number"
+      ],
+      "id": "level-05-q34"
+    },
+    {
+      "domain": "integration",
+      "type": "order",
+      "prompt": "Arrange the successful frontier PeekLock path so a fault after the database write leaves the operation safe to replay.",
+      "answer": [
+        "Receive and lock the message",
+        "Validate the payload and derive the stable operation key",
+        "Commit the idempotent business result",
+        "Complete the broker delivery"
+      ],
+      "explanation": "Acknowledgment follows a durable idempotent write, preserving retry safety.",
+      "id": "level-05-q35"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "A frontier retrieval service has 135 total DB connections and reserves 15 for other services. What pool cap per replica fits with 8 simultaneous replicas?",
+      "answer": "15",
+      "explanation": "Subtract the reserved connections, divide by the replica count and round down.",
+      "options": [
+        "15",
+        "120",
+        "18",
+        "16"
+      ],
+      "id": "level-05-q36"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "The frontier identity reads an App Configuration Key Vault reference successfully, but resolution of the target value fails. Which explanation requires checking the separate data-plane authorization?",
+      "answer": "The provider can read a reference, but its resolving identity lacks secret-value access on the vault",
+      "explanation": "The stored reference is a URI. Reading the referenced secret requires vault permissions for the credential used by the provider.",
+      "options": [
+        "App Configuration Data Reader automatically includes vault read access",
+        "The provider can read a reference, but its resolving identity lacks secret-value access on the vault",
+        "The App Configuration label must equal the vault hostname",
+        "A Key Vault URI cannot be used as a reference value"
+      ],
+      "id": "level-05-q37"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The frontier canary receives 13% of explicitly weighted ingress. What stable weight keeps the split valid?",
+      "answer": "87",
+      "explanation": "The weights for the active ingress targets must sum to 100%.",
+      "options": [
+        "13",
+        "100",
+        "0",
+        "87"
+      ],
+      "id": "level-05-q38"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "The frontier Cosmos transport gets HTTP 429. What minimum timing should its first custom retry honor before retrying?",
+      "answer": "Wait at least 750 ms as indicated by the service",
+      "explanation": "x-ms-retry-after-ms reports milliseconds. Use this hint with bounded retry behavior.",
+      "options": [
+        "Retry only after changing the consistency level",
+        "Wait 0.75 ms",
+        "Retry immediately on another client",
+        "Wait at least 750 ms as indicated by the service"
+      ],
+      "exhibits": [
+        {
+          "title": "Response headers",
+          "code": "HTTP/1.1 429 Too Many Requests\nx-ms-retry-after-ms: 750"
+        }
+      ],
+      "id": "level-05-q39"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "Which KQL aggregation calculates the 95th percentile of request latency grouped by Name for the frontier deployment?",
+      "answer": "summarize Tail = percentile(DurationMs, 95) by Name",
+      "explanation": "percentile aggregates a requested quantile over each group. Multiplying individual durations does not calculate a percentile.",
+      "options": [
+        "extend Tail = DurationMs * 0.95",
+        "summarize Tail = avg(DurationMs) by Name",
+        "summarize Tail = percentile(DurationMs, 95) by Name",
+        "summarize Tail = max(DurationMs) by Name"
+      ],
+      "id": "level-05-q40"
+    },
+    {
+      "domain": "containers",
+      "type": "order",
+      "prompt": "Arrange promotion of the frontier AKS image when manifests are applied after artifact validation.",
+      "answer": [
+        "Publish the candidate container image",
+        "Capture and test its manifest digest",
+        "Update the production manifest to the tested digest",
+        "Apply the manifest and verify rollout status"
+      ],
+      "explanation": "The tested digest is the release input. Updating and applying the manifest precedes rollout verification.",
+      "id": "level-05-q41"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "The frontier sender retried within the broker duplicate detection window. Which message property must stay unchanged on an unpartitioned queue?",
+      "answer": "message_id",
+      "explanation": "Duplicate detection uses the application-assigned MessageId. Sequence numbers and delivery counts are set by the broker.",
+      "options": [
+        "message_id",
+        "sequence_number",
+        "locked_until_utc",
+        "delivery_count"
+      ],
+      "exhibits": [
+        {
+          "title": "Service Bus retry (Python)",
+          "code": "new_msg = ServiceBusMessage(body, message_id=f\"frontier:{operation_id}\")\nsender.send_messages(new_msg)"
+        }
+      ],
+      "id": "level-05-q42"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "The frontier updates must be processed in order for each document while unrelated documents process concurrently. What should the producer put into SessionId?",
+      "answer": "The verified tenant and stable document ID together",
+      "explanation": "Session keys group related work. A single global key over-serializes the independent documents.",
+      "options": [
+        "The verified tenant and stable document ID together",
+        "A random identifier created for each send",
+        "The same global value for all tenants and documents",
+        "The retry counter"
+      ],
+      "exhibits": [
+        {
+          "title": "Service Bus sender (Python)",
+          "code": "msg = ServiceBusMessage(body, message_id=operation_id, session_id=___)\n# Queue is session-enabled for tenant frontier"
+        }
+      ],
+      "id": "level-05-q43"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "The Azure Managed Redis cache for frontier stores per-tenant answers. Which cache key is sufficient when changing model generations?",
+      "answer": "frontier:<verified-tenant>:<model-generation>:<query-hash>",
+      "explanation": "Tenant scope and model generation are both retrieval inputs and must participate in cache identity.",
+      "options": [
+        "frontier:<query-hash>",
+        "frontier:<model-generation>:<query-hash>",
+        "frontier:<verified-tenant>:<model-generation>:<query-hash>",
+        "frontier:<verified-tenant>:<query-hash>"
+      ],
+      "id": "level-05-q44"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "The frontier Pod reports ImagePullBackOff. Which first move tests the most specific failure cause?",
+      "answer": "Check image name, registry access and pull events",
+      "explanation": "The container never started. Inspect Pod events before application startup logs.",
+      "options": [
+        "Disable all health checks for healthy peers",
+        "Check image name, registry access and pull events",
+        "Change the Docker tag without inspecting Pod events",
+        "Change the application load-balancer DNS name"
+      ],
+      "exhibits": [
+        {
+          "title": "AKS status",
+          "code": "Container state: ImagePullBackOff\nCheck requested for deployment/frontier-api"
+        }
+      ],
+      "id": "level-05-q45"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "Which OpenTelemetry resource attribute identifies the logical frontier service independently of the request operation name?",
+      "answer": "service.name",
+      "explanation": "service.name groups instances of the same logical service. service.instance.id identifies an individual instance.",
+      "options": [
+        "service.name",
+        "service.instance.id",
+        "http.request.method",
+        "server.address"
+      ],
+      "exhibits": [
+        {
+          "title": "OpenTelemetry resource attributes",
+          "code": "{\"___\": \"frontier-retrieval-api\", \"deployment.environment.name\": \"production\"}"
+        }
+      ],
+      "id": "level-05-q46"
+    },
+    {
+      "domain": "data",
+      "type": "match",
+      "prompt": "Match the three distinct Redis requirements at frontier.",
+      "answer": [
+        "SET key value EX 105",
+        "DEL key",
+        "TTL key"
+      ],
+      "explanation": "EX sets expiration with the write, DEL invalidates the key, and TTL reports the remaining time.",
+      "labels": [
+        "Write a reply that expires after 105 seconds",
+        "Invalidate a reply immediately following an update",
+        "Inspect the remaining lifetime in seconds"
+      ],
+      "id": "level-05-q47"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "Each frontier batch has 115 Cosmos reads that cost 7 RU each. What total RU charge should be expected if all reads complete once?",
+      "answer": "805",
+      "explanation": "Multiply the count by the RU charge per operation. Retry overhead is excluded.",
+      "options": [
+        "920",
+        "7",
+        "805",
+        "115"
+      ],
+      "exhibits": [
+        {
+          "title": "Cosmos logs",
+          "code": "completedReads=115\nx-ms-request-charge per read=7"
+        }
+      ],
+      "id": "level-05-q48"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "Your vault diagnostic output names a firewall denial for a credential that already has Secrets User. What should you check first?",
+      "answer": "The workload's network route, private DNS and allowed network paths to the vault",
+      "explanation": "A network-origin 403 persists even with a correct data-plane role. Validate connectivity from the workload itself.",
+      "options": [
+        "Increase the cache expiration for the secret",
+        "The workload's network route, private DNS and allowed network paths to the vault",
+        "Raise the application's permission to subscription Owner",
+        "Switch to a different secret version with identical access policy"
+      ],
+      "exhibits": [
+        {
+          "title": "Key Vault response",
+          "code": "HTTP 403\ninnererror.code: ForbiddenByFirewall\nCaller role: Key Vault Secrets User"
+        }
+      ],
+      "id": "level-05-q49"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "The frontier store must accept 768-dimensional embeddings, while the old table contains 1024-dimensional vectors. Which change preserves rollback?",
+      "answer": "Backfill a versioned vector(768) column or table and pair it with the new encoder",
+      "explanation": "An index must match the encoder dimension and embedding space. Versioned storage keeps the prior model and data available.",
+      "options": [
+        "Backfill a versioned vector(768) column or table and pair it with the new encoder",
+        "Pad and compare representations from both model spaces without validation",
+        "Write the new vectors directly to vector(1024)",
+        "Convert vectors to a shared integer and sort by the integer"
+      ],
+      "id": "level-05-q50"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "For the frontier event consumer, what should the deduplication key contain under CloudEvents if two publishers can generate the same id?",
+      "answer": "Both source and id",
+      "explanation": "CloudEvents treats the source and id combination as unique for distinct events.",
+      "options": [
+        "Both source and id",
+        "Only the delivery count",
+        "Only id across all sources",
+        "Only specversion and time"
+      ],
+      "exhibits": [
+        {
+          "title": "Event pair (JSON lines)",
+          "code": "{\"id\":\"7\",\"source\":\"/sites/frontier/api\"}\n{\"id\":\"7\",\"source\":\"/sites/frontier/backfill\"}"
+        }
+      ],
+      "id": "level-05-q51"
+    },
+    {
+      "domain": "operations",
+      "type": "match",
+      "prompt": "Match the frontier telemetry requirements to the appropriate signal.",
+      "answer": [
+        "Distributed traces",
+        "Latency metrics",
+        "Structured application logs"
+      ],
+      "explanation": "Traces preserve causality, metrics show aggregate trends, and logs capture selected event detail.",
+      "labels": [
+        "Follow a request across the API and worker",
+        "Watch the rolling p95 latency trend",
+        "Read a specific sanitized diagnostic event"
+      ],
+      "id": "level-05-q52"
+    },
+    {
+      "domain": "data",
+      "type": "text",
+      "prompt": "Type the Cosmos DB for NoSQL function that computes distance in the frontier vector query.",
+      "answer": [
+        "VectorDistance"
+      ],
+      "explanation": "VectorDistance compares the stored vector to the query vector using the configured policy.",
+      "exhibits": [
+        {
+          "title": "Cosmos SQL",
+          "code": "SELECT TOP 10 c.id\nFROM c\nORDER BY ____ (c.embedding, @queryVector)"
+        }
+      ],
+      "id": "level-05-q53"
+    },
+    {
+      "domain": "containers",
+      "type": "text",
+      "prompt": "The frontier container listens on the port printed below. Enter the numeric Container Apps ingress targetPort.",
+      "answer": [
+        "8005"
+      ],
+      "explanation": "Ingress forwards to the internal listening port, regardless of the public HTTPS port.",
+      "exhibits": [
+        {
+          "title": "Server startup log",
+          "code": "INFO: Listening on 0.0.0.0:8005\nINFO: External endpoint uses HTTPS"
+        }
+      ],
+      "id": "level-05-q54"
+    },
+    {
+      "domain": "containers",
+      "type": "single",
+      "prompt": "Your API is stateless, but a mounted writable emptyDir stores a rebuilt index. You need the index files to survive replacing its only Pod. Which Kubernetes change meets that requirement?",
+      "answer": "Mount storage through a PersistentVolumeClaim with an appropriate access mode",
+      "explanation": "A persistent volume can survive the Pod. emptyDir and writable container layers have shorter lifetimes.",
+      "options": [
+        "Change emptyDir.medium to Memory",
+        "Use a different path in the container writable layer",
+        "Mount storage through a PersistentVolumeClaim with an appropriate access mode",
+        "Add a liveness probe to recreate the old emptyDir after eviction"
+      ],
+      "id": "level-05-q55"
+    },
+    {
+      "domain": "operations",
+      "type": "single",
+      "prompt": "The frontier worker begins a completely new trace for every Service Bus delivery. Which corrected operation associates spans with the producer?",
+      "answer": "Extract propagated context from message properties and use it as a parent or span link according to messaging semantics",
+      "explanation": "Producer context belongs in transport metadata. The receiving span uses the context to link the operations across the broker.",
+      "options": [
+        "Derive the trace ID from message length",
+        "Put the account credential into baggage",
+        "Extract propagated context from message properties and use it as a parent or span link according to messaging semantics",
+        "Copy the queue lock token into the span name"
+      ],
+      "id": "level-05-q56"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "The frontier Event Grid function receives document version 8 followed by version 7. What should the durable update predicate enforce?",
+      "answer": "Only apply an event whose version is strictly newer than the stored document version",
+      "explanation": "Idempotency protects duplicates, while monotonic version checks protect against distinct events arriving out of order.",
+      "options": [
+        "Compare only whether the event IDs differ",
+        "Use the delivery retry count to choose the newest document",
+        "Always overwrite with the most recently delivered event",
+        "Only apply an event whose version is strictly newer than the stored document version"
+      ],
+      "id": "level-05-q57"
+    },
+    {
+      "domain": "data",
+      "type": "single",
+      "prompt": "Multiple Python Cosmos clients fetch and update the same item. You need a conditional write that rejects an update when the item was changed since reading it. What should you use?",
+      "answer": "Send the item's ETag with an If-Match precondition and handle precondition failure",
+      "explanation": "Optimistic concurrency uses the server version ETag. A read consistency setting does not prevent a conflicting write.",
+      "options": [
+        "Perform an unconditional replace through strong consistency",
+        "Use the document ID as a substitute for the ETag",
+        "Send the item's ETag with an If-Match precondition and handle precondition failure",
+        "Use the read session token as an exclusive write lock"
+      ],
+      "id": "level-05-q58"
+    },
+    {
+      "domain": "data",
+      "type": "text",
+      "prompt": "Type the Redis SET option used in the frontier command to express a 105-second expiry.",
+      "answer": [
+        "EX"
+      ],
+      "explanation": "SET with EX attaches an expiration in seconds as part of the value write.",
+      "exhibits": [
+        {
+          "title": "Redis command",
+          "code": "SET frontier:summary result ____ 105"
+        }
+      ],
+      "id": "level-05-q59"
+    },
+    {
+      "domain": "integration",
+      "type": "single",
+      "prompt": "An Event Grid subscription should allow only frontier.DocumentAccepted events with subjects under /tenant/frontier/. Which configuration expresses both constraints?",
+      "answer": "Include event type frontier.DocumentAccepted and set subjectBeginsWith to /tenant/frontier/",
+      "explanation": "Event-type selection and a subject prefix address separate constraints. Include the ending slash to avoid adjacent prefix matches.",
+      "options": [
+        "Include event type frontier.DocumentAccepted and set subjectBeginsWith to /tenant/frontier/",
+        "Use a subscription filter on delivery attempt only",
+        "Include event type frontier.DocumentAccepted and remove subject filtering",
+        "Use subjectEndsWith /tenant/frontier/ without an event-type filter"
+      ],
+      "id": "level-05-q60"
+    }
+  ]
+}

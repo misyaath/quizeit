@@ -1,0 +1,70 @@
+{
+  "id": "ai-200-project-lab",
+  "title": "AI-200 project lab · Score thresholds",
+  "questions": [
+    {
+      "id": "ai-200-code-score-threshold",
+      "type": "coding",
+      "domain": "data",
+      "prompt": "Filter vector-search scores in a small multi-file project. Read an integer threshold on the first line and zero or more whitespace-separated integer scores after it. Complete the helper in the lib folder to count scores greater than or equal to the threshold. The entry file should print that count as a single integer. A score equal to the threshold qualifies.",
+      "explanation": "Keeping the threshold logic in a helper makes it reusable. Count each qualifying score independently and include exact matches at the boundary.",
+      "languages": [
+        {
+          "id": "python",
+          "starter": "import sys\nfrom lib.scores import count_matches\n\nvalues = list(map(int, sys.stdin.read().split()))\nprint(count_matches(values[1:], values[0]))\n",
+          "solution": "import sys\nfrom lib.scores import count_matches\n\nvalues = list(map(int, sys.stdin.read().split()))\nprint(count_matches(values[1:], values[0]))\n",
+          "files": [
+            {
+              "path": "lib/scores.py",
+              "starter": "def count_matches(scores: list, threshold: int) -> int:\n    # Count scores that meet the threshold.\n    return 0\n",
+              "solution": "def count_matches(scores: list, threshold: int) -> int:\n    return sum(score >= threshold for score in scores)\n"
+            }
+          ]
+        },
+        {
+          "id": "javascript",
+          "starter": "const fs = require('fs');\nconst { countMatches } = require('./lib/scores');\nconst [threshold, ...scores] = fs.readFileSync(0, 'utf8').trim().split(/\\s+/).map(Number);\nconsole.log(countMatches(scores, threshold));\n",
+          "solution": "const fs = require('fs');\nconst { countMatches } = require('./lib/scores');\nconst [threshold, ...scores] = fs.readFileSync(0, 'utf8').trim().split(/\\s+/).map(Number);\nconsole.log(countMatches(scores, threshold));\n",
+          "files": [
+            {
+              "path": "lib/scores.js",
+              "starter": "function countMatches(scores, threshold) {\n  // Count scores that meet the threshold.\n  return 0;\n}\n\nmodule.exports = { countMatches };\n",
+              "solution": "function countMatches(scores, threshold) {\n  return scores.filter(score => score >= threshold).length;\n}\n\nmodule.exports = { countMatches };\n"
+            }
+          ]
+        },
+        {
+          "id": "php",
+          "starter": "<?php\nrequire __DIR__ . '/lib/scores.php';\n$values = array_map('intval', preg_split('/\\s+/', trim(stream_get_contents(STDIN))));\n$threshold = array_shift($values);\necho count_matches($values, $threshold) . PHP_EOL;\n",
+          "solution": "<?php\nrequire __DIR__ . '/lib/scores.php';\n$values = array_map('intval', preg_split('/\\s+/', trim(stream_get_contents(STDIN))));\n$threshold = array_shift($values);\necho count_matches($values, $threshold) . PHP_EOL;\n",
+          "files": [
+            {
+              "path": "lib/scores.php",
+              "starter": "<?php\nfunction count_matches(array $scores, int $threshold): int {\n    // Count scores that meet the threshold.\n    return 0;\n}\n",
+              "solution": "<?php\nfunction count_matches(array $scores, int $threshold): int {\n    return count(array_filter($scores, function ($score) use ($threshold) {\n        return $score >= $threshold;\n    }));\n}\n"
+            }
+          ]
+        }
+      ],
+      "tests": [
+        {
+          "label": "Include the threshold",
+          "stdin": "70\n45 70 90 20\n",
+          "expected": "2"
+        },
+        {
+          "label": "Negative scores",
+          "stdin": "-3\n-4 -3 -2\n",
+          "expected": "2",
+          "hidden": true
+        },
+        {
+          "label": "No candidates",
+          "stdin": "10\n",
+          "expected": "0",
+          "hidden": true
+        }
+      ]
+    }
+  ]
+}

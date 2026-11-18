@@ -1,0 +1,27 @@
+name: azure-study-editor
+services:
+  vscode:
+    build: ./docker/editor
+    image: azure-study-vscode:4.145.2
+    user: "${EDITOR_UID:?Set EDITOR_UID}:${EDITOR_GID:?Set EDITOR_GID}"
+    environment:
+      PASSWORD: ${EDITOR_PASSWORD:?Set EDITOR_PASSWORD}
+      HOME: /quiz-editor-data
+    command:
+      - --bind-addr=0.0.0.0:8080
+      - --auth=password
+      - --config=/quiz-editor-data/config.yaml
+      - --disable-telemetry
+      - --disable-update-check
+      - --extensions-dir=/quiz-editor-data/extensions
+      - --user-data-dir=/quiz-editor-data
+      - /quiz-workspaces
+    ports:
+      - "127.0.0.1:${EDITOR_PORT:-8180}:8080"
+    volumes:
+      - ./local-data/editor/workspaces:/quiz-workspaces
+      - ./local-data/editor/user-data:/quiz-editor-data
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 2g
+    pids_limit: 256
