@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { emptyProgress, newAttempt } from './attempts.js'
 import { localApi } from './local-api.js'
 
@@ -6,6 +6,7 @@ export function useAttemptProgress() {
   const [progress, setProgress] = useState(emptyProgress)
   const progressRef = useRef(progress)
   const queue = useRef(Promise.resolve())
+  const flushDraft = useCallback(() => queue.current, [])
   const currentAction = useRef(false)
   const retryRestart = useRef(null)
   const [ready, setReady] = useState(false)
@@ -93,6 +94,16 @@ export function useAttemptProgress() {
     })
   }
 
+  function keepVideoGrade({ id, videoGrades, correct, pendingReview, passed }) {
+    const current = progressRef.current
+    showProgress({
+      ...current,
+      history: current.history.map(item => item.id === id
+        ? { ...item, videoGrades, correct, pendingReview, passed }
+        : item),
+    })
+  }
+
   function acceptImportedProgress(next) {
     showProgress(next)
     setReady(true)
@@ -101,7 +112,7 @@ export function useAttemptProgress() {
 
   return {
     progress, ready, busy, timings, saveError, loadError,
-    loadProgress, acceptImportedProgress, updateAttempt, finishAttempt, keepExplanation,
+    loadProgress, acceptImportedProgress, updateAttempt, finishAttempt, keepExplanation, keepVideoGrade, flushDraft,
     clearSaveError: () => setSaveError(''),
   }
 }

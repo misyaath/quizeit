@@ -1,0 +1,15 @@
+{
+  "id": "video-answer-practice",
+  "title": "Video Answer Practice",
+  "mode": "practice",
+  "questions": [
+    {
+      "id": "video-answer-practice-introduction",
+      "domain": "general",
+      "type": "video",
+      "prompt": "Introduce yourself in a short video. Describe one topic you want to practice and one goal for your next study session.",
+      "videoSeconds": 60,
+      "explanation": "Mark the response correct if it names a practice topic and a clear study goal."
+    }
+  ]
+}

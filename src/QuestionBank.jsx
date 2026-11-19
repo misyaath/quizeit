@@ -67,7 +67,7 @@ function BankQuestion({ question, goSettings }) {
           {question.type === 'match' && <><h4>Items to match</h4><ul>{question.labels.map(label => <li key={label}>{label}</li>)}</ul></>}
           {question.options && <><h4>{question.type === 'order' ? 'Available steps' : 'Options'}</h4><ul>{question.options.map(option => <li key={option}>{option}</li>)}</ul></>}
           {error && <p className="notice" role="alert">{error}</p>}
-          {answer ? <><AnswerKey question={answer} /><ExplainWithChatGPT question={answer} goSettings={goSettings} /></>
+          {answer ? <><AnswerKey question={answer} />{answer.type !== 'video' && <ExplainWithChatGPT question={answer} goSettings={goSettings} />}</>
             : <button className="button secondary" disabled={loading} onClick={reveal}>{loading ? 'Loading answer…' : 'Reveal answer'}</button>}
         </div>
   </details>

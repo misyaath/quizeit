@@ -5,22 +5,27 @@ import { limitsFor } from '../src/execution-settings.js'
 import { elapsedActivity, includeWorkspaceStats, addRun, newActivity } from './attempt-activity.mjs'
 import { cleanDraft, validUuid, workspaceAnswer } from './attempt-draft.mjs'
 import { editorCounters } from './editor-workspaces.mjs'
+import { finishCapture, requireExamCapture } from './capture-state.mjs'
 import { currentUser } from './request-user.mjs'
 import { ApiError } from './openai.mjs'
 
 export function createAttemptService({ progress, executionSettings, getSets, runCode, editor }) {
   const pendingGrades = new Set()
+  const canAttemptExam = setId => currentUser()?.role === 'candidate' && currentUser().setId === setId
 
   async function updateDraft(setId, draftId, change) {
     return progress.update(current => {
       const draft = current.attempts[setId]
       if (draft?.draftId !== draftId || draft.submitted) throw new ApiError(409, 'This attempt changed. Reload the quiz.')
+      if (draft.setSnapshot?.mode === 'exam' && !canAttemptExam(setId)) throw new ApiError(404, 'Exam invitation required.')
       return { ...current, attempts: { ...current.attempts, [setId]: change(draft) } }
     })
   }
 
+  const currentSet = async setId => (await getSets()).find(item => item.id === setId)
+
   async function activeSet(setId, saved) {
-    return (!saved?.submitted && saved?.setSnapshot) || (await getSets()).find(item => item.id === setId)
+    return (!saved?.submitted && saved?.setSnapshot) || currentSet(setId)
   }
 
   async function selectCoding(body) {
@@ -28,6 +33,11 @@ export function createAttemptService({ progress, executionSettings, getSets, run
     const set = await activeSet(body.setId, saved)
     const question = set?.questions.find(item => item.id === body.questionId && item.type === 'coding')
     if (!question) throw new ApiError(404, 'Coding question not found.')
+    if (set.mode === 'exam') {
+      if (!canAttemptExam(set.id)) throw new ApiError(404, 'Exam invitation required.')
+      if (saved?.draftId !== body.draftId || saved.submitted) throw new ApiError(409, 'Open the active exam first.')
+      requireExamCapture(saved, question.id)
+    }
     const selection = codingSelection(question, body.language)
     if (!selection) throw new ApiError(400, 'Choose a supported language.')
     return { set, question, selection }
@@ -71,10 +81,15 @@ export function createAttemptService({ progress, executionSettings, getSets, run
   async function changeAttempt(body) {
     const { action, setId, draft, previousResultId } = body
     if (!['draft', 'restart', 'submit'].includes(action)) throw new ApiError(400, 'Unknown practice action.')
+    if (currentUser()?.role === 'candidate' && (!canAttemptExam(setId) || action === 'restart')) {
+      throw new ApiError(403, 'This invitation is for one exam attempt.')
+    }
     const previous = await progress.read()
     if (action === 'submit' && validUuid(draft?.draftId) && previous.history.some(entry => entry.id === draft.draftId && entry.setId === setId)) return previous
-    const set = await activeSet(setId, action === 'restart' ? null : previous.attempts[setId])
+    const latest = await currentSet(setId)
+    const set = (action !== 'restart' && !previous.attempts[setId]?.submitted && previous.attempts[setId]?.setSnapshot) || latest
     if (!set) throw new ApiError(404, 'This practice set is no longer available.')
+    if (set.mode === 'exam' && !canAttemptExam(setId)) throw new ApiError(404, 'Exam invitation required.')
     const next = cleanDraft(set, draft)
     function alreadySubmitted(current) {
       return action === 'submit' && current.history.some(entry => entry.id === next.draftId && entry.setId === setId)
@@ -92,13 +107,37 @@ export function createAttemptService({ progress, executionSettings, getSets, run
     const submittedAt = new Date(now).toISOString()
     const workspaceMetrics = {}
 
+    function keepVideoAnswers(saved) {
+      for (const question of set.questions.filter(item => item.type === 'video')) {
+        const answer = saved?.answers[question.id]
+        if (answer?.mediaId) next.answers[question.id] = answer
+        else delete next.answers[question.id]
+      }
+    }
+
+    function enforceCapture(saved) {
+      if (set.mode !== 'exam' || action === 'restart') return
+      const draft = saved ?? { setSnapshot: set }
+      if (action === 'submit') requireExamCapture(draft)
+      for (const question of set.questions) {
+        if ((question.type !== 'video'
+          && JSON.stringify(next.answers[question.id]) !== JSON.stringify(saved?.answers[question.id]))
+          || next.flags.includes(question.id) !== Boolean(saved?.flags.includes(question.id))) {
+          requireExamCapture(draft, question.id)
+        }
+      }
+    }
+
     function saveAttempt(current) {
       const saved = current.attempts[setId]
       if (alreadySubmitted(current) || (action === 'restart' && saved?.draftId === next.draftId && !saved.submitted)) return current
       checkAttempt(current)
-      const activity = action === 'restart' ? newActivity(limitsFor(settings, set).examMinutes, now)
-        : saved?.activity ?? newActivity(limitsFor(settings, set).examMinutes, now)
-      next.activity = action === 'submit' ? elapsedActivity(includeWorkspaceStats(activity, workspaceMetrics), submittedAt) : activity
+      if (action === 'draft') enforceCapture(saved)
+      if (action !== 'restart') keepVideoAnswers(saved)
+      const examMinutes = latest ? limitsFor(settings, latest).examMinutes : saved?.activity?.examMinutes ?? limitsFor(settings, set).examMinutes
+      const activity = action === 'restart' || !saved?.activity ? newActivity(examMinutes, now)
+        : { ...saved.activity, examMinutes }
+      next.activity = action === 'submit' ? elapsedActivity(finishCapture(includeWorkspaceStats(activity, workspaceMetrics), now), submittedAt) : activity
       if (action === 'submit') return recordSubmission(current, set, next, next.draftId, submittedAt)
       next.setSnapshot = action === 'restart' ? set : saved?.setSnapshot ?? set
       return { ...current, attempts: { ...current.attempts, [setId]: next } }
@@ -106,6 +145,8 @@ export function createAttemptService({ progress, executionSettings, getSets, run
     if (action !== 'submit') return progress.update(saveAttempt)
 
     checkAttempt(previous)
+    enforceCapture(previous.attempts[setId])
+    keepVideoAnswers(previous.attempts[setId])
     // Grading calls the runner outside the store's serialized writes.
     const gradeKey = currentUser()._id + ':' + setId
     if (pendingGrades.has(gradeKey)) throw new ApiError(409, 'This practice set is already being graded.')
@@ -113,7 +154,8 @@ export function createAttemptService({ progress, executionSettings, getSets, run
     try {
       await savedDraft(set, next.draftId, next.index, settings)
       await updateDraft(setId, next.draftId, saved => ({
-        ...saved, answers: next.answers, flags: next.flags, index: next.index,
+        ...saved, answers: { ...next.answers, ...Object.fromEntries(set.questions.filter(question => question.type === 'video'
+          && saved.answers[question.id]?.mediaId).map(question => [question.id, saved.answers[question.id]])) }, flags: next.flags, index: next.index,
         activity: { ...saved.activity, submissions: saved.activity.submissions + 1 },
       }))
       for (const question of set.questions.filter(item => item.type === 'coding')) {
@@ -161,5 +203,5 @@ export function createAttemptService({ progress, executionSettings, getSets, run
     })
   }
 
-  return { activeSet, updateDraft, selectCoding, savedDraft, changeAttempt, recordRun }
+  return { currentSet, updateDraft, selectCoding, savedDraft, changeAttempt, recordRun }
 }

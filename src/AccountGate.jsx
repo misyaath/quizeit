@@ -66,7 +66,8 @@ export default function AccountGate() {
   }
 
   if (account?.user) return <App user={account.user} onLogout={logout} accountBusy={busy}
-    googleEnabled={account.googleEnabled} connectGoogle={connectGoogle} accountError={error} />
+    googleEnabled={account.googleEnabled} connectGoogle={connectGoogle} accountError={error}
+    onAccountUpdated={user => setAccount(previous => ({ ...previous, user }))} />
 
   return <main className="account-page">
     <section className="account-panel" aria-labelledby="account-title">

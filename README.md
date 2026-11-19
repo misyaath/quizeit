@@ -59,3 +59,7 @@ Refresh the app after assigning the owner. Each other account can create and edi
 To enable Google sign-in, set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in `.env`. Register `http://127.0.0.1:5173/auth/google/callback` on the Google OAuth web client, adjusting the port or hostname to match the URL you use. Restart the app. An existing password account can connect Google from **Settings**.
 
 Set and question time budgets use active practice time. The clock pauses while the quiz is hidden, closed, or explicitly paused. Time is saved at regular checkpoints and resumed on return. Exceeding a budget shows a warning and allows submission. Coding results continue to show Judge0 runtime and memory separately from practice time.
+
+### Manage users
+
+Administrators can open **Users** to list accounts and manage learners. The owner can also grant or remove the Administrator role. Deactivation blocks sign-in and invalidates existing sessions. Restoring an account preserves its question sets and attempt history. An email, password, or role change requires the affected user to sign in again.

@@ -3,6 +3,8 @@ import { codingLanguages, maxCodeLength, maxProjectFiles, maxRunOutput, projectL
 
 import { questionLimitFields, setLimitFields, validLimitOverrides } from '../execution-settings.js'
 
+import { defaultVideoSeconds, maxVideoSeconds, defaultWebcamPhotoSeconds, minWebcamPhotoSeconds, maxWebcamPhotoSeconds } from '../exam-media.js'
+
 const validText = value => typeof value === 'string' && value.trim().length > 0
 const validId = value => validText(value) && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value)
   && !Object.hasOwn(Object.prototype, value)
@@ -32,6 +34,10 @@ export function loadQuestionSets(documents) {
     if (!validId(id)) fail('Set id must use lowercase letters, digits, and hyphens.')
     if (difficulty !== undefined && (!Number.isInteger(difficulty) || difficulty < 1 || difficulty > 10)) fail('Difficulty must be an integer from 1 to 10.')
     if (!validLimitOverrides(document.limits, setLimitFields)) fail('Set limits are invalid.')
+    if (document.mode !== undefined && !['practice', 'exam'].includes(document.mode)) fail('Choose Practice or Exam mode.')
+    const webcamPhotoSeconds = document.webcamPhotoSeconds ?? defaultWebcamPhotoSeconds
+    if (document.mode === 'exam' && (!Number.isInteger(webcamPhotoSeconds) || webcamPhotoSeconds < minWebcamPhotoSeconds
+      || webcamPhotoSeconds > maxWebcamPhotoSeconds)) fail('Webcam photo interval must be from 5 to 300 seconds.')
     if (!validText(title)) fail('Set title is required.')
     if (!Array.isArray(questions) || questions.length === 0) fail('Add at least one question to the questions array.')
 
@@ -47,6 +53,8 @@ export function loadQuestionSets(documents) {
       check(domain, 'Use a supported domain.')
       check(Object.hasOwn(formats, type), 'Use a supported question type.')
       check(validLimitOverrides(question.limits, type === 'coding' ? questionLimitFields : questionLimitFields.slice(-1)), 'Question limits are invalid.')
+      check(question.difficulty === undefined || (Number.isInteger(question.difficulty) && question.difficulty >= 1 && question.difficulty <= 10),
+        'Question difficulty must be from 1 to 10.')
       check(validText(prompt) && validText(explanation), 'Prompt and explanation are required.')
       if (caseStudy !== undefined) check(validText(caseStudy?.title) && validText(caseStudy?.background), 'Case study needs a title and background.')
 
@@ -59,6 +67,10 @@ export function loadQuestionSets(documents) {
         else check(textList(answer, 2) && answer.length < choices.length && answer.every(item => choices.includes(item)), 'Provide at least two correct options and one distractor.')
       }
       if (type === 'text') check(textList(answer, 1), 'Provide an array of accepted answers.')
+      if (type === 'video' && question.videoSeconds !== undefined) {
+        check(Number.isInteger(question.videoSeconds) && question.videoSeconds >= 5 && question.videoSeconds <= maxVideoSeconds,
+          'Maximum recording duration must be from 5 to ' + maxVideoSeconds + ' seconds.')
+      }
       if (type === 'coding') {
         check(Array.isArray(languages) && languages.length > 0 && new Set(languages.map(item => item?.id)).size === languages.length
           && languages.every(item => Object.hasOwn(codingLanguages, item?.id)
@@ -89,6 +101,8 @@ export function loadQuestionSets(documents) {
       }
       questionIds.add(id)
       return { id, domain, type, prompt, answer, ...(question.limits && { limits: question.limits }), explanation, options: choices, labels, caseStudy, exhibits,
+        ...(question.difficulty !== undefined && { difficulty: question.difficulty }),
+        ...(type === 'video' && { videoSeconds: question.videoSeconds ?? defaultVideoSeconds }),
         ...(type === 'coding' && {
           languages: languages.map(({ id, starter, solution, files }) => ({
             id, starter, solution, ...(files && { files: files.map(({ path, starter, solution }) => ({ path, starter, solution })) }),
@@ -102,7 +116,10 @@ export function loadQuestionSets(documents) {
       const setId = part === 1 ? id : id + '-part-' + part
       if (setIds.has(setId)) fail('Duplicate set id ' + setId + '.')
       setIds.add(setId)
-      sets.push({ id: setId, sourceId: id, ...(ownerId && { private: true }), ...(document.limits && { limits: document.limits }), ...(providerId && { providerId, examId }), difficulty, title: part === 1 ? title : title + ' · Part ' + part, ...(sources.length && { sources }), ...(studyFiles.length && { studyFiles }), ...(attachmentNames.length && { attachmentNames }), questions: normalized.slice(offset, offset + 60) })
+      sets.push({ id: setId, sourceId: id, ...(document.mode === 'exam' && { mode: 'exam', webcamPhotoSeconds }),
+        ...(ownerId && { private: true }), ...(document.limits && { limits: document.limits }), ...(providerId && { providerId, examId }),
+        difficulty, title: part === 1 ? title : title + ' · Part ' + part, ...(sources.length && { sources }),
+        ...(studyFiles.length && { studyFiles }), ...(attachmentNames.length && { attachmentNames }), questions: normalized.slice(offset, offset + 60) })
     }
   }
   return sets

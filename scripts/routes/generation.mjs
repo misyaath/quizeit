@@ -52,6 +52,7 @@ export class GenerationController {
   async generate({ req, host }, res) {
     if (req.headers.origin !== 'http://' + host) throw new ApiError(403, 'Generate questions from the local quiz.')
     const input = await readBody(req, Math.ceil(maxAttachmentBytes / 3) * 4 + 256_000)
+    if (input.mode === 'exam' && currentUser().role !== 'admin') throw new ApiError(403, 'Only administrators can generate real exam questions.')
     if (this.generation) throw new ApiError(409, 'A generation is already running. Check its activity or cancel it before starting another.', 'generation_active')
     const job = { id: randomUUID(), startedAt: Date.now(), message: 'Loading the question catalog…', controller: new AbortController(), cancellable: true }
     const userId = currentUser()._id

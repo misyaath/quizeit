@@ -5,10 +5,11 @@ import { emptyProgress } from '../src/attempts.js'
 import { emptyExecutionSettings } from '../src/execution-settings.js'
 import { mongoStore } from './mongo-store.mjs'
 import { ApiError } from './openai.mjs'
+import { createAttemptMedia } from './attempt-media.mjs'
 import { currentUser } from './request-user.mjs'
 import { loadCatalogSource, readCatalogSource, resolveCategory } from './question-files.mjs'
 
-export async function initializeAppData(db, dataDir, questionsDir) {
+export async function initializeAppData(db, dataDir, questionsDir, realExams) {
   const definitions = {
     progress: ['attempts.json', emptyProgress],
     executionSettings: ['execution-settings.json', emptyExecutionSettings],
@@ -19,11 +20,28 @@ export async function initializeAppData(db, dataDir, questionsDir) {
   const stores = {}
   const initialized = []
   const perAccount = new Map()
+  const users = db.collection('users')
+  const media = createAttemptMedia(db)
+  let progressStoreForUser
+  async function reviewAccounts(includeCandidates = false) {
+    const accounts = await users.find({}, { projection: { firstName: 1, lastName: 1, email: 1, role: 1, legacyOwner: 1 } }).toArray()
+    return includeCandidates && realExams ? [...accounts, ...await realExams.reviewCandidates()] : accounts
+  }
+  async function reviewProgress(user) {
+    if (currentUser()?.role !== 'admin') throw new ApiError(403, 'Only administrators can review other accounts.')
+    const key = user.legacyOwner && user.role === 'admin' ? 'progress' : 'progress:' + user._id
+    if (!await db.collection('app_state').findOne({ _id: key }, { projection: { _id: 1 } })) return emptyProgress()
+    return (await progressStoreForUser(user)).read()
+  }
+  async function reviewAccount(id) {
+    const user = await users.findOne({ _id: id }, { projection: { firstName: 1, lastName: 1, role: 1, legacyOwner: 1 } }) ?? await realExams?.reviewCandidate(id)
+    if (!user) throw new ApiError(404, 'Account not found.')
+    return { ...user, legacyOwner: user.role === 'admin' && user.legacyOwner === true }
+  }
   const userStore = (id, fallback, legacy) => {
-    async function storeForRequest() {
-      const user = currentUser()
+    async function storeForUser(user) {
       if (!user) throw new ApiError(401, 'Sign in to continue.')
-      if (user.legacyOwner) return legacy
+      if (user.legacyOwner && user.role === 'admin') return legacy
       const key = id + ':' + user._id
       if (!perAccount.has(key)) {
         const store = mongoStore(db, key)
@@ -34,9 +52,10 @@ export async function initializeAppData(db, dataDir, questionsDir) {
       }
       return perAccount.get(key)
     }
+    if (id === 'progress') progressStoreForUser = storeForUser
     return {
-      read: async () => (await storeForRequest()).read(),
-      update: async change => (await storeForRequest()).update(change),
+      read: async () => (await storeForUser(currentUser())).read(),
+      update: async change => (await storeForUser(currentUser())).update(change),
     }
   }
   for (const [id, [file, initialValue]] of Object.entries(definitions)) {
@@ -64,11 +83,15 @@ export async function initializeAppData(db, dataDir, questionsDir) {
     return source
   })) initialized.push('catalog')
 
+  const modeOf = entry => entry.document.mode === 'exam' ? 'exam' : 'practice'
   function visible(entry, user = currentUser()) {
-    return !entry.archived && (!entry.ownerId || entry.ownerId === user?._id)
+    if (entry.archived) return false
+    if (modeOf(entry) === 'exam') return user?.role === 'admin'
+    return !entry.ownerId || entry.ownerId === user?._id
   }
 
   function canEdit(entry, user = currentUser()) {
+    if (modeOf(entry) === 'exam') return user?.role === 'admin'
     return entry.ownerId ? entry.ownerId === user?._id : user?.role === 'admin'
   }
 
@@ -83,14 +106,22 @@ export async function initializeAppData(db, dataDir, questionsDir) {
 
   async function readCatalog() {
     const source = await catalog.read()
-    return loadCatalogSource({ categories: visibleCategories(source), documents: source.documents.filter(entry => visible(entry)) })
+    const documents = source.documents.filter(entry => modeOf(entry) === 'practice' && visible(entry))
+    return loadCatalogSource({ categories: visibleCategories({ ...source, documents }), documents })
   }
 
-  async function editableSets() {
+  async function examSources() {
+    if (currentUser()?.role !== 'admin') throw new ApiError(403, 'Only administrators can access the exam bank.')
+    const source = await catalog.read()
+    return loadCatalogSource({ ...source, documents: source.documents.filter(entry => modeOf(entry) === 'exam' && visible(entry)) }).sets
+  }
+
+  async function editableSets(mode = 'practice') {
+    if (mode === 'exam' && currentUser()?.role !== 'admin') throw new ApiError(403, 'Only administrators can access the exam bank.')
     const source = await catalog.read()
     return {
-      categories: visibleCategories(source),
-      sets: source.documents.filter(entry => visible(entry) && canEdit(entry)).map(entry => ({
+      categories: visibleCategories({ ...source, documents: source.documents.filter(entry => modeOf(entry) === mode) }),
+      sets: source.documents.filter(entry => modeOf(entry) === mode && visible(entry) && canEdit(entry)).map(entry => ({
         id: entry.document.id, title: entry.document.title, providerId: entry.providerId, examId: entry.examId,
         count: entry.document.questions.length, private: Boolean(entry.ownerId),
       })),
@@ -110,17 +141,20 @@ export async function initializeAppData(db, dataDir, questionsDir) {
 
   async function writeQuestionSet({ id, revision, proposal, document, sharing, generated = false }) {
     const user = currentUser()
+    const exam = document.mode === 'exam'
+    if (exam && user?.role !== 'admin') throw new ApiError(403, 'Only administrators can create real exam questions.')
     let result
     await catalog.update(current => {
       const previous = id && current.documents.find(entry => entry.document.id === id)
       if (id) {
         editorDocument(previous)
+        if ((modeOf(previous) === 'exam') !== exam) throw new ApiError(400, 'A saved set belongs to its original bank.')
         if ((previous.revision ?? null) !== revision) throw new ApiError(409, 'This set changed in another editor. Reopen it before saving.')
       }
       const destination = resolveCategory(current.categories, proposal)
       if (!destination) throw new ApiError(400, 'Choose a category and subcategory.')
       const { category: { providerId, examId } } = destination
-      const ownerId = previous ? previous.ownerId : user && (generated || sharing !== 'shared' || user.role !== 'admin') ? user._id : undefined
+      const ownerId = previous ? previous.ownerId : user && (exam || generated || sharing !== 'shared' || user.role !== 'admin') ? user._id : undefined
       const oldExam = current.categories.find(item => item.id === providerId)?.exams.find(item => item.id === examId)
       const categories = destination.categories.map(provider => provider.id !== providerId ? provider : {
         ...provider, exams: provider.exams.map(exam => exam.id !== examId ? exam : {
@@ -132,12 +166,16 @@ export async function initializeAppData(db, dataDir, questionsDir) {
         ownerId, document, revision: randomUUID(),
       }
       const documents = previous ? current.documents.map(entry => entry === previous ? record : entry) : [...current.documents, record]
+      let normalized
       try {
-        loadCatalogSource({ categories, documents: documents.filter(entry => !entry.archived) })
+        normalized = loadCatalogSource({ categories, documents: documents.filter(entry => !entry.archived) })
       } catch (error) {
         throw new ApiError(400, error.message)
       }
-      result = { category: destination.category, categories: visibleCategories({ categories, documents }), ...(user && { saved: editorDocument(record) }) }
+      result = { category: destination.category, categories: visibleCategories({ categories, documents: documents.filter(entry => modeOf(entry) === modeOf(record)) }),
+        ...(generated && { set: normalized.sets.find(set => set.id === document.id) }),
+        ...(user && { saved: editorDocument(record) }),
+      }
       return { categories, documents }
     })
     return result
@@ -147,14 +185,14 @@ export async function initializeAppData(db, dataDir, questionsDir) {
     await catalog.update(current => {
       const entry = current.documents.find(item => item.document.id === id)
       editorDocument(entry)
-      if ((entry.revision ?? null) !== revision) throw new ApiError(409, 'This set changed in another editor. Reopen it before archiving.')
+      if ((entry.revision ?? null) !== revision) throw new ApiError(409, 'This set changed in another editor. Reopen it before deleting.')
       return { ...current, documents: current.documents.map(item => item === entry ? { ...item, archived: true } : item) }
     })
   }
 
   async function saveQuestionSet(proposal, document) {
-    const { category, categories } = await writeQuestionSet({ proposal, document, generated: true })
-    return { category, categories }
+    const { category, categories, set } = await writeQuestionSet({ proposal, document, generated: true })
+    return { category, categories, set }
   }
 
   async function importQuestionFiles() {
@@ -177,5 +215,5 @@ export async function initializeAppData(db, dataDir, questionsDir) {
     })
   }
 
-  return { ...stores, initialized, readCatalog, saveQuestionSet, importQuestionFiles, editableSets, editQuestionSet, writeQuestionSet, archiveQuestionSet }
+  return { ...stores, media, reviewAccounts, reviewAccount, reviewProgress, initialized, readCatalog, examSources, saveQuestionSet, importQuestionFiles, editableSets, editQuestionSet, writeQuestionSet, archiveQuestionSet }
 }

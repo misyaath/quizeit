@@ -1,5 +1,10 @@
+export function apiUrl(path) {
+  const candidate = typeof window !== 'undefined' && /^\/candidate\/(exam-[a-f0-9-]{36})\/?$/.exec(window.location.pathname)
+  return candidate ? '/api/candidate/' + candidate[1] + '/' + path : '/api/' + path
+}
+
 export async function localApi(path, method = 'GET', data) {
-  const response = await fetch('/api/' + path, {
+  const response = await fetch(apiUrl(path), {
     method,
     headers: data === undefined ? undefined : { 'Content-Type': 'application/json' },
     body: data === undefined ? undefined : JSON.stringify(data),

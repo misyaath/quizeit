@@ -44,8 +44,8 @@ class CodingController {
     return json(res, value ?? {})
   }
 
-  async run({ req, host }, res) {
-    if (req.headers.origin !== 'http://' + host) throw new ApiError(403, 'Run code from the local quiz.')
+  async run({ req }, res) {
+    if (req.headers.origin !== req.quizOrigin) throw new ApiError(403, 'Run code from Quizeit.')
     const { runCode, editor, executionSettings, attempts } = this
     const body = await readBody(req, 500_000)
     const { setId, questionId, language, draftId, stdin } = body

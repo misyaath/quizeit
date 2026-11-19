@@ -1,11 +1,12 @@
 import { Controller, Get, Inject, Module, Post } from '@nestjs/common'
+import { requireExamCapture } from '../capture-state.mjs'
 import { importBrowserAttempts } from '../import-attempts.mjs'
 import { cleanDraft, validUuid } from '../attempt-draft.mjs'
 import { activeTime, newActivity, updateClock } from '../attempt-activity.mjs'
 import { ApiError } from '../openai.mjs'
 import { json, readBody } from '../http.mjs'
 import { codingLanguages, practiceProgress, practiceSet, publicCodingSet } from '../../src/coding.js'
-import { examField, limitFields, limitsFor, questionTimeField } from '../../src/execution-settings.js'
+import { examField, limitFields, limitsFor } from '../../src/execution-settings.js'
 import { APP_DATA, ATTEMPTS, CATALOG } from '../backend-services.module.mjs'
 import { currentUser } from '../request-user.mjs'
 import { bindRoute } from './nest-http.mjs'
@@ -19,6 +20,10 @@ class PracticeController {
   }
 
   async readCatalog(_context, res) {
+    const user = currentUser()
+    if (user.role === 'candidate' && (await this.progress.read()).attempts[user.setId]?.submitted) {
+      return json(res, { categories: [], sets: [] })
+    }
     const catalog = await this.catalog.getCatalog()
     return json(res, { ...catalog, sets: catalog.sets.map(practiceSet) })
   }
@@ -49,8 +54,8 @@ class PracticeController {
     }))
   }
 
-  async recordQuestionTime({ req, host }, res) {
-    if (req.headers.origin !== 'http://' + host) throw new ApiError(403, 'Track attempt time from the local quiz.')
+  async recordQuestionTime({ req }, res) {
+    if (req.headers.origin !== req.quizOrigin) throw new ApiError(403, 'Track attempt time from Quizeit.')
     const input = await readBody(req)
     const { setId, draftId, questionId, durationMs, tabId, action, sequence } = input
     if (!validUuid(draftId) || !validUuid(tabId) || !Number.isSafeInteger(sequence) || sequence < 1
@@ -59,19 +64,25 @@ class PracticeController {
       || typeof setId !== 'string' || typeof questionId !== 'string') {
       throw new ApiError(400, 'Invalid question timing.')
     }
-    const set = await this.attempts.activeSet(setId, (await this.progress.read()).attempts[setId])
+    const latest = await this.attempts.currentSet(setId)
+    const attempt = (await this.progress.read()).attempts[setId]
+    const set = attempt?.setSnapshot ?? latest
     const question = set?.questions.find(item => item.id === questionId)
     if (!question) throw new ApiError(404, 'Question not found in this attempt.')
-    const limits = limitsFor(await this.executionSettings.read(), set, undefined, question)
-    const saved = await this.attempts.updateDraft(setId, draftId, draft => ({
-      ...draft, activity: updateClock(draft.activity ?? newActivity(limits.examMinutes), input),
-    }))
+    const examMinutes = limitsFor(await this.executionSettings.read(), latest ?? set).examMinutes
+    const timedQuestion = latest?.questions.find(item => item.id === questionId) ?? question
+    const saved = await this.attempts.updateDraft(setId, draftId, draft => {
+      if (!['stop', 'pause'].includes(action)) requireExamCapture(draft, questionId)
+      return { ...draft, activity: updateClock(draft.activity
+        ? { ...draft.activity, examMinutes: latest ? examMinutes : draft.activity.examMinutes }
+        : newActivity(examMinutes), input),
+      }
+    })
     const { activity } = saved.attempts[setId]
-    const questionLimit = limits[questionTimeField.name] ?? 0
     return json(res, {
       paused: Boolean(activity.paused), active: activity.clock?.tabId === tabId && activity.clock.lastAt != null,
       totalMs: activeTime(activity), questionMs: activity.questions[questionId]?.visibleMs ?? 0,
-      examMinutes: activity.examMinutes, questionMinutes: questionLimit,
+      examMinutes: activity.examMinutes, questionMinutes: timedQuestion.limits?.questionMinutes ?? 0,
     })
   }
 
@@ -88,7 +99,22 @@ class PracticeController {
   }
 
   async readProgress(_context, res) {
-    return json(res, practiceProgress(await this.progress.read()))
+    return json(res, this.visibleProgress(await this.progress.read()))
+  }
+
+  visibleProgress(progress) {
+    const user = currentUser()
+    if (user.role === 'candidate') {
+      const attempt = progress.attempts[user.setId]
+      const visibleAttempt = attempt?.submitted ? { submitted: true } : attempt
+      return practiceProgress({ attempts: visibleAttempt ? { [user.setId]: visibleAttempt } : {}, history: [], snapshots: [] })
+    }
+    const snapshots = progress.snapshots.map(snapshot => JSON.parse(snapshot)?.mode === 'exam' ? null : snapshot)
+    const history = progress.history.filter(entry => snapshots[entry.snapshotIndex] !== null)
+    const examResults = new Set(progress.history.filter(entry => snapshots[entry.snapshotIndex] === null).map(entry => entry.id))
+    const attempts = Object.fromEntries(Object.entries(progress.attempts).filter(([, draft]) =>
+      draft.setSnapshot?.mode !== 'exam' && !examResults.has(draft.resultId)))
+    return practiceProgress({ ...progress, attempts, history, snapshots })
   }
 
   async changeAttempt({ req }, res) {
@@ -99,7 +125,7 @@ class PracticeController {
       const { clock, ...timing } = activity
       return json(res, { ...timing, ...(body.includeSet && setSnapshot && { practiceSet: practiceSet(setSnapshot) }) })
     }
-    return json(res, practiceProgress(saved))
+    return json(res, this.visibleProgress(saved))
   }
 
   async importProgress({ req }, res) {

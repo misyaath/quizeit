@@ -12,9 +12,12 @@ export const CATALOG = Symbol('CATALOG')
 export const CODING = Symbol('CODING')
 export const ATTEMPTS = Symbol('ATTEMPTS')
 export const AI_INTEGRATIONS = Symbol('AI_INTEGRATIONS')
+export const REAL_EXAMS = Symbol('REAL_EXAMS')
 
-function createCatalog(data) {
+function createCatalog(data, realExams) {
   async function getCatalog() {
+    const user = currentUser()
+    if (user?.role === 'candidate') return { categories: [], sets: [await realExams.assignedSet(user)] }
     try {
       return await data.readCatalog()
     } catch (error) {
@@ -26,14 +29,15 @@ function createCatalog(data) {
 }
 
 export class BackendServicesModule {
-  static register({ data, accounts, runCode, editor, fetchResponse }) {
+  static register({ data, accounts, realExams, runCode, editor, fetchResponse }) {
     return {
       module: BackendServicesModule,
       providers: [
         { provide: APP_DATA, useValue: data },
         { provide: ACCOUNTS, useValue: accounts },
         { provide: CODING, useValue: { runCode, editor } },
-        { provide: CATALOG, useFactory: createCatalog, inject: [APP_DATA] },
+        { provide: REAL_EXAMS, useValue: realExams },
+        { provide: CATALOG, useFactory: createCatalog, inject: [APP_DATA, REAL_EXAMS] },
         {
           provide: ATTEMPTS,
           inject: [APP_DATA, CATALOG, CODING],
@@ -58,7 +62,7 @@ export class BackendServicesModule {
           },
         },
       ],
-      exports: [ACCOUNTS, APP_DATA, CATALOG, CODING, ATTEMPTS, AI_INTEGRATIONS],
+      exports: [ACCOUNTS, APP_DATA, CATALOG, CODING, ATTEMPTS, AI_INTEGRATIONS, REAL_EXAMS],
     }
   }
 }

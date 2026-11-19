@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
+import RouteLink from './RouteLink.jsx'
 import { formats } from './questions/index.js'
 import AiActivity, { useAiActivity } from './AiActivity.jsx'
 import { localAiApi, localApi } from './local-api.js'
@@ -13,7 +14,7 @@ function encodeAttachment(file) {
   })
 }
 
-export default function GenerateSet({ active, savedSets, onGenerated, refreshCatalog, openSet, goSettings }) {
+export default function GenerateSet({ active, savedSets, onGenerated, refreshCatalog, navigate, goSettings, admin }) {
   const [models, setModels] = useState([])
   const [modelId, setModelId] = useState('')
   const [effort, setEffort] = useState('')
@@ -26,7 +27,9 @@ export default function GenerateSet({ active, savedSets, onGenerated, refreshCat
   const [attachmentError, setAttachmentError] = useState('')
   const fileInput = useRef(null)
   const [count, setCount] = useState(15)
-  const [types, setTypes] = useState(() => Object.keys(formats).filter(type => type !== 'coding'))
+  const [mode, setMode] = useState('practice')
+  const [difficulty, setDifficulty] = useState(5)
+  const [types, setTypes] = useState(() => Object.keys(formats).filter(type => !['coding', 'video'].includes(type)))
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [result, setResult] = useState(null)
@@ -121,9 +124,10 @@ export default function GenerateSet({ active, savedSets, onGenerated, refreshCat
       const files = await Promise.all(attachments.map(encodeAttachment))
       const response = await localAiApi('questions/generate', {
         modelId, effort: selectedModel?.efforts.includes(effort) ? effort : '', prompt, count: Number(count), types,
+        mode, ...(mode === 'exam' && { difficulty: Number(difficulty) }),
         ...(files.length && { attachments: files }),
       }, activity.report)
-      onGenerated(response.set, response.categories)
+      if (response.set.mode !== 'exam') onGenerated(response.set, response.categories)
       setResult(response)
       activity.report('Question set saved.')
     } catch (error) {
@@ -139,8 +143,15 @@ export default function GenerateSet({ active, savedSets, onGenerated, refreshCat
   const briefingLocked = busy || Boolean(serverGeneration)
 
   return <>
-    <header className="bank-heading"><h1>Generate questions</h1><p>Describe what you want to practice. ChatGPT will file the set under a matching exam or create a relevant category if there’s no match.</p></header>
+    <header className="bank-heading"><h1>Generate questions</h1><p>Describe the topics and skills the questions should cover.</p></header>
     <form className="generator-panel" onSubmit={generate}>
+      {admin && <div className="author-pair">
+        <label className="editor-field">Question bank<select value={mode} disabled={briefingLocked} onChange={event => setMode(event.target.value)}>
+          <option value="practice">Practice</option><option value="exam">Real exam</option>
+        </select></label>
+        {mode === 'exam' && <label className="editor-field">Difficulty (1–10)<input type="number" min={1} max={10} required
+          disabled={briefingLocked} value={difficulty} onChange={event => setDifficulty(event.target.value)} /></label>}
+      </div>}
       <AiActivity stages={activity.stages} active={busy} onDismiss={activity.dismiss} />
       {serverGeneration && <div className="ai-activity">
         {!busy && <p className="ai-activity-current" role="status">{serverGeneration.message}</p>}
@@ -168,7 +179,7 @@ export default function GenerateSet({ active, savedSets, onGenerated, refreshCat
           <div className="generator-models">
             <div className="filter-label">
               <label htmlFor="generator-model">Model</label>
-              <select id="generator-model" value={modelId} required disabled={busy || loadingModels || !models.length} onChange={event => {
+              <select id="generator-model" value={modelId} required disabled={briefingLocked || loadingModels || !models.length} onChange={event => {
                 setModelId(event.target.value)
                 setEffort('')
               }}>
@@ -178,7 +189,7 @@ export default function GenerateSet({ active, savedSets, onGenerated, refreshCat
             </div>
             <div className="filter-label">
               <label htmlFor="generator-effort">Reasoning effort</label>
-              <select id="generator-effort" value={selectedModel?.efforts.includes(effort) ? effort : ''} disabled={busy || !selectedModel}
+              <select id="generator-effort" value={selectedModel?.efforts.includes(effort) ? effort : ''} disabled={briefingLocked || !selectedModel}
                 onChange={event => setEffort(event.target.value)}>
                 <option value="">Model default</option>
                 {selectedModel?.efforts.map(value => <option value={value} key={value}>{value === 'xhigh' ? 'Extra high' : value[0].toUpperCase() + value.slice(1)}</option>)}
@@ -207,9 +218,9 @@ export default function GenerateSet({ active, savedSets, onGenerated, refreshCat
         </div>
       </div>}
       <label className="filter-label generator-count">Question count
-        <input type="number" min={1} max={60} required value={count} onChange={event => setCount(event.target.value)} disabled={busy} />
+        <input type="number" min={1} max={60} required value={count} onChange={event => setCount(event.target.value)} disabled={briefingLocked} />
       </label>
-      <fieldset className="generator-formats" disabled={busy}>
+      <fieldset className="generator-formats" disabled={briefingLocked}>
         <legend>Question formats</legend>
         {Object.entries(formats).map(([type, format]) => <label key={type}>
           <input type="checkbox" checked={types.includes(type)} onChange={event => setTypes(current => event.target.checked
@@ -223,21 +234,23 @@ export default function GenerateSet({ active, savedSets, onGenerated, refreshCat
     {result && <section className="question-panel generator-panel" aria-labelledby="generated-set">
       <h2 id="generated-set" ref={resultHeading} tabIndex={-1}>{result.set.title}</h2>
       <p>{result.set.questions.length} questions · Model{result.models.length === 1 ? '' : 's'} {result.models.join(', ')}</p>
-      <p>{result.category.providerName} → {result.category.examName}</p>
+      <p>{result.set.categoryName} · {result.set.subcategoryName} · Private</p>
       {result.set.attachmentNames?.length > 0 && <p>Attachments: {result.set.attachmentNames.join(', ')}</p>}
       {result.set.studyFiles?.length > 0 && <p>Study files cited: {result.set.studyFiles.join(', ')}</p>}
       {result.set.sources?.length > 0 && <details>
         <summary>Web sources used ({result.set.sources.length})</summary>
         <ul>{result.set.sources.map(source => <li key={source.url}><a href={source.url} target="_blank" rel="noreferrer">{source.title}</a></li>)}</ul>
       </details>}
-      <button className="button secondary" onClick={() => openSet(result.set.id)}>Start generated set →</button>
+      {result.set.mode === 'exam'
+        ? <RouteLink className="button secondary" to={{ screen: 'exam-bank', editorId: result.set.sourceId }} navigate={navigate}>Edit in exam question bank →</RouteLink>
+        : <RouteLink className="button secondary" to={{ screen: 'exam', setId: result.set.id }} navigate={navigate}>Start generated set →</RouteLink>}
     </section>}
     {savedSets.length > 0 && <section className="question-panel generator-panel" aria-labelledby="saved-generated-sets">
       <h2 id="saved-generated-sets">Saved generated sets</h2>
       <ul className="history-list saved-generated-list">
         {savedSets.map(set => <li key={set.id}>
           <div><h3>{set.title}</h3><p>{set.questions.length} questions</p></div>
-          <button className="button secondary" onClick={() => openSet(set.id)} aria-label={`Open ${set.title}`}>Open set →</button>
+          <RouteLink className="button secondary" to={{ screen: 'exam', setId: set.id }} navigate={navigate} aria-label={`Open ${set.title}`}>Open set →</RouteLink>
         </li>)}
       </ul>
     </section>}

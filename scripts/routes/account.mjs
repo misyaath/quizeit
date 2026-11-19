@@ -1,4 +1,4 @@
-import { Controller, Delete, Get, Inject, Module, Post } from '@nestjs/common'
+import { Controller, Delete, Get, Inject, Module, Post, Put } from '@nestjs/common'
 import { json, readBody } from '../http.mjs'
 import { ACCOUNTS } from '../backend-services.module.mjs'
 import { bindRoute } from './nest-http.mjs'
@@ -25,6 +25,29 @@ class AccountController {
     return json(res, {})
   }
 
+  async listUsers({ req }, res) {
+    return json(res, await this.accounts.listUsers(req.user))
+  }
+
+  async createUser({ req }, res) {
+    return json(res, { user: await this.accounts.createUser(req.user, await readBody(req, 10_000)) }, 201)
+  }
+
+  async editUser({ req }, res) {
+    const input = await readBody(req, 10_000)
+    return json(res, await this.accounts.changeUser(req.user, req.params.id, {
+      firstName: input.firstName, lastName: input.lastName, email: input.email, role: input.role, password: input.password,
+    }))
+  }
+
+  async deactivateUser({ req }, res) {
+    return json(res, await this.accounts.changeUser(req.user, req.params.id, { active: false }))
+  }
+
+  async restoreUser({ req }, res) {
+    return json(res, await this.accounts.changeUser(req.user, req.params.id, { active: true }))
+  }
+
   async google({ req, url }, res) {
     const destination = await this.accounts.beginGoogle(req, res, new URL(googleCallback, url).href, req.user)
     return json(res, { url: destination })
@@ -43,6 +66,11 @@ bindRoute(AccountController, 'status', Get('api/account'))
 bindRoute(AccountController, 'signup', Post('api/account/signup'))
 bindRoute(AccountController, 'login', Post('api/account/login'))
 bindRoute(AccountController, 'logout', Delete('api/account'))
+bindRoute(AccountController, 'listUsers', Get('api/users'))
+bindRoute(AccountController, 'createUser', Post('api/users'))
+bindRoute(AccountController, 'editUser', Put('api/users/:id'))
+bindRoute(AccountController, 'deactivateUser', Delete('api/users/:id'))
+bindRoute(AccountController, 'restoreUser', Post('api/users/:id/restore'))
 bindRoute(AccountController, 'google', Post('api/account/google'))
 bindRoute(AccountController, 'callback', Get(googleCallback))
 

@@ -27,14 +27,18 @@ const mongo = await connectMongo({ dataDir: resolve('local-data') })
 try {
   await createAccounts(mongo.db)
   const users = mongo.db.collection('users')
-  const user = await users.findOne({ email }, { projection: { role: 1, legacyOwner: 1 } })
+  const user = await users.findOne({ email }, { projection: { role: 1, legacyOwner: 1, deactivatedAt: 1 } })
   if (!user) throw new Error('Create your quizeit account before assigning it the existing data.')
+  if (user.deactivatedAt) throw new Error('Restore this account before assigning ownership.')
   const existing = await users.findOne({ legacyOwner: true }, { projection: { _id: 1 } })
   if (existing && existing._id !== user._id) throw new Error('The existing data already belongs to another owner account.')
 
   if (!user.legacyOwner || user.role !== 'admin') {
     // Reserve the unique owner slot before copying any account data.
-    try { await users.updateOne({ _id: user._id }, { $set: { legacyOwner: true } }) }
+    try {
+      const reserved = await users.updateOne({ _id: user._id, deactivatedAt: { $exists: false } }, { $set: { legacyOwner: true } })
+      if (!reserved.matchedCount) throw new Error('Restore this account before assigning ownership.')
+    }
     catch (error) {
       if (error.code === 11000) throw new Error('The existing data already belongs to another owner account.')
       throw error

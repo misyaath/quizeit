@@ -1,9 +1,12 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { localApi } from './local-api.js'
 import CategoryFields, { matchesCategory } from './CategoryFields.jsx'
 import { codingLanguages, projectLanguages } from './coding.js'
 import { domains, formats, generalDomain } from './questions/index.js'
 import { examField, questionLimitFields, questionTimeField, setLimitFields } from './execution-settings.js'
+
+import { defaultVideoSeconds, maxVideoSeconds } from './exam-media.js'
+import RouteLink, { Breadcrumbs } from './RouteLink.jsx'
 
 const emptySet = () => ({ title: '', questions: [], providerId: '', examId: '', providerName: '', examName: '', sharing: 'private', revision: null })
 const newQuestion = type => ({
@@ -12,13 +15,13 @@ const newQuestion = type => ({
   ...(type === 'text' && { answer: [''] }),
   ...(type === 'order' && { answer: ['', ''] }),
   ...(type === 'match' && { labels: ['', ''], answer: ['', ''] }),
+  ...(type === 'video' && { videoSeconds: defaultVideoSeconds }),
   ...(type === 'coding' && { languages: [{ id: 'python', starter: '', solution: '' }], tests: [{ label: 'Example', stdin: '', expected: '', hidden: false }] }),
 })
 const replace = (items, index, value) => items.map((item, position) => position === index ? value : item)
 const remove = (items, index) => items.filter((_, position) => position !== index)
-const setFields = setLimitFields.map(field => ({
-  ...field, label: field === examField ? 'Total set time (minutes)'
-    : field === questionTimeField ? 'Default time per question (minutes)' : field.label,
+const setFields = setLimitFields.filter(field => field !== questionTimeField).map(field => ({
+  ...field, label: field === examField ? 'Total set time (minutes)' : field.label,
 }))
 
 function Text({ label, value, onChange, multiline = false, ...props }) {
@@ -92,6 +95,8 @@ function CodingFields({ question, update }) {
 
 function AnswerFields({ question, update }) {
   const { type, options, labels, answer } = question
+  if (type === 'video') return <Text label="Maximum video length (seconds)" type="number" min={5} max={maxVideoSeconds}
+    value={question.videoSeconds ?? defaultVideoSeconds} onChange={value => update({ videoSeconds: Number(value) })} required />
   if (type === 'coding') return <CodingFields question={question} update={update} />
   if (type === 'single' || type === 'multi') return <>
     <h3>Options and correct answers</h3>
@@ -99,7 +104,7 @@ function AnswerFields({ question, update }) {
       options: values, answer: type === 'single' ? values.includes(answer) ? answer : '' : answer.filter(item => values.includes(item)),
     })} render={(option, index, change) => <>
       <Text label={'Option ' + (index + 1)} value={option} onChange={change} required />
-      <label><input type={type === 'single' ? 'radio' : 'checkbox'} name={type === 'single' ? 'correct-option' : undefined}
+      <label><input type={type === 'single' ? 'radio' : 'checkbox'} name={type === 'single' ? 'correct-option-' + question.id : undefined}
         disabled={!option} checked={Boolean(option && (type === 'single' ? option === answer : answer.includes(option)))}
         onChange={() => update({ answer: type === 'single' ? option : answer.includes(option) ? answer.filter(item => item !== option) : [...answer, option] })} /> Correct option {index + 1}</label>
     </>} />
@@ -121,22 +126,24 @@ function AnswerFields({ question, update }) {
   </>
 }
 
-function QuestionEditor({ question, onChange }) {
+function QuestionEditor({ question, onChange, examBank }) {
   const update = fields => onChange({ ...question, ...fields })
   const study = question.caseStudy
   return <div className="question-author-fields">
     <div className="author-pair">
       <label className="editor-field">Question type<select value={question.type} onChange={event => onChange({
         ...newQuestion(event.target.value), id: question.id, prompt: question.prompt, explanation: question.explanation,
-        domain: question.domain, caseStudy: question.caseStudy, exhibits: question.exhibits,
+        domain: question.domain, caseStudy: question.caseStudy, exhibits: question.exhibits, difficulty: question.difficulty,
         limits: question.limits && Object.fromEntries(Object.entries(question.limits).filter(([name]) => event.target.value === 'coding' || name === 'questionMinutes')),
       })}>{Object.entries(formats).map(([id, format]) => <option value={id} key={id}>{format.label}</option>)}</select></label>
       <label className="editor-field">Domain<select value={question.domain} onChange={event => update({ domain: event.target.value })}>
         {[generalDomain, ...domains].map(domain => <option value={domain.id} key={domain.id}>{domain.name}</option>)}
       </select></label>
     </div>
+    {examBank && <Text label="Question difficulty (1–10)" type="number" min={1} max={10} placeholder="Inherit set difficulty"
+      value={question.difficulty} onChange={difficulty => update({ difficulty: difficulty === '' ? undefined : Number(difficulty) })} />}
     <Text label="Question prompt" multiline value={question.prompt} onChange={prompt => update({ prompt })} required />
-    <Text label="Explanation" multiline value={question.explanation} onChange={explanation => update({ explanation })} required />
+    <Text label={question.type === 'video' ? 'Grading guidance' : 'Explanation'} multiline value={question.explanation} onChange={explanation => update({ explanation })} required />
     <AnswerFields question={question} update={update} />
     <details open><summary>Timing and execution overrides</summary>
       <Limits fields={question.type === 'coding' ? questionLimitFields : questionLimitFields.slice(-1)}
@@ -158,69 +165,44 @@ function QuestionEditor({ question, onChange }) {
   </div>
 }
 
-export default function QuestionSetEditor({ user, onSaved }) {
+export default function QuestionSetEditor({ user, onSaved, navigate, editorId, creating, examBank = false }) {
   const [list, setList] = useState(null)
   const [provider, setProvider] = useState('')
   const [exam, setExam] = useState('')
-  const [form, setForm] = useState(null)
-  const [questionIndex, setQuestionIndex] = useState(0)
-  const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
-  const [archive, setArchive] = useState(false)
 
   async function load() {
-    try { setList(await localApi('question-sets')) } catch (failure) { setError(failure.message) }
+    setError('')
+    try { setList(await localApi(examBank ? 'question-sets?mode=exam' : 'question-sets')) } catch (failure) { setError(failure.message) }
   }
   useEffect(() => { void load() }, [])
-  function apply(saved) {
-    setForm({ ...saved.document, providerId: saved.providerId, examId: saved.examId, providerName: '', examName: '',
-      revision: saved.revision, sharing: saved.private ? 'private' : 'shared' })
-    setArchive(false)
-  }
-  async function open(id) {
-    setBusy(true)
-    setError('')
+
+  const editing = creating || Boolean(editorId)
+  const screen = examBank ? 'exam-bank' : 'authoring'
+  const heading = examBank ? 'Exam question bank' : 'Manage question sets'
+  function follow(route) {
     setNotice('')
-    try {
-      apply(await localApi('question-sets/' + id))
-      setQuestionIndex(0)
-    } catch (failure) { setError(failure.message) }
-    finally { setBusy(false) }
+    navigate(route)
+  }
+  function updateCatalog(message, destination) {
+    setNotice(message)
+    if (destination) navigate(destination, { replace: true })
+    void load()
+    void onSaved()
   }
 
-  async function commit(event) {
-    event.preventDefault()
-    setBusy(true)
-    setError('')
-    setNotice('')
-    try {
-      if (archive) {
-        await localApi('question-sets/' + form.id, 'DELETE', { revision: form.revision })
-        setForm(null)
-        setNotice('Question set archived.')
-      } else {
-        const saved = await localApi(form.id ? 'question-sets/' + form.id : 'question-sets', form.id ? 'PUT' : 'POST', form)
-        apply(saved)
-        setNotice('Question set saved.')
-      }
-      await Promise.all([load(), onSaved()])
-    } catch (failure) { setError(failure.message) }
-    finally { setBusy(false) }
-  }
-
-  const patch = values => setForm(current => ({ ...current, ...values }))
-  const category = list?.categories.find(item => item.id === form?.providerId)
-  const question = form?.questions[questionIndex]
   return <>
-    <header className="section-heading"><div><h1>Manage question sets</h1></div>
-      <button className="button primary" disabled={busy} onClick={() => {
-        setForm(emptySet()); setQuestionIndex(0); setNotice(''); setError(''); setArchive(false)
-      }}>New question set</button>
-    </header>
+    {editing ? <Breadcrumbs to={screen} navigate={follow} label={heading}>
+      {creating ? 'New question set' : 'Edit question set'}
+    </Breadcrumbs> : <header className="section-heading">
+      <h1>{heading}</h1>
+      <RouteLink className="button primary" to={{ screen, section: 'new' }} navigate={follow}>New question set</RouteLink>
+    </header>}
     {error && <p className="notice" role="alert">{error}</p>}
     {notice && <p className="notice" role="status">{notice}</p>}
-    {!form && list && <>
+    {editing ? <SetForm key={editorId ?? 'new'} editorId={editorId} user={user} categories={list?.categories ?? []}
+      examBank={examBank} screen={screen} onStart={() => setNotice('')} onCommit={updateCatalog} /> : list && <>
       <CategoryFields categories={list.categories} providerId={provider} examId={exam}
         onChange={(nextProvider, nextExam) => { setProvider(nextProvider); setExam(nextExam) }} />
       <div className="set-grid">
@@ -229,56 +211,162 @@ export default function QuestionSetEditor({ user, onSaved }) {
           const subcategory = category?.exams.find(item => item.id === set.examId)
           return <article className="set-card" key={set.id}>
             <div><h3>{set.title}</h3><p>{category?.name} · {subcategory?.name}</p><p>{set.count} questions · {set.private ? 'Private' : 'Shared'}</p></div>
-            <button className="button small secondary" disabled={busy} onClick={() => open(set.id)}>Edit {set.title}</button>
+            <RouteLink className="button small secondary" to={{ screen, editorId: set.id }} navigate={follow}>Edit {set.title}</RouteLink>
           </article>
         })}
       </div>
       {!list.sets.some(set => matchesCategory(set, provider, exam)) && <p className="notice">No editable sets match these filters.</p>}
     </>}
-    {form && <form onSubmit={commit} className="author-form question-panel">
-      <fieldset disabled={busy || archive}>
-        <legend>Question set</legend>
-        <Text label="Set title" value={form.title} maxLength={160} required onChange={title => patch({ title })} />
-        <CategoryFields categories={list?.categories ?? []} allowNew providerId={form.providerId} examId={form.examId}
-          onChange={(providerId, examId) => patch({ providerId, examId, providerName: '', examName: '' })} />
-        {!form.providerId && <Text label="New category name" value={form.providerName} maxLength={100} required onChange={providerName => patch({ providerName })} />}
-        {!form.examId && <Text label="New subcategory name" value={form.examName} maxLength={100} required onChange={examName => patch({ examName })} />}
-        {category && form.examId && <p className="muted">{category.name} · {category.exams.find(item => item.id === form.examId)?.name}</p>}
-        <div className="author-pair">
-          <Text label="Difficulty (1–10, optional)" type="number" min={1} max={10} value={form.difficulty}
-            onChange={difficulty => patch({ difficulty: difficulty === '' ? undefined : Number(difficulty) })} />
-          {user.role === 'admin' && !form.id && <label className="editor-field">Visibility<select value={form.sharing}
-            onChange={event => patch({ sharing: event.target.value })}><option value="private">Private</option><option value="shared">Shared bank</option></select></label>}
-        </div>
-        <Limits fields={setFields} limits={form.limits} onChange={limits => patch({ limits })} />
-      </fieldset>
-      <fieldset disabled={busy || archive}>
-        <legend>Questions</legend>
+  </>
+}
+
+function editableForm(saved) {
+  return { ...saved.document, providerId: saved.providerId, examId: saved.examId, providerName: '', examName: '',
+    revision: saved.revision, sharing: saved.private ? 'private' : 'shared' }
+}
+
+function SetForm({ editorId, user, categories, examBank, screen, onStart, onCommit }) {
+  const [form, setForm] = useState(() => editorId ? null : { ...emptySet(), mode: examBank ? 'exam' : 'practice' })
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [deleteError, setDeleteError] = useState('')
+  const deleteDialog = useRef(null)
+  const addButton = useRef(null)
+
+  useEffect(() => {
+    if (!editorId) return
+    let active = true
+    localApi('question-sets/' + editorId).then(saved => {
+      if ((saved.document.mode === 'exam') !== examBank) throw new Error('This set is in a different question bank.')
+      if (active) setForm(editableForm(saved))
+    }).catch(failure => {
+      if (active) setError(failure.message)
+    })
+    return () => { active = false }
+  }, [editorId, examBank])
+
+  const patch = values => setForm(current => ({ ...current, ...values }))
+
+  function addQuestion() {
+    const question = { ...newQuestion('single'), id: 'new-' + crypto.randomUUID() }
+    patch({ questions: [...form.questions, question] })
+    requestAnimationFrame(() => {
+      const card = document.getElementById('author-' + question.id)
+      if (!card) return
+      card.open = true
+      card.querySelector('textarea')?.focus()
+    })
+  }
+
+  function deleteQuestion(index) {
+    const questions = remove(form.questions, index)
+    patch({ questions })
+    requestAnimationFrame(() => {
+      const next = questions[index] ?? questions[index - 1]
+      const summary = next && document.getElementById('author-' + next.id)?.querySelector('summary')
+      const focusTarget = summary || addButton.current
+      focusTarget?.focus()
+    })
+  }
+
+  async function commit(event) {
+    event.preventDefault()
+    const path = window.location.pathname
+    onStart()
+    setBusy(true)
+    setError('')
+    try {
+      const saved = await localApi(editorId ? 'question-sets/' + editorId : 'question-sets', editorId ? 'PUT' : 'POST', form)
+      if (editorId) setForm(editableForm(saved))
+      const destination = !editorId && window.location.pathname === path ? { screen, editorId: saved.document.id } : undefined
+      onCommit('Question set saved.', destination)
+    } catch (failure) { setError(failure.message) }
+    finally { setBusy(false) }
+  }
+
+  async function deleteSet() {
+    const path = window.location.pathname
+    onStart()
+    setBusy(true)
+    setDeleteError('')
+    try {
+      await localApi('question-sets/' + editorId, 'DELETE', { revision: form.revision })
+      deleteDialog.current?.close()
+      onCommit('Question set deleted.', window.location.pathname === path ? { screen } : undefined)
+    } catch (failure) { setDeleteError(failure.message) }
+    finally { setBusy(false) }
+  }
+
+  function revealInvalidControl(event) {
+    let disclosure = event.target.closest('details')
+    while (disclosure) {
+      disclosure.open = true
+      disclosure = disclosure.parentElement.closest('details')
+    }
+  }
+
+  const category = categories.find(item => item.id === form?.providerId)
+  return <>
+    <header className="section-heading author-heading">
+      <h1>{editorId ? form?.title || 'Edit question set' : 'New question set'}</h1>
+      {editorId && form && <button className="button danger" type="button" disabled={busy} onClick={() => {
+        setDeleteError('')
+        deleteDialog.current.showModal()
+      }}>Delete question set</button>}
+    </header>
+    {error && <p className="notice" role="alert">{error}</p>}
+    {!form && !error && <p role="status">Loading question set…</p>}
+    {form && <form onSubmit={commit} onInvalidCapture={revealInvalidControl} className="author-form question-panel">
+      <details className="author-settings" open={!editorId}>
+        <summary>Set settings</summary>
+        <fieldset disabled={busy} aria-label="Set settings">
+          <Text label="Set title" value={form.title} maxLength={160} required onChange={title => patch({ title })} />
+          <CategoryFields categories={categories} allowNew providerId={form.providerId} examId={form.examId}
+            onChange={(providerId, examId) => patch({ providerId, examId, providerName: '', examName: '' })} />
+          {!form.providerId && <Text label="New category name" value={form.providerName} maxLength={100} required onChange={providerName => patch({ providerName })} />}
+          {!form.examId && <Text label="New subcategory name" value={form.examName} maxLength={100} required onChange={examName => patch({ examName })} />}
+          {category && form.examId && <p className="muted">{category.name} · {category.exams.find(item => item.id === form.examId)?.name}</p>}
+          <div className="author-pair">
+            <Text label="Difficulty (1–10, optional)" type="number" min={1} max={10} value={form.difficulty}
+              onChange={difficulty => patch({ difficulty: difficulty === '' ? undefined : Number(difficulty) })} />
+            {user.role === 'admin' && !examBank && !form.id && <label className="editor-field">Visibility<select value={form.sharing}
+              onChange={event => patch({ sharing: event.target.value })}><option value="private">Private</option><option value="shared">Shared bank</option></select></label>}
+          </div>
+          <Limits fields={examBank ? setFields.filter(field => field.name !== examField.name) : setFields}
+            limits={form.limits} onChange={limits => patch({ limits })} />
+        </fieldset>
+      </details>
+      <fieldset className="author-questions" disabled={busy} aria-labelledby="author-questions-heading">
         <div className="author-question-bar">
-          {form.questions.length > 0 && <label className="editor-field">Question<select value={questionIndex} onChange={event => setQuestionIndex(Number(event.target.value))}>
-            {form.questions.map((item, index) => <option key={item.id ?? index} value={index}>{index + 1}. {item.prompt.trim().slice(0, 70) || formats[item.type].label}</option>)}
-          </select></label>}
-          <button className="button secondary" type="button" onClick={() => {
-            setQuestionIndex(form.questions.length)
-            patch({ questions: [...form.questions, newQuestion('single')] })
-          }}>Add question</button>
-          {question && <button className="text-button" type="button" onClick={() => {
-            patch({ questions: remove(form.questions, questionIndex) })
-            setQuestionIndex(Math.max(0, questionIndex - 1))
-          }}>Delete question</button>}
+          <h2 id="author-questions-heading">Questions <span className="muted">({form.questions.length})</span></h2>
+          <div className="author-question-actions">
+            <button className="button secondary" ref={addButton} type="button" onClick={addQuestion}><span aria-hidden="true">+</span> Add question</button>
+            <button className="button primary" type="submit" disabled={!form.questions.length}>Save question set</button>
+          </div>
         </div>
-        {question && <QuestionEditor key={questionIndex} question={question}
-          onChange={next => patch({ questions: replace(form.questions, questionIndex, next) })} />}
+        {form.questions.map((question, index) => <details className="author-question" key={question.id} id={'author-' + question.id}>
+          <summary>
+            <span className="author-question-number">{index + 1}.</span>
+            <span className="author-question-title">{question.prompt.trim() || 'New question'}</span>
+            <span className="format">{formats[question.type].label}</span>
+          </summary>
+          <div className="author-question-body">
+            <button className="button danger small" type="button" onClick={() => deleteQuestion(index)}>Delete question</button>
+            <QuestionEditor question={question} examBank={examBank} onChange={next => patch({ questions: replace(form.questions, index, next) })} />
+          </div>
+        </details>)}
       </fieldset>
-      {archive && <p className="notice">Archive this set? Saved attempts and results will still be available.</p>}
-      <div className="ai-actions">
-        <button className="button primary" disabled={busy || (!archive && !form.questions.length)}>{archive ? 'Confirm archive' : 'Save question set'}</button>
-        {form.id && !archive && <button className="button secondary" type="button" disabled={busy} onClick={() => setArchive(true)}>Archive set</button>}
-        <button className="button secondary" disabled={busy} type="button" onClick={() => {
-          if (archive) setArchive(false)
-          else { setForm(null); setError(''); setNotice('') }
-        }}>{archive ? 'Cancel archive' : 'Back to question sets'}</button>
-      </div>
     </form>}
+    <dialog ref={deleteDialog} className="submit-dialog" aria-labelledby="delete-set-title" onCancel={event => {
+      if (busy) event.preventDefault()
+    }}>
+      <h2 id="delete-set-title">Delete question set?</h2>
+      <p>This removes the set from the catalog. Saved attempts and results remain available.</p>
+      {deleteError && <p role="alert">{deleteError}</p>}
+      <div className="dialog-actions">
+        <button className="button secondary" type="button" disabled={busy} onClick={() => deleteDialog.current.close()}>Cancel</button>
+        <button className="button danger" type="button" disabled={busy} onClick={deleteSet}>{busy ? 'Deleting…' : 'Delete set'}</button>
+      </div>
+    </dialog>
   </>
 }

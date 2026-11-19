@@ -1,0 +1,25 @@
+{
+  "id": "video-answer-demo",
+  "title": "Video Answer and Screenshot Demo",
+  "mode": "exam",
+  "limits": { "examMinutes": 5 },
+  "questions": [
+    {
+      "id": "video-answer-demo-setup",
+      "domain": "general",
+      "type": "single",
+      "prompt": "What should you do if exam tab sharing stops?",
+      "options": ["Share the exam tab again", "Refresh the page and continue without sharing", "Turn off the microphone"],
+      "answer": "Share the exam tab again",
+      "explanation": "Quizeit pauses the exam when sharing stops. Share the same tab again to continue."
+    },
+    {
+      "id": "video-answer-demo-recording",
+      "domain": "general",
+      "type": "video",
+      "prompt": "Record a short introduction. Say what you want to practice and name one goal for your next study session.",
+      "videoSeconds": 60,
+      "explanation": "Mark the response correct if the recording includes a practice topic and a clear study goal."
+    }
+  ]
+}

@@ -13,8 +13,8 @@ const googleSeconds = 600
 const jwks = createRemoteJWKSet(new URL('https://www.googleapis.com/oauth2/v3/certs'))
 const emailFor = value => typeof value === 'string' ? value.trim().toLowerCase() : ''
 const nameFor = value => typeof value === 'string' ? value.trim().slice(0, 80) : ''
-const publicUser = ({ _id, email, firstName, lastName, role, googleSub }) => ({
-  id: _id, email, firstName, lastName, role, googleLinked: Boolean(googleSub),
+const publicUser = ({ _id, email, firstName, lastName, role, googleSub, legacyOwner, deactivatedAt }) => ({
+  id: _id, email, firstName, lastName, role, googleLinked: Boolean(googleSub), owner: legacyOwner === true && role === 'admin', active: !deactivatedAt,
 })
 
 function cookie(req, name, value, age) {
@@ -71,12 +71,14 @@ export async function createAccounts(db, { googleClientId = process.env.GOOGLE_C
     const session = await sessions.findOne({ _id: digest(token), expiresAt: { $gt: new Date() } })
     if (!session) return null
     const user = await users.findOne({ _id: session.userId }, { projection: { passwordHash: 0, passwordSalt: 0 } })
-    return user && { ...user, legacyOwner: user.legacyOwner === true && user.role === 'admin' }
+    if (!user || user.deactivatedAt || (session.version ?? 0) !== (user.sessionVersion ?? 0)) return null
+    return { ...user, legacyOwner: user.legacyOwner === true && user.role === 'admin' }
   }
 
   async function startSession(req, res, user) {
+    if (user.deactivatedAt) throw new ApiError(401, 'This account is inactive.')
     const token = random()
-    await sessions.insertOne({ _id: digest(token), userId: user._id, expiresAt: new Date(Date.now() + sessionSeconds * 1000) })
+    await sessions.insertOne({ _id: digest(token), userId: user._id, version: user.sessionVersion ?? 0, expiresAt: new Date(Date.now() + sessionSeconds * 1000) })
     const previous = fromCookie(req, cookieName)
     if (previous) await sessions.deleteOne({ _id: digest(previous) })
     res.append('Set-Cookie', cookie(req, cookieName, token, sessionSeconds))
@@ -84,21 +86,104 @@ export async function createAccounts(db, { googleClientId = process.env.GOOGLE_C
     return publicUser(user)
   }
 
-  async function register(req, res, input) {
+  function profileFields(input, allowEmptyLastName = false) {
     const email = emailFor(input.email)
     const firstName = nameFor(input.firstName)
     const lastName = nameFor(input.lastName)
-    if (!firstName || !lastName || !validEmail(email) || !validPassword(input.password)) {
-      throw new ApiError(400, 'Enter your first and last name, a valid email, and a password of 12–256 characters.')
+    if (!firstName || (!allowEmptyLastName && !lastName) || !validEmail(email)) {
+      throw new ApiError(400, 'Enter your first and last name and a valid email.')
     }
+    return { email, firstName, lastName }
+  }
+
+  async function passwordFields(password) {
+    if (!validPassword(password)) throw new ApiError(400, 'Enter a password of 12–256 characters.')
     const passwordSalt = random()
-    const passwordHash = (await passwordWork(() => key(input.password, passwordSalt))).toString('hex')
-    const user = { _id: randomUUID(), email, firstName, lastName, passwordSalt, passwordHash, role: 'learner', createdAt: new Date() }
+    const passwordHash = (await passwordWork(() => key(password, passwordSalt))).toString('hex')
+    return { passwordSalt, passwordHash }
+  }
+
+  async function saveNewUser(input, role) {
+    const user = { _id: randomUUID(), ...profileFields(input), ...await passwordFields(input.password), role, createdAt: new Date() }
     try { await users.insertOne(user) } catch (error) {
-      if (error.code === 11000) throw new ApiError(409, 'An account already uses this email. Sign in to continue.')
+      if (error.code === 11000) throw new ApiError(409, 'An account already uses this email.')
       throw error
     }
-    return startSession(req, res, user)
+    return user
+  }
+
+  async function register(req, res, input) {
+    return startSession(req, res, await saveNewUser(input, 'learner'))
+  }
+
+  function requireAdmin(actor) {
+    if (actor?.role !== 'admin') throw new ApiError(403, 'Only administrators can manage users.')
+  }
+
+  const canManage = (actor, target) => target.legacyOwner ? target._id === actor._id : actor.legacyOwner || target.role === 'learner'
+  const managementUser = (actor, target) => ({ ...publicUser(target), editable: canManage(actor, target) })
+
+  async function listUsers(actor) {
+    requireAdmin(actor)
+    const accounts = await users.find({}, { projection: { passwordHash: 0, passwordSalt: 0 } }).sort({ firstName: 1, lastName: 1, email: 1 }).toArray()
+    return { users: accounts.map(target => managementUser(actor, target)), assignableRoles: actor.legacyOwner ? ['learner', 'admin'] : ['learner'] }
+  }
+
+  function validateRole(actor, role) {
+    if (!['learner', 'admin'].includes(role)) throw new ApiError(400, 'Choose a valid role.')
+    if (role === 'admin' && !actor.legacyOwner) throw new ApiError(403, 'Only the owner can grant the administrator role.')
+  }
+
+  async function createUser(actor, input) {
+    requireAdmin(actor)
+    validateRole(actor, input.role)
+    return managementUser(actor, await saveNewUser(input, input.role))
+  }
+
+  async function changeUser(actor, id, input) {
+    requireAdmin(actor)
+    const target = await users.findOne({ _id: id })
+    if (!target) throw new ApiError(404, 'User not found.')
+    if (!canManage(actor, target)) throw new ApiError(403, 'Only the owner can manage this account.')
+    const statusChange = Object.hasOwn(input, 'active')
+    if (statusChange && typeof input.active !== 'boolean') throw new ApiError(400, 'Choose a valid account status.')
+    if (statusChange && (target.legacyOwner || target._id === actor._id)) {
+      throw new ApiError(403, 'You cannot deactivate your own account or the owner.')
+    }
+    const profile = statusChange ? {} : profileFields(input, target.googleSub && !target.lastName)
+    const role = statusChange ? target.role : input.role
+    if (!statusChange && role !== target.role) validateRole(actor, role)
+    if (target.legacyOwner && role !== 'admin') throw new ApiError(403, 'The owner must remain an administrator.')
+    const emailChanged = profile.email !== undefined && profile.email !== target.email
+    const newPassword = !statusChange && input.password !== undefined && input.password !== ''
+    if (emailChanged && target.googleSub && !target.passwordHash && !newPassword) {
+      throw new ApiError(400, 'Set a login password before changing the email for a Google-only account.')
+    }
+    const credentials = newPassword ? await passwordFields(input.password) : {}
+    const signInChanged = statusChange || emailChanged || newPassword || role !== target.role
+    const remove = {
+      ...(emailChanged && { googleSub: '' }),
+      ...(statusChange && input.active && { deactivatedAt: '' }),
+    }
+    const revision = randomUUID()
+    let saved
+    try {
+      saved = await users.findOneAndUpdate({
+        _id: id, role: target.role, legacyOwner: target.legacyOwner ?? { $exists: false },
+        managementRevision: target.managementRevision ?? { $exists: false },
+      }, {
+        $set: { ...profile, ...credentials, role, managementRevision: revision,
+          ...(statusChange && !input.active && { deactivatedAt: target.deactivatedAt ?? new Date() }),
+        },
+        ...(Object.keys(remove).length && { $unset: remove }),
+        ...(signInChanged && { $inc: { sessionVersion: 1 } }),
+      }, { returnDocument: 'after' })
+    } catch (error) {
+      if (error.code === 11000) throw new ApiError(409, 'An account already uses this email.')
+      throw error
+    }
+    if (!saved) throw new ApiError(409, 'This account changed. Reload the user list and try again.')
+    return { user: managementUser(actor, saved), signInAgain: signInChanged && actor._id === id }
   }
 
   async function login(req, res, input) {
@@ -107,7 +192,7 @@ export async function createAccounts(db, { googleClientId = process.env.GOOGLE_C
     if (!validEmail(email) || !validPassword(input.password)) throw failure()
     const user = await users.findOne({ email })
     const candidate = await passwordWork(() => key(input.password, user?.passwordSalt ?? 'quizeit-unused-account'))
-    if (!user?.passwordHash || !timingSafeEqual(Buffer.from(user.passwordHash, 'hex'), candidate)) throw failure()
+    if (user?.deactivatedAt || !user?.passwordHash || !timingSafeEqual(Buffer.from(user.passwordHash, 'hex'), candidate)) throw failure()
     return startSession(req, res, user)
   }
 
@@ -164,7 +249,7 @@ export async function createAccounts(db, { googleClientId = process.env.GOOGLE_C
       let user = await users.findOne({ googleSub: profile.sub })
       if (flow.userId) {
         if ((user && user._id !== flow.userId) || email !== currentUser.email) return 'email'
-        user = await users.findOneAndUpdate({ _id: flow.userId, $or: [{ googleSub: { $exists: false } }, { googleSub: profile.sub }] },
+        user = await users.findOneAndUpdate({ _id: flow.userId, email, deactivatedAt: { $exists: false }, $or: [{ googleSub: { $exists: false } }, { googleSub: profile.sub }] },
           { $set: { googleSub: profile.sub } }, { returnDocument: 'after' })
         if (!user) return 'email'
       } else if (!user) {
@@ -184,5 +269,5 @@ export async function createAccounts(db, { googleClientId = process.env.GOOGLE_C
     }
   }
 
-  return { getUser, register, login, logout, beginGoogle, finishGoogle, googleEnabled, publicUser }
+  return { getUser, register, login, logout, beginGoogle, finishGoogle, googleEnabled, publicUser, listUsers, createUser, changeUser }
 }

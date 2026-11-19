@@ -13,6 +13,9 @@ import { BackendServicesModule } from './backend-services.module.mjs'
 import { createAccounts } from './accounts.mjs'
 import { AccountModule } from './routes/account.mjs'
 import { AuthoringModule } from './routes/authoring.mjs'
+import { RealExamsModule } from './routes/real-exams.mjs'
+import { createRealExams } from './real-exams.mjs'
+import { AttemptMediaModule } from './routes/attempt-media.mjs'
 import { PracticeModule } from './routes/practice.mjs'
 import { CodingModule } from './routes/coding.mjs'
 import { AiModule } from './routes/openai.mjs'
@@ -25,7 +28,7 @@ class AppModule {
     return {
       module: AppModule,
       // Mount the frontend fallback after the API controllers.
-      imports: [BackendServicesModule.register(services), AccountModule, PracticeModule, AuthoringModule, CodingModule, AiModule, FrontendModule],
+      imports: [BackendServicesModule.register(services), AccountModule, PracticeModule, AttemptMediaModule, AuthoringModule, RealExamsModule, CodingModule, AiModule, FrontendModule],
       providers: [
         { provide: APP_GUARD, useClass: LocalRequestGuard },
         { provide: APP_FILTER, useClass: ApiExceptionFilter },
@@ -38,7 +41,7 @@ Module({})(AppModule)
 
 export async function startServer({
   port = Number(process.env.QUIZEIT_PORT || 5173), dataDir = resolve('local-data'), fetchResponse = fetch, questionsDir = questionFolder,
-  runCode, editor = createEditorWorkspaces(dataDir), mongoUri, mongoDatabase, accountOptions,
+  runCode, editor = createEditorWorkspaces(dataDir), mongoUri, mongoDatabase, accountOptions, examOptions,
 } = {}) {
   if (!runCode) {
     const token = process.env.JUDGE0_TOKEN || (!process.env.JUDGE0_URL
@@ -49,13 +52,23 @@ export async function startServer({
   const mongo = await connectMongo({ dataDir, mongoUri, mongoDatabase })
   let app
   try {
-    const data = await initializeAppData(mongo.db, dataDir, questionsDir)
+    const realExams = await createRealExams(mongo.db, examOptions)
+    const data = await initializeAppData(mongo.db, dataDir, questionsDir, realExams)
     const accounts = await createAccounts(mongo.db, accountOptions)
     const httpApp = express()
     httpApp.disable('x-powered-by')
     httpApp.enable('case sensitive routing')
     httpApp.enable('strict routing')
-    app = await NestFactory.create(AppModule.register({ data, accounts, runCode, editor, fetchResponse }), new ExpressAdapter(httpApp), {
+    if (process.env.QUIZEIT_TRUST_PROXY === '1') httpApp.set('trust proxy', 'loopback')
+    httpApp.use((req, _res, next) => {
+      const candidate = /^\/api\/candidate\/(exam-[a-f0-9-]{36})(\/[^?]+)(\?.*)?$/.exec(req.url)
+      if (candidate) {
+        req.candidateSetId = candidate[1]
+        req.url = '/api' + candidate[2] + (candidate[3] ?? '')
+      }
+      next()
+    })
+    app = await NestFactory.create(AppModule.register({ data, accounts, realExams, runCode, editor, fetchResponse }), new ExpressAdapter(httpApp), {
       abortOnError: false,
       // The controllers enforce different JSON limits and accept raw file uploads.
       bodyParser: false,

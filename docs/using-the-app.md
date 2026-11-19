@@ -21,7 +21,7 @@ See [coding lab setup](../README.md#optional-coding-labs).
 
 ### Activity and limits
 
-Use **Manage question sets** to set CPU time, wall-clock time, memory, the total set budget, and the default time per question. A question can override its own time budget and, for coding questions, each execution limit. The owner can manage shared defaults and language overrides in **Settings**. Judge0 applies its configured maximums to code runs.
+Use **Manage question sets** to set CPU time, wall-clock time, memory, and the total set budget. Set a time budget on an individual question to give it its own countdown. Coding questions can override each execution limit. The owner can manage shared defaults and language overrides in **Settings**. Judge0 applies its configured maximums to code runs.
 
 The set and question timers count visible practice time. Use **Pause timer** to pause until you explicitly resume. Opening the same attempt again restores saved time and the pause state. Reaching a time budget shows a warning and keeps submission available.
 
@@ -43,7 +43,11 @@ Use **Attach files** to add up to three study files totaling 10 MiB. The quiz se
 
 ChatGPT matches the subject to the existing provider and exam catalog. When a match is missing, it proposes a relevant provider or exam. After the full set passes validation, the app saves the set and any new categories together in MongoDB.
 
-The model can choose whether to search the web or look up question prompts in the local bank. Web search has no domain allowlist and depends on ChatGPT model and account support. The activity panel shows live model and tool stages, plus local validation and saving. Only one set generates at a time. Use **Cancel generation** to stop the active request. Reloading or closing the tab that submitted it also cancels generation before saving starts. When web sources are returned, the quiz shows them in the generation result and saves them in the set JSON.
+The model can choose whether to search the web or look up question prompts in the local bank. The activity panel shows live generation, validation, and saving. Each account can run one generation at a time. Use **Cancel generation** to stop a request before saving starts. Reloading or closing the tab that submitted it also cancels the request at that stage.
+
+New generated sets are private to the account that created them. Open **Manage question sets** to edit the questions or add time limits. When web sources are returned, the quiz shows them in the generation result and saves them with the set in MongoDB.
+
+In the question set editor, select a question to expand it and select it again to collapse it. **Add question** opens a new question for editing. Use **Save question set** to apply changes, including individual question deletions. **Delete question set** removes the set from the catalog after confirmation. Saved attempts and results remain available.
 
 Every successful run writes a separate `generated-<id>.json` file in the matched folder. Running the same prompt again creates another set and leaves the earlier set and its attempts available. The result shows the model, category, and saved path. Invalid or incomplete runs write no set file.
 
@@ -64,3 +68,27 @@ In **Settings → OpenAI hosted tools**, enter an OpenAI Platform API key and ch
 Upload a study file under **Study files** and wait for **Ready**. The app uses the project's vector store for hosted File Search and displays any document names cited by OpenAI. Code Interpreter can run Python in OpenAI's sandbox. Hosted tool search can discover the deferred quiz-bank lookup. The model decides when to use these tools.
 
 Use **Switch to ChatGPT OAuth** to switch back. You can delete uploaded files from OpenAI in the same settings section. Existing explanations can be regenerated using **Refresh explanation**.
+
+## Video answers and exam screenshots
+
+In **Manage question sets**, add a **Video response** question with a prompt, grading guidance, and a maximum recording length. Learners start their camera, check the live preview, and record their answer alongside the question. Use **Hide question** to expand the player during recording or playback. The app host uses `ffprobe` from FFmpeg to validate video uploads. Saved video answers remain with the draft after reopening.
+
+Open **Video Answer Practice** to try recording in Firefox, Chrome, or Edge. This sample uses Practice mode, so it opens directly to the video question.
+
+For a real exam, choose the exam tab in desktop Chrome or Edge. In Firefox, choose the browser window displaying the exam and keep it in front. Quizeit checks that the exam is visible and crops the image to the page before uploading. Screenshots are saved when each question opens and every 30 seconds, including during video recording.
+
+Set **Webcam photo interval (seconds)** between 5 and 300. The default is 30 seconds. Learners grant camera access separately for questions without a video answer. Quizeit takes a photo at the start of each of those questions and at the configured interval. Webcam photos use no microphone and stop during video questions. The exam pauses if required sharing or camera access stops. Practice sets use neither type of exam capture.
+
+Open **Attempt history** to review practice videos. Administrators can use **Real exams → Review exam submissions** to see exam screenshots, webcam photos, the sharing timeline, and recorded answers. Open a video answer and choose **Mark correct** or **Mark incorrect**. The attempt shows **Pending review** until all submitted video responses have been graded. Media is stored privately in MongoDB GridFS with the attempt.
+
+## Build and invite candidates to a real exam
+
+Administrators manage assessment questions through **Exam question bank**. Practice questions use **Manage question sets**. A saved set stays in its original bank. When administrators use **Generate questions**, they can choose **Practice** or **Real exam**. The latter also accepts a difficulty from 1 to 10.
+
+Under **Real exams**, choose one or more exam question sets and enter the number to draw from each and its minimum difficulty. A question inherits its set's difficulty when it has no override. The fallback is 5. Each invitation gets a randomized selection and order from the pools saved when the exam was created. Later changes to the source sets apply to future exams.
+
+Enter the candidate's email and the number of days the link is valid. Use **Create invitation link** to share it yourself or **Send invitation email** when delivery is configured. Candidates start once with their name and matching email, then resume in the same browser for up to 24 hours after starting. Location sharing is optional. The candidate list shows the recorded IP address, browser information, and approximate location when shared. Open a submitted attempt to grade and review evidence.
+
+Set `QUIZEIT_PUBLIC_URL` to an HTTPS origin in `.env` for remote candidates. Forward that origin to the loopback app through your TLS reverse proxy. Configure the proxy to set a fixed public Host and overwrite `X-Forwarded-For` with the verified client address. Set `QUIZEIT_TRUST_PROXY=1` when using that proxy so Quizeit records the candidate's IP. The public origin serves invitation and candidate pages, while the administration console remains on localhost.
+
+To enable built-in email delivery, also set `QUIZEIT_RESEND_API_KEY` and `QUIZEIT_EXAM_FROM` to your Resend API key and verified sender, then restart Quizeit. [Resend email documentation](https://resend.com/docs/api-reference/emails/send-email)

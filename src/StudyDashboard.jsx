@@ -13,7 +13,7 @@ const count = (value, label) => number.format(value) + ' ' + label + (value === 
 
 function ScoreTrend({ entries, openAttempt }) {
   const [selectedId, setSelectedId] = useState(null)
-  const points = entries.filter(item => Number.isFinite(item.at)).slice(0, 12).reverse()
+  const points = entries.filter(item => !item.attempt.pendingReview && Number.isFinite(item.at)).slice(0, 12).reverse()
   const selected = points.find(item => item.attempt.id === selectedId) ?? points.at(-1)
   return <section className="analytics-panel" aria-labelledby="trend-heading">
     <div className="analytics-panel-header">
@@ -85,7 +85,7 @@ function RecentAttempts({ entries, openAttempt, openHistory }) {
       {entries.slice(0, 5).map(({ attempt, score, at }) => <li key={attempt.id}>
         <button className="analytics-attempt" onClick={() => openAttempt(attempt.id)}>
           <span className="analytics-attempt-title"><strong>{attempt.title}</strong><small>{attemptDate(at)}</small></span>
-          <span className="analytics-attempt-score"><strong>{percent(score)}</strong><small>{attempt.passed ? 'Passed' : 'Failed'}</small></span>
+          <span className="analytics-attempt-score"><strong>{attempt.pendingReview ? 'Pending review' : percent(score)}</strong>{!attempt.pendingReview && <small>{attempt.passed ? 'Passed' : 'Failed'}</small>}</span>
         </button>
       </li>)}
     </ul> : <p className="analytics-empty">No attempts match these filters.</p>}
@@ -107,9 +107,10 @@ export default function StudyDashboard({ catalog, history, snapshots, openAttemp
   const entries = category.filter(item => (!setId || item.attempt.setId === setId)
     && (period === 'all' || item.at >= Number(threshold)))
   const report = dashboardReport(entries)
+  const gradedCount = entries.filter(item => !item.attempt.pendingReview).length
   const cards = [
     ['Question accuracy', report.total ? percent(100 * report.correct / report.total) : '—', report.total ? report.correct + ' correct out of ' + report.total : ''],
-    ['Pass rate', entries.length ? percent(100 * report.passed / entries.length) : '—', entries.length ? report.passed + ' passed · ' + (entries.length - report.passed) + ' failed' : ''],
+    ['Pass rate', gradedCount ? percent(100 * report.passed / gradedCount) : '—', gradedCount ? report.passed + ' passed · ' + (gradedCount - report.passed) + ' failed' : ''],
     ['Submitted attempts', number.format(entries.length), entries.length ? count(new Set(entries.map(item => item.attempt.setId)).size, 'practice set') : ''],
     ['Time on questions', report.recordedTime ? formatDuration(report.visibleMs) : '—', report.recordedTime ? 'Time with a question visible' : 'No timing data'],
   ]

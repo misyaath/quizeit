@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { apiUrl } from './local-api.js'
 import { codingLanguages } from './coding.js'
 import { summarizeLanguages } from './activity-metrics.js'
 
@@ -36,7 +37,7 @@ export function useQuestionTime(setId, questionId, draftId, timing, enabled) {
       if (action !== 'tick') active = false
 
       const task = queue.current.then(async () => {
-        const response = await fetch('/api/progress/time', {
+        const response = await fetch(apiUrl('progress/time'), {
           method: 'POST', keepalive: background, headers: { 'Content-Type': 'application/json' }, body: payload,
         })
         const result = await response.json()
@@ -104,29 +105,33 @@ export function useQuestionTime(setId, questionId, draftId, timing, enabled) {
   return {
     totalMs: totalMs + delta, questionMs: (saved?.questionMs ?? timing?.questions?.[questionId]?.visibleMs ?? 0) + delta,
     examMinutes: saved?.examMinutes ?? timing?.examMinutes ?? 0, questionMinutes: saved?.questionMinutes ?? 0,
-    active: Boolean(saved?.active) && !error, paused: saved?.paused ?? Boolean(timing?.paused), ready: Boolean(saved || error),
+    active: enabled && Boolean(saved?.active) && !error, paused: saved?.paused ?? Boolean(timing?.paused), ready: Boolean(saved || error),
     toggle: () => controls.current.toggle?.(), stop: () => controls.current.stop?.(), restart: () => controls.current.restart?.(),
     error, saving,
   }
 }
 
+function TimeSummary({ label, usedMs, minutes, usedOnly = false }) {
+  const budgetMs = minutes * 60_000
+  const limited = budgetMs > 0
+  const expired = limited && usedMs >= budgetMs
+  return <section className={'clock-summary' + (expired ? ' clock-expired' : '')} aria-label={label}>
+    <h2>{label}{expired && <span className="clock-limit">Limit reached</span>}</h2>
+    <dl>
+      <div><dt>Used</dt><dd>{formatDuration(usedMs)}</dd></div>
+      {!usedOnly && <>
+        <div><dt>Total</dt><dd>{limited ? formatDuration(budgetMs) : 'No limit'}</dd></div>
+        <div><dt>Remaining</dt><dd>{limited ? formatDuration(budgetMs - usedMs) : 'Unlimited'}</dd></div>
+      </>}
+    </dl>
+  </section>
+}
+
 export function ExamClock({ clock }) {
-  const totalBudget = clock.examMinutes * 60_000
-  const questionBudget = clock.questionMinutes * 60_000
-  const totalOver = totalBudget > 0 && clock.totalMs >= totalBudget
-  const questionOver = questionBudget > 0 && clock.questionMs >= questionBudget
   return <div className="practice-clock">
-    <p className={totalOver ? 'exam-timer expired' : 'exam-timer'}>
-      Set time {formatDuration(clock.totalMs)}{totalBudget > 0 && (totalOver ? ' · limit reached' : ' · ' + formatDuration(totalBudget - clock.totalMs) + ' remaining')}
-    </p>
-    <p className={questionOver ? 'exam-timer expired' : 'exam-timer'}>
-      Question time {formatDuration(clock.questionMs)}{questionBudget > 0 && (questionOver ? ' · limit reached' : ' · ' + formatDuration(questionBudget - clock.questionMs) + ' remaining')}
-    </p>
-    <button type="button" className="button small secondary" onClick={clock.toggle} disabled={!clock.ready || clock.saving}>
-      {clock.active ? 'Pause timer' : 'Resume timer'}
-    </button>
-    {clock.paused && <p className="muted">Timer paused</p>}
-    {clock.error && <p role="alert">{clock.error}</p>}
+    <TimeSummary label="Question set time" usedMs={clock.totalMs} minutes={clock.examMinutes} />
+    <TimeSummary label="Current question time" usedMs={clock.questionMs} minutes={clock.questionMinutes} usedOnly={!clock.questionMinutes} />
+    {clock.error && <p className="clock-error" role="alert">{clock.error}</p>}
   </div>
 }
 

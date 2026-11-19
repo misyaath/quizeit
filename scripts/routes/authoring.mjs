@@ -8,8 +8,8 @@ import { ApiError } from '../openai.mjs'
 class AuthoringController {
   constructor(data) { this.data = data }
 
-  async list(_context, res) {
-    return json(res, await this.data.editableSets())
+  async list({ url }, res) {
+    return json(res, await this.data.editableSets(url.searchParams.get('mode') === 'exam' ? 'exam' : 'practice'))
   }
 
   async read({ req }, res) {
@@ -31,11 +31,13 @@ class AuthoringController {
       title: input.title.trim(),
       limits: input.limits,
       difficulty: input.difficulty,
+      mode: input.mode ?? previous?.mode,
+      webcamPhotoSeconds: input.webcamPhotoSeconds ?? previous?.webcamPhotoSeconds,
       questions: input.questions.map(question => {
         if (!question || typeof question !== 'object') throw new ApiError(400, 'Invalid question.')
-        const { domain, type, prompt, answer, explanation, options, labels, caseStudy, exhibits, languages, tests, limits } = question
+        const { domain, type, prompt, answer, explanation, options, labels, caseStudy, exhibits, languages, tests, limits, videoSeconds, difficulty } = question
         return { id: existing.has(question.id) ? question.id : 'question-' + randomUUID(),
-          domain, type, prompt, answer, explanation, options, labels, caseStudy, exhibits, languages, tests, limits }
+          domain, type, prompt, answer, explanation, options, labels, caseStudy, exhibits, languages, tests, limits, videoSeconds, difficulty }
       }),
     }
     const { saved } = await this.data.writeQuestionSet({

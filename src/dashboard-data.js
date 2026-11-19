@@ -34,8 +34,10 @@ export function dashboardReport(entries) {
   const domains = new Map()
   const activities = []
   for (const { attempt, snapshot } of entries) {
-    correct += attempt.correct
-    total += attempt.total
+    if (!attempt.pendingReview) {
+      correct += attempt.correct
+      total += attempt.total
+    }
     if (attempt.passed) passed++
     for (const question of Object.values(attempt.activity?.questions ?? {})) {
       if (Number.isFinite(question.visibleMs)) {
@@ -50,12 +52,13 @@ export function dashboardReport(entries) {
       result.language && !graded.has(id) ? [{ language: result.language, mode: 'submit' }] : [])
     activities.push({ questions: attempt.activity?.questions, runs: [...runs, ...previousGrades] })
 
+    if (attempt.pendingReview) continue
     for (const question of snapshot?.questions ?? []) {
       if (!question.domain) continue
       const { id, name } = question.domain
       const domain = domains.get(id) ?? { id, name, total: 0, correct: 0 }
       domain.total++
-      if (isCorrect(question, attempt.answers?.[question.id], attempt.codingResults?.[question.id])) domain.correct++
+      if (isCorrect(question, attempt.answers?.[question.id], attempt.codingResults?.[question.id], attempt.videoGrades?.[question.id])) domain.correct++
       domains.set(id, domain)
     }
   }

@@ -1,10 +1,12 @@
 import React from 'react'
+import { mediaUrl } from './exam-media.js'
 import { hasResponse } from './questions/index.js'
 import { CodeBlock } from './CodingQuestion.jsx'
 import { codingLanguages, codingSelection, projectFiles } from './coding.js'
 
 export function FormattedAnswer({ question, value }) {
   if (!hasResponse(value)) return <p>No answer</p>
+  if (question.type === 'video') return <video className="review-video" controls playsInline preload="metadata" src={mediaUrl(value.mediaId)} aria-label="Submitted video answer" />
   if (question.type === 'match') return <ul>{question.labels.map((label, index) => <li key={label}><b>{label}</b> → {value[index] || '—'}</li>)}</ul>
   if (question.type === 'order') return <ol>{value.map(step => <li key={step}>{step}</li>)}</ol>
   if (question.type === 'multi') return <ul>{value.map(option => <li key={option}>{option}</li>)}</ul>
@@ -31,9 +33,9 @@ export function SubmittedFiles({ question, value }) {
 
 export function AnswerKey({ question }) {
   return <div className="answer-key">
-    <h4>Correct answer</h4>
-    {question.type === 'coding' ? <ReferenceSolutions question={question} /> : <FormattedAnswer question={question} value={question.answer} />}
-    <h4>Explanation</h4>
+    <h4>{question.type === 'video' ? 'Video response' : 'Correct answer'}</h4>
+    {question.type === 'video' ? <p>Record your own response to this question.</p> : question.type === 'coding' ? <ReferenceSolutions question={question} /> : <FormattedAnswer question={question} value={question.answer} />}
+    <h4>{question.type === 'video' ? 'Grading guidance' : 'Explanation'}</h4>
     <p>{question.explanation}</p>
     {question.domain.source && <a href={question.domain.source} target="_blank" rel="noreferrer">Review this exam domain ↗</a>}
   </div>

@@ -18,10 +18,12 @@ export const formats = {
   match: { label: 'Drag and drop', instruction: 'Drag each answer onto its match, or use the dropdowns.' },
   order: { label: 'Build list', instruction: 'Add each step in order. Use the arrows to rearrange your list.' },
   text: { label: 'Short answer', instruction: 'Type the requested term, command, or value.' },
+  video: { label: 'Video response', instruction: 'Start your camera, then record a video answer for review.' },
   coding: { label: 'Coding', instruction: 'Write a solution and run the examples before submitting.' },
 }
 
 export function isAnswered(question, value) {
+  if (question.type === 'video') return Boolean(value?.mediaId)
   if (question.type === 'coding') return hasCodingResponse(value)
   if (question.type === 'text') return typeof value === 'string' && Boolean(value.trim())
   if (question.type === 'multi') return Array.isArray(value) && value.length === (question.answerCount ?? question.answer?.length)
@@ -31,8 +33,9 @@ export function isAnswered(question, value) {
   return Boolean(value)
 }
 
-export function isCorrect(question, value, codingResult) {
+export function isCorrect(question, value, codingResult, videoGrade) {
   if (!isAnswered(question, value)) return false
+  if (question.type === 'video') return videoGrade?.correct === true
   if (question.type === 'coding') return codingResult?.passed === true
   if (question.type === 'text') {
     const normalize = text => text.trim().toLowerCase().replace(/\s+/g, ' ')
@@ -44,7 +47,7 @@ export function isCorrect(question, value, codingResult) {
 }
 
 export function hasResponse(value) {
-  if (value && typeof value === 'object' && !Array.isArray(value)) return hasCodingResponse(value)
+  if (value && typeof value === 'object' && !Array.isArray(value)) return Boolean(value.mediaId) || hasCodingResponse(value)
   return Array.isArray(value) ? value.some(Boolean) : typeof value === 'string' && Boolean(value.trim())
 }
 

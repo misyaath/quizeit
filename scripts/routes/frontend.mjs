@@ -22,7 +22,7 @@ class FrontendController {
       if (error.code === 'ENOENT') throw new ApiError(404, 'Run npm run build before starting the server.')
       throw error
     })
-    res.writeHead(200, { 'Content-Type': contentType, 'Cache-Control': 'no-cache', 'X-Content-Type-Options': 'nosniff' })
+    res.writeHead(200, { 'Content-Type': contentType, 'Cache-Control': 'no-cache', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer' })
     res.end(body)
   }
 }

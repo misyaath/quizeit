@@ -79,7 +79,8 @@ export function createAiService({ auth, hosted, fetchResponse, progress, bankExp
     } else {
       const current = await progress.read()
       entry = current.history.find(item => item.id === attemptId)
-      question = entry && JSON.parse(current.snapshots[entry.snapshotIndex]).questions.find(item => item.id === questionId)
+      const set = entry && JSON.parse(current.snapshots[entry.snapshotIndex])
+      question = set?.mode !== 'exam' && set?.questions.find(item => item.id === questionId)
       if (!question) throw new ApiError(404, 'This question was not found in the saved attempt.')
       cacheKey = JSON.stringify([attemptId, questionId])
       cached = entry.explanations?.[questionId]
@@ -90,6 +91,7 @@ export function createAiService({ auth, hosted, fetchResponse, progress, bankExp
           : item),
       }))
     }
+    if (question.type === 'video') throw new ApiError(400, 'Video responses are reviewed by an administrator.')
     if (cached && refresh !== true) return cached
     let pending = pendingExplanations.get(cacheKey)
     if (!pending) {
