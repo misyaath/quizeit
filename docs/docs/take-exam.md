@@ -10,13 +10,15 @@ Open the invitation in a supported desktop browser and enter your name and the e
 2. Select **Enable webcam** and grant camera access when prompted.
 3. Select **Start exam** once both checks pass. If access stops, follow the prompts to restore it. Stay in the exam window while answering. Quizeit records screenshots, webcam photos, and focus changes during the written and coding section.
 
+Quizeit takes screenshots when questions open and every 30 seconds. It takes webcam photos when questions open and at the interval set by the exam administrator. Webcam photos use no microphone. The video-answer section has its own camera and mic controls.
+
 ![Candidate setup showing the screen sharing requirement and disabled Start exam button](./images/exam-setup.png)
 
 ## Answer and submit
 
 Use **Previous**, **Next**, or the question navigator to move through the current section. Flag a question when you want to return to it.
 
-Choose one option for **Single choice**, and select all applicable options for **Multiple select**. For **Drag and drop**, match each item by dragging it or using its dropdown. For **Build list**, put the steps in order. For **Short answer**, enter the requested term or value in the answer field.
+Choose one option for **Single choice**, and select all applicable options for **Multiple select**. For **Drag and drop**, match each item by dragging it or using its dropdown. For **Build list**, put the steps in order. For **Short answer**, enter the requested term or value in the answer field. Coding questions offer the [question workspace and example controls](practice.md#use-the-workspace-in-a-coding-question).
 
 In a mixed-format exam, **Submit and start video answers** locks the written and coding section. On a video question, select **Start camera**, check the preview and microphone, and select **Start recording**. Review the recording and choose **Submit video** to save it as your answer. Select **Submit exam** when you finish, and wait for **Exam submitted**.
 

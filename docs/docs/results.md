@@ -18,4 +18,4 @@ Written answers are scored against the set's answer keys. A coding answer earns 
 
 ## Review exam evidence
 
-Open **Exam evidence** to browse the saved exam screenshots and webcam photos. Compare the image timestamps with the sharing and focus timeline. The galleries cover the written and coding section. Video answers appear under **Review answers** separately.
+Open **Exam evidence** to browse the written and coding section's **Screenshots** and **Webcam photos**. Each button gives the number of images available. Select a thumbnail to enlarge it. Use **Previous**, **Next**, or **Close** in the viewer, and **Show more** in the gallery to load additional images. Expand **Sharing timeline** to compare image timestamps with documented sharing and focus changes. A **Left exam** count shows recorded departures. Video responses appear under **Review answers**.

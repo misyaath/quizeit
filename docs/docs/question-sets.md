@@ -1,4 +1,4 @@
-# Create and manage question sets
+# Manage question sets
 
 ## How questions are organized
 
@@ -18,10 +18,19 @@ Choose the area based on who will use the questions.
 1. Open **Manage question sets** or **Exam question bank** and select **New question set**.
 2. In **Set settings**, enter the **Set title**. Select an existing **Category** and **Subcategory**, or select **New category** or **New subcategory** and enter a name.
 3. Select a difficulty from 1 to 10 if useful. A real exam question inherits the set difficulty unless you set it on that question. The default difficulty for real exam selection is 5 when both fields are empty.
-4. Set a total time budget for a practice set if needed. When creating a shared practice set as an administrator, choose the **Visibility** before saving.
+4. Choose the optional limits below. When creating a shared practice set as an administrator, choose the **Visibility** before saving. The default is **Private**.
 5. Select **Add question**, fill its required fields, and add any others. Select **Save question set**. [Create and edit individual questions](questions.md)
 
 ![Questions section of the set editor with Add question, Save question set, and an expandable question row](./images/question-set.png)
+
+| Set setting | What it controls |
+| --- | --- |
+| **Total set time (minutes)** | Practice time budget. Choose 0–600 minutes. Enter 0 for an unlimited budget, or leave it empty to inherit the shared setting. Set the time for an invited exam in **Real exams**. |
+| **CPU time (seconds)** | Processor time allowed per coding test. Choose 1–15 seconds or leave blank to inherit. |
+| **Wall-clock time (seconds)** | Total elapsed time allowed per coding test. Choose 1–20 seconds or leave blank to inherit. |
+| **Memory (MiB)** | Memory allowed per coding test. Choose 32–500 MiB or leave blank to inherit. |
+
+A question can override the corresponding coding limits. [Shared defaults and overrides](settings.md#judge0-execution-limits-and-exam-timer)
 
 ## Edit a set or remove it from the catalog
 
@@ -31,8 +40,4 @@ Use **Delete question set** and confirm to remove the set from the catalog. Save
 
 ## Generate questions with AI
 
-If a model is available to your account, open **Generate questions**. Administrators can choose **Practice** or **Real exam**. For a real exam set, also choose a difficulty.
-
-1. Pick a model. Describe the topic, intended audience, and kinds of questions you want. Attach study material if the chosen model offers **Attach files**.
-2. Choose how many questions to generate and select the formats. Allow at least one question per format.
-3. Select **Generate question set** and wait for the saved result. Open the set in **Manage question sets** or **Exam question bank** and check the answer keys before sharing it or using it in an exam.
+Use [Generate questions](generate-questions.md) to draft a set. Open the result in **Manage question sets** or **Exam question bank** and check the questions before use.

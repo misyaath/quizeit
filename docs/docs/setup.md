@@ -1,4 +1,4 @@
-# Accounts and roles
+# Users
 
 ## Create your own account
 
@@ -14,7 +14,7 @@ If **Continue with Google** appears, you can use it to sign in. To connect Googl
 ## Create an account for another person
 
 1. As an administrator or the owner, open **Users** and select **New user**.
-2. Enter the person's first name, last name, and email address. Choose a role and enter a password of at least 12 characters.
+2. Enter the person's **First name**, **Last name**, and **Email**. Use their own email address. Choose a **Role**, then enter a **Password** of at least 12 characters. **Learner** is the initial selection.
 3. Select **Create user**. Give the person their sign-in details privately. Use [Candidate invitations](invitations.md) when someone only needs to sit an exam.
 
 ![Create user form showing name, email, role, and password fields for a fictional learner](./images/new-user.png)

@@ -15,24 +15,26 @@ export default defineConfig({
     sidebar: {
       '/docs/': [
         {
-          text: 'Accounts and practice',
+          text: 'App sidebar',
           items: [
-            { text: 'Accounts and roles', link: '/docs/setup' },
-            { text: 'Practice and review results', link: '/docs/practice' },
-          ],
-        },
-        {
-          text: 'Write questions',
-          items: [
+            { text: 'Dashboard', link: '/docs/dashboard' },
+            { text: 'Practice exams', link: '/docs/practice' },
+            { text: 'Question bank', link: '/docs/question-bank' },
+            { text: 'Attempt history', link: '/docs/attempt-history' },
             { text: 'Manage question sets', link: '/docs/question-sets' },
-            { text: 'Add and edit questions', link: '/docs/questions' },
+            { text: 'Exam question bank', link: '/docs/exam-question-bank' },
+            { text: 'Real exams', link: '/docs/first-exam' },
+            { text: 'Candidate invitations', link: '/docs/invitations' },
+            { text: 'Generate questions', link: '/docs/generate-questions' },
+            { text: 'Users', link: '/docs/setup' },
+            { text: 'Settings', link: '/docs/settings' },
+            { text: 'Export practice results', link: '/docs/export-practice-results' },
           ],
         },
         {
-          text: 'Run real exams',
+          text: 'Related tasks',
           items: [
-            { text: 'Create your first exam', link: '/docs/first-exam' },
-            { text: 'Invite candidates', link: '/docs/invitations' },
+            { text: 'Add and edit questions', link: '/docs/questions' },
             { text: 'Take an invited exam', link: '/docs/take-exam' },
             { text: 'Review exam submissions', link: '/docs/results' },
           ],
