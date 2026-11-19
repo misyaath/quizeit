@@ -1,6 +1,6 @@
 # Author question sets
 
-[questions/categories.json](../questions/categories.json) lists the main categories (`providers`) and their subcategories (`exams`). Add a provider or exam there using lowercase IDs with optional hyphens, then place set files under `questions/<provider-id>/<exam-id>/`. For example, use `questions/azure/ai-200/my-set.json`. Refresh the page after editing. The local server reads the catalog at runtime.
+[questions/categories.json](../questions/categories.json) lists the main categories (`providers`) and their subcategories (`exams`). Add a provider or exam there using lowercase IDs with optional hyphens, then place set files under `questions/<provider-id>/<exam-id>/`. For example, use `questions/azure/ai-200/my-set.json`. Run `npm run mongo:migrate -- --questions` after editing, then refresh the page. The import adds or updates the files you provide and keeps the other sets already in MongoDB.
 
 The Practice exams and Question bank pages both offer Provider and Exam filters. Azure includes the existing AI-200 bank. AWS Solutions Architect Associate, Google Associate Cloud Engineer, and Other topics are available as destinations for your own or generated sets.
 

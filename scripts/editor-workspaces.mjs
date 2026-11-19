@@ -1,11 +1,11 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { constants } from 'node:fs'
-import { mkdir, mkdtemp, open, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, open, readdir, rename, rm, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
-import { parseEnv } from 'node:util'
 import { codingLanguages, maxCodeLength, projectFiles } from '../src/coding.js'
 import { ApiError } from './openai.mjs'
+import { readEnvFile } from './env-file.mjs'
 
 export const editorCounters = ['editEvents', 'singleCharacterEdits', 'insertedCharacters', 'deletedCharacters', 'saves', 'activeMs']
 const directoryFlags = constants.O_DIRECTORY | constants.O_NOFOLLOW
@@ -65,13 +65,12 @@ export function createEditorWorkspaces(dataDir, root = resolve(dataDir, 'editor/
   const pendingSave = new Map()
 
   async function config() {
-    const contents = await readFile(resolve(dataDir, 'editor.env'), 'utf8').catch(error => {
-      if (error.code === 'ENOENT') throw offline()
-      throw error
-    })
-    const { EDITOR_PASSWORD, EDITOR_PORT = '8180' } = parseEnv(contents)
-    if (!EDITOR_PASSWORD || !/^\d{1,5}$/.test(EDITOR_PORT) || Number(EDITOR_PORT) > 65535) throw offline()
-    return { password: EDITOR_PASSWORD, port: EDITOR_PORT }
+    const legacy = process.env.EDITOR_PASSWORD && process.env.EDITOR_PORT
+      ? {} : await readEnvFile(resolve(dataDir, 'editor.env'))
+    const password = process.env.EDITOR_PASSWORD || legacy.EDITOR_PASSWORD
+    const port = process.env.EDITOR_PORT || legacy.EDITOR_PORT || '8180'
+    if (!password || !/^\d{1,5}$/.test(port) || Number(port) < 1 || Number(port) > 65535) throw offline()
+    return { password, port }
   }
 
   async function connect(hostname) {

@@ -5,6 +5,9 @@ const pages = {
   generate: '/generate',
   settings: '/settings',
   history: '/attempts',
+  authoring: '/question-sets',
+  login: '/login',
+  signup: '/signup',
 }
 
 const setSegment = '[a-z0-9]+(?:-[a-z0-9]+)*'

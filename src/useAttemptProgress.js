@@ -41,8 +41,8 @@ export function useAttemptProgress() {
       // A newer draft already queued for this set supersedes this write.
       if (progressRef.current.attempts[setId] !== draft) return
       try {
-        const timing = await localApi('progress', 'POST', { action: 'draft', setId, draft })
-        setTimings(previous => previous[draft.draftId] ? previous : { ...previous, [draft.draftId]: timing })
+        const timing = await localApi('progress', 'POST', { action: 'draft', setId, draft, includeSet: !draft.practiceSet && !timings[draft.draftId]?.practiceSet })
+        setTimings(previous => ({ ...previous, [draft.draftId]: { ...previous[draft.draftId], ...timing } }))
         setSaveError('')
       } catch (error) {
         setSaveError('Draft could not be saved. ' + error.message)

@@ -477,3 +477,32 @@ input[type="search"], .typed, select { background: #fff; color: #17243a; border:
   .generator-toolbar { flex-wrap: wrap; }
   .generator-submit-actions { margin-left: auto; }
 }
+
+.account-page { min-height: 100vh; display: grid; place-items: center; padding: 1rem; }
+.account-panel { display: grid; gap: 1rem; width: min(100%, 440px); padding: clamp(1.2rem, 5vw, 2rem); border: 1px solid var(--line); border-radius: 18px; background: white; }
+.account-panel h1 { font-size: clamp(1.6rem, 5vw, 2.15rem); }
+.account-brand { display: flex; align-items: center; gap: .65rem; font-weight: 800; }
+.account-brand .brand-icon { color: white; }
+.account-form, .account-form label, .editor-field { display: grid; gap: .4rem; }
+.account-form { gap: .85rem; }
+.account-names, .author-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .65rem; }
+.account-form label, .editor-field { font-size: .88rem; font-weight: 650; }
+.account-form input, .editor-field :is(input, select, textarea), .inline-code-editor textarea { width: 100%; min-width: 0; min-height: 40px; border: 1px solid var(--line); background: white; color: inherit; border-radius: 8px; padding: .48rem .65rem; font: inherit; }
+.account-panel > .text-button { justify-self: start; }
+.account-name { overflow-wrap: anywhere; }
+.sidebar { overflow: auto; }
+.author-form, .author-form fieldset, .question-author-fields, .editor-rows, .editor-row { display: grid; gap: .9rem; }
+.author-form fieldset { min-width: 0; border: 1px solid var(--line); border-radius: 10px; padding: 1rem; }
+.author-form legend { font-weight: 750; padding: 0 .35rem; }
+.editor-field textarea { min-height: 84px; resize: vertical; }
+.editor-row { align-items: start; background: #f5f8fc; border-radius: 8px; padding: .75rem; }
+.editor-rows > button { justify-self: start; }
+.author-question-bar { display: flex; align-items: end; gap: .65rem; flex-wrap: wrap; }
+.author-question-bar label { flex: 1 1 240px; min-width: 0; }
+.question-author-fields details { display: grid; border: 1px solid var(--line); border-radius: 8px; padding: .75rem; }
+.question-author-fields details > :not(summary) { margin-top: .65rem; }
+.practice-clock { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; margin-top: .4rem; }
+.practice-clock p { margin: 0; }
+.inline-code-editor { display: grid; gap: .6rem; padding: .65rem; height: 100%; overflow: auto; background: #f5f8fc; }
+.inline-code-editor label { display: grid; font-weight: 650; gap: .3rem; }
+.inline-code-editor textarea { min-height: 160px; resize: vertical; font-family: ui-monospace, monospace; font-weight: 400; }

@@ -6,7 +6,7 @@
 - Use Previous, Next, or the question navigator to move around. Flag questions for review and submit when ready.
 - Review the raw practice score, domain breakdown, and explanations after submission. Multi-part questions require a complete correct answer for credit.
 - Open the Question bank to browse the full question and answer collection by domain and response format.
-- Draft progress and every submitted attempt are saved in `local-data/attempts.json` on the computer running the app. Open Attempt history and expand a practice set to review its submissions, scores, and pass or fail counts. The practice pass mark is 70% correct.
+- Draft progress and every submitted attempt are saved in MongoDB. Open Attempt history and expand a practice set to review its submissions, scores, and pass or fail counts. The practice pass mark is 70% correct.
 - The home page opens **Dashboard** for score trends, question accuracy, pass rate, recorded practice time, topics to review, and coding activity by language. Open **Practice exams** to browse and start sets.
 
 The practice formats are single choice, multiple select, drag-and-drop matching with keyboard-accessible dropdowns, build lists, and short typed answers. Each case-study level starts with a shared scenario and five questions based on it. Code exhibits include AKS YAML, Python Azure SDK and Functions snippets, SQL, KQL, and configurations. Microsoft’s sandbox shows formats that may appear. The practice levels also include typed recall drills.
@@ -17,11 +17,13 @@ Open **Coding labs → AI-200 coding lab · Vector search** from Practice exams.
 
 See [coding lab setup](../README.md#optional-coding-labs).
 
-**Run examples** saves any pending edits, then checks visible tests in Judge0. **Custom input** runs with your own standard input. **Submit set** saves pending edits and grades the selected solution against all tests. Each language has a separate workspace for each question and attempt. Grading reads the entry file and helper files declared by the question. The submitted source, custom input and output, grades, and run history are saved in `local-data/attempts.json`.
+**Run examples** saves any pending edits, then checks visible tests in Judge0. **Custom input** runs with your own standard input. **Submit set** saves pending edits and grades the selected solution against all tests. Each language has a separate workspace for each question and attempt. Grading reads the entry file and helper files declared by the question. The submitted source, custom input and output, grades, and run history are saved in MongoDB.
 
 ### Activity and limits
 
-Open **Settings → Judge0 execution limits and exam timer** to set CPU time, wall-clock time, and memory. Set-specific overrides take precedence over language overrides. Judge0’s configured maximums cap the applied values. Set an optional countdown in minutes for new attempts.
+Use **Manage question sets** to set CPU time, wall-clock time, memory, the total set budget, and the default time per question. A question can override its own time budget and, for coding questions, each execution limit. The owner can manage shared defaults and language overrides in **Settings**. Judge0 applies its configured maximums to code runs.
+
+The set and question timers count visible practice time. Use **Pause timer** to pause until you explicitly resume. Opening the same attempt again restores saved time and the pause state. Reaching a time budget shows a warning and keeps submission available.
 
 Open a saved attempt to see elapsed time, time with each question visible, editing activity, saves, example and custom runs, and submission requests. The **Activity by programming language** table groups editing and runs by language. Each question identifies the language submitted for grading. Start and finish timestamps, counts, and resource usage are available under **Run history**. Editing stats count edit events, single-character edits, characters inserted or deleted, and focused editing time with a 30-second idle cutoff.
 
@@ -39,7 +41,7 @@ Select **Coding** to generate programming exercises. Name a language in the prom
 
 Use **Attach files** to add up to three study files totaling 10 MiB. The quiz sends them with the prompt, or uses them on their own if the prompt is empty. With the ChatGPT connection, the quiz sends text extracted from PDFs and UTF-8 text files, up to 60,000 characters total. With OpenAI Platform enabled, it sends the files directly as Responses API inputs and also accepts Word, PowerPoint, and Excel files. The saved set records the attachment names.
 
-ChatGPT matches the subject to the existing provider and exam catalog. When a match is missing, it proposes a relevant provider or exam. After the full set passes validation, the app adds any missing category to `questions/categories.json` and saves the set in the corresponding folder.
+ChatGPT matches the subject to the existing provider and exam catalog. When a match is missing, it proposes a relevant provider or exam. After the full set passes validation, the app saves the set and any new categories together in MongoDB.
 
 The model can choose whether to search the web or look up question prompts in the local bank. Web search has no domain allowlist and depends on ChatGPT model and account support. The activity panel shows live model and tool stages, plus local validation and saving. Only one set generates at a time. Use **Cancel generation** to stop the active request. Reloading or closing the tab that submitted it also cancels generation before saving starts. When web sources are returned, the quiz shows them in the generation result and saves them in the set JSON.
 
@@ -49,15 +51,15 @@ Every successful run writes a separate `generated-<id>.json` file in the matched
 
 1. Open the quiz on `http://127.0.0.1:5173/` and go to **Settings**.
 2. Choose **Continue with ChatGPT**, sign in at OpenAI, and approve ChatGPT plan usage. OpenAI redirects you to quiz settings.
-3. In **Review answers**, expand a question and choose **Explain with ChatGPT**. The server uses an eligible model from your ChatGPT account's model catalog. The explanation appears in the quiz and is saved with the attempt. From **Question bank**, expand any question and choose **Explain with ChatGPT** to generate a study explanation without submitting a set. Both kinds of AI explanations can use web search and read-only question lookup. Their activity panel shows live progress, and linked sources appear when returned. Use **Refresh explanation** to regenerate a cached answer. Bank explanations are cached in `local-data/bank-explanations.json`.
+3. In **Review answers**, expand a question and choose **Explain with ChatGPT**. The server uses an eligible model from your ChatGPT account's model catalog. The explanation appears in the quiz and is saved with the attempt. From **Question bank**, expand any question and choose **Explain with ChatGPT** to generate a study explanation without submitting a set. Both kinds of AI explanations can use web search and read-only question lookup. Their activity panel shows live progress, and linked sources appear when returned. Use **Refresh explanation** to regenerate a cached answer. Bank explanations are cached in MongoDB.
 
-The connection requires an eligible ChatGPT plan, such as Plus or Pro. Review access and usage in [ChatGPT Settings](https://chatgpt.com/settings/usage). The local server stores OAuth credentials in the private, git-ignored `local-data/chatgpt-auth.json`. Use **Disconnect** to sign out. Any existing `local-data/openai.json` from the API-key version is no longer read.
+The connection requires an eligible ChatGPT plan, such as Plus or Pro. Review access and usage in [ChatGPT Settings](https://chatgpt.com/settings/usage). The local server stores OAuth credentials in MongoDB. Use **Disconnect** to sign out. Any existing `local-data/openai.json` from the API-key version is no longer read.
 
-**Settings → Import previous browser attempts** copies results and drafts from the older browser-storage version. Daily use reads and writes only `local-data/attempts.json`.
+The owner can use **Settings → Import previous browser attempts** to copy results and drafts from the older browser-storage version into MongoDB.
 
 ## Use OpenAI hosted tools
 
-In **Settings → OpenAI hosted tools**, enter an OpenAI Platform API key and choose **Connect and enable hosted tools**. This switches new question generation and AI explanations to GPT-6.2 Astra on your Platform account. Platform usage, Code Interpreter, and File Search storage can incur API charges. The key is kept in a private, git-ignored `local-data/openai-platform.json` file.
+In **Settings → OpenAI hosted tools**, enter an OpenAI Platform API key and choose **Connect and enable hosted tools**. This switches new question generation and AI explanations to GPT-6.2 Astra on your Platform account. Platform usage, Code Interpreter, and File Search storage can incur API charges. The key is stored in MongoDB.
 
 Upload a study file under **Study files** and wait for **Ready**. The app uses the project's vector store for hosted File Search and displays any document names cited by OpenAI. Code Interpreter can run Python in OpenAI's sandbox. Hosted tool search can discover the deferred quiz-bank lookup. The model decides when to use these tools.
 

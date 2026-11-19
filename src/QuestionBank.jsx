@@ -3,6 +3,7 @@ import { domains, generalDomain, formats } from './questions/index.js'
 import CategoryFields, { matchesCategory } from './CategoryFields.jsx'
 import { CaseDetails, Exhibits, formatLabel } from './QuestionDetails.jsx'
 import { AnswerKey } from './AnswerReview.jsx'
+import { localApi } from './local-api.js'
 import ExplainWithChatGPT from './ExplainWithChatGPT.jsx'
 
 export default function QuestionBank({ catalog, goSettings }) {
@@ -15,7 +16,7 @@ export default function QuestionBank({ catalog, goSettings }) {
   const [format, setFormat] = useState('all')
   const [setId, setSetId] = useState('all')
   const [limit, setLimit] = useState(40)
-  const pool = setId === 'all' ? allQuestions : sets.find(set => set.id === setId).questions
+  const pool = setId === 'all' ? allQuestions : sets.find(set => set.id === setId)?.questions ?? []
   const matches = pool.filter(question => (domainId === 'all' || question.domain.id === domainId)
     && (format === 'all' || question.type === format)
     && [question.prompt, question.caseStudy?.title].some(value => value?.toLowerCase().includes(search.trim().toLowerCase())))
@@ -38,19 +39,36 @@ export default function QuestionBank({ catalog, goSettings }) {
     </select></div>
     <p className="muted" role="status">{matches.length} {matches.length === 1 ? 'question' : 'questions'}</p>
     <div className="review-list">
-      {matches.slice(0, limit).map(question => <details className="review-card bank-card" key={question.id}>
+      {matches.slice(0, limit).map(question => <BankQuestion question={question} key={question.id} goSettings={goSettings} />)}
+      {!matches.length && <p className="notice">No questions match your search and filters.</p>}
+      {limit < matches.length && <button className="button secondary" onClick={() => setLimit(limit + 40)}>Show more questions</button>}
+    </div>
+  </>
+}
+
+function BankQuestion({ question, goSettings }) {
+  const [answer, setAnswer] = useState(null)
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  async function reveal() {
+    setLoading(true)
+    setError('')
+    try { setAnswer(await localApi('bank/' + question.id + '/answer')) }
+    catch (failure) { setError(failure.message) }
+    finally { setLoading(false) }
+  }
+
+  return <details className="review-card bank-card" key={question.id}>
         <summary><span>{question.prompt}<small>{formatLabel(question)} · {question.domain.name}</small></span></summary>
         <div className="review-body">
           <CaseDetails study={question.caseStudy} />
           <Exhibits items={question.exhibits} />
           {question.type === 'match' && <><h4>Items to match</h4><ul>{question.labels.map(label => <li key={label}>{label}</li>)}</ul></>}
           {question.options && <><h4>{question.type === 'order' ? 'Available steps' : 'Options'}</h4><ul>{question.options.map(option => <li key={option}>{option}</li>)}</ul></>}
-          <AnswerKey question={question} />
-          <ExplainWithChatGPT question={question} goSettings={goSettings} />
+          {error && <p className="notice" role="alert">{error}</p>}
+          {answer ? <><AnswerKey question={answer} /><ExplainWithChatGPT question={answer} goSettings={goSettings} /></>
+            : <button className="button secondary" disabled={loading} onClick={reveal}>{loading ? 'Loading answer…' : 'Reveal answer'}</button>}
         </div>
-      </details>)}
-      {!matches.length && <p className="notice">No questions match your search and filters.</p>}
-      {limit < matches.length && <button className="button secondary" onClick={() => setLimit(limit + 40)}>Show more questions</button>}
-    </div>
-  </>
+  </details>
 }

@@ -24,11 +24,13 @@ export default function PracticeSets({ catalog, attempts, history, openSet, goGe
     const result = attempt?.submitted && history.find(entry => entry.id === attempt.resultId)
     const status = result ? `${result.correct}/${result.total} correct · ${result.passed ? 'Passed' : 'Failed'}`
       : attempt ? `${answered}/${set.questions.length} answered` : `${set.questions.length} questions`
+    const category = catalog.categories.find(item => item.id === set.providerId)
+    const subcategory = category?.exams.find(item => item.id === set.examId)
     return <article className="set-card" key={set.id}>
       {set.difficulty
         ? <span className="format">Difficulty {set.difficulty}/10</span>
         : <div className={'set-icon ' + (set.id === 'bonus' ? 'bonus-icon' : '')} aria-hidden="true">{set.id === 'bonus' ? '✦' : '☷'}</div>}
-      <div><h3>{set.difficulty ? set.title.replace(/^Level \d+ · /, '') : set.title}</h3><p>{status}</p></div>
+      <div><h3>{set.difficulty ? set.title.replace(/^Level \d+ · /, '') : set.title}</h3><p>{[set.categoryName ?? category?.name, set.subcategoryName ?? subcategory?.name].filter(Boolean).join(' · ')}</p><p>{status}</p></div>
       <button className="button small secondary" onClick={() => openSet(set.id)} aria-label={`${attempt?.submitted ? 'View results for' : attempt ? 'Resume' : 'Start'} ${set.title}`}>
         {attempt?.submitted ? 'Results' : attempt ? 'Resume' : 'Start'} <span aria-hidden="true">→</span>
       </button>
@@ -41,7 +43,7 @@ export default function PracticeSets({ catalog, attempts, history, openSet, goGe
       <div className="hero-art" aria-hidden="true"><i /><i /><i /><i /><b /><b /><b /></div>
       <div className="hero-content">
         <h1>Cloud certification practice</h1>
-        <p>Practice by provider and exam, or generate a question set for your own topic.</p>
+        <p>Filter practice sets by category and subcategory, or generate a question set for your own topic.</p>
         <button className="button primary" onClick={() => next ? openSet(next.id) : goGenerate()}>
           {!next ? 'Generate questions' : completed === sets.length ? 'View practice results' : attempts[next.id] ? 'Resume practice' : 'Start practice'} <span aria-hidden="true">→</span>
         </button>
@@ -60,7 +62,7 @@ export default function PracticeSets({ catalog, attempts, history, openSet, goGe
       {generated.length > 0 && <><h3 className="set-group-heading">Generated sets</h3><div className="set-grid">{generated.map(renderSet)}</div></>}
       {levels.length > 0 && <><h3 className="set-group-heading">Case-study levels</h3><div className="set-grid">{levels.map(renderSet)}</div></>}
       {other.length > 0 && <><h3 className="set-group-heading">Practice sets</h3><div className="set-grid">{other.map(renderSet)}</div></>}
-      {!sets.length && <p className="notice">No question sets match this provider and exam.</p>}
+      {!sets.length && <p className="notice">No question sets match these filters.</p>}
     </section>
     {(!providerId || providerId === 'azure') && <section className="dashboard-section blueprint" aria-labelledby="expect-heading">
       <div>

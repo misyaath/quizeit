@@ -1,14 +1,12 @@
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
-import { resolve } from 'node:path'
 import { createLocalJWKSet, jwtVerify } from 'jose'
-import { jsonFile } from './local-store.mjs'
 import { ApiError } from './openai.mjs'
 
 const issuer = 'https://auth.openai.com'
 const resource = 'https://api.openai.com/v1'
 const permission = 'chatgpt.tokens.use.direct'
 const scopes = 'openid profile email offline_access resource.invoke ' + permission
-const callbackPath = '/auth/chatgpt/callback'
+export const callbackPath = '/auth/chatgpt/callback'
 const cookieName = 'study_lab_chatgpt'
 const lifetime = 10 * 60 * 1000
 const random = () => randomBytes(32).toString('base64url')
@@ -21,8 +19,7 @@ function sameSecret(expected, actual) {
     && Buffer.byteLength(actual) === expected.length && timingSafeEqual(Buffer.from(expected), Buffer.from(actual))
 }
 
-export function createChatGPTAuth(dataDir, fetchResponse) {
-  const file = jsonFile(resolve(dataDir, 'chatgpt-auth.json'), () => ({ hostId: null, account: null }))
+export function createChatGPTAuth(store, fetchResponse) {
   let pending
   let refreshing
   let revision = 0
@@ -44,8 +41,8 @@ export function createChatGPTAuth(dataDir, fetchResponse) {
   }
 
   async function begin(port, useDifferentAccount) {
-    let saved = await file.read()
-    if (!saved.hostId) saved = await file.update(current => ({ ...current, hostId: current.hostId ?? 'urn:uuid:' + randomUUID() }))
+    let saved = await store.read()
+    if (!saved.hostId) saved = await store.update(current => ({ ...current, hostId: current.hostId ?? 'urn:uuid:' + randomUUID() }))
     const account = useDifferentAccount ? null : saved.account
     const state = random()
     const browser = random()
@@ -127,7 +124,7 @@ export function createChatGPTAuth(dataDir, fetchResponse) {
       }
       const allowed = hasPermission(tokens.scope)
       const account = allowed ? { ...identity, ...credentials(tokens) } : { ...identity, needsPermission: true }
-      const saved = await file.update(current => {
+      const saved = await store.update(current => {
         if (revision !== transaction.revision) return current
         if (!allowed && current.account?.accessToken) return current
         return { ...current, account }
@@ -140,11 +137,11 @@ export function createChatGPTAuth(dataDir, fetchResponse) {
   }
 
   async function accessToken(rejectedToken) {
-    const { account } = await file.read()
+    const { account } = await store.read()
     if (!account?.refreshToken || !hasPermission(account.scope)) throw expired()
     if (account.accessToken !== rejectedToken && account.expiresAt > Date.now() + 30_000) return account.accessToken
     if (!refreshing) {
-      refreshing = file.update(async current => {
+      refreshing = store.update(async current => {
         const existing = current.account
         if (!existing?.refreshToken) throw expired()
         if (existing.accessToken !== rejectedToken && existing.expiresAt > Date.now() + 30_000) return current
@@ -169,7 +166,7 @@ export function createChatGPTAuth(dataDir, fetchResponse) {
     revision++
     pending = undefined
     let revoked = true
-    const saved = await file.update(async current => {
+    const saved = await store.update(async current => {
       const account = current.account
       if (!account) return current
       try {
@@ -194,8 +191,7 @@ export function createChatGPTAuth(dataDir, fetchResponse) {
 
   return {
     begin, callback, accessToken, disconnect,
-    status: async () => status(await file.read()),
-    callbackPath,
+    status: async () => status(await store.read()),
     clearCookie: `${cookieName}=; Path=${callbackPath}; HttpOnly; SameSite=Lax; Max-Age=0`,
   }
 }

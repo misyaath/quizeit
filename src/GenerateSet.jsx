@@ -224,7 +224,6 @@ export default function GenerateSet({ active, savedSets, onGenerated, refreshCat
       <h2 id="generated-set" ref={resultHeading} tabIndex={-1}>{result.set.title}</h2>
       <p>{result.set.questions.length} questions · Model{result.models.length === 1 ? '' : 's'} {result.models.join(', ')}</p>
       <p>{result.category.providerName} → {result.category.examName}</p>
-      <p>Saved as a new file at <code>{result.filename}</code></p>
       {result.set.attachmentNames?.length > 0 && <p>Attachments: {result.set.attachmentNames.join(', ')}</p>}
       {result.set.studyFiles?.length > 0 && <p>Study files cited: {result.set.studyFiles.join(', ')}</p>}
       {result.set.sources?.length > 0 && <details>

@@ -3,4 +3,6 @@ dist/
 .venv/
 local-data/
 .env
+.env.*
+!.env.example
 .idea/

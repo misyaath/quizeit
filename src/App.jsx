@@ -13,8 +13,9 @@ import PracticeSets from './PracticeSets.jsx'
 import Exam from './Exam.jsx'
 import Results from './Results.jsx'
 import QuestionBank from './QuestionBank.jsx'
+import QuestionSetEditor from './QuestionSetEditor.jsx'
 
-export default function App() {
+export default function App({ user, onLogout, accountBusy, googleEnabled, connectGoogle, accountError }) {
   const [route, setRoute] = useState(() => readRoute(window.location))
   const { screen, setId, historyId, questionId } = route
   const [signInOutcome, setSignInOutcome] = useState(() => new URLSearchParams(window.location.search).get('chatgpt'))
@@ -69,8 +70,9 @@ export default function App() {
     }
   }
 
-  const set = sets.find(item => item.id === setId)
+  const currentSet = sets.find(item => item.id === setId)
   const attempt = attempts[setId] ?? newAttempt()
+  const set = (!attempt.submitted && (attempt.practiceSet || timings[attempt.draftId]?.practiceSet)) || currentSet
   const requestedIndex = questionId && set?.questions.findIndex(item => item.id === questionId)
   const position = requestedIndex >= 0 ? requestedIndex : Math.min(attempt.index, (set?.questions.length ?? 1) - 1)
   const activeQuestion = set?.questions[position]
@@ -122,10 +124,13 @@ export default function App() {
         <button disabled={busy} className={screen === 'home' || screen === 'exam' ? 'nav-active' : ''} aria-current={screen === 'home' ? 'page' : undefined} onClick={() => navigate('home')}><span aria-hidden="true">▦</span> Practice exams</button>
         <button disabled={busy} className={screen === 'bank' ? 'nav-active' : ''} aria-current={screen === 'bank' ? 'page' : undefined} onClick={() => navigate('bank')}><span aria-hidden="true">☷</span> Question bank</button>
         <button disabled={busy} className={screen.startsWith('history') ? 'nav-active' : ''} aria-current={screen === 'history' ? 'page' : undefined} onClick={() => navigate('history')}><span aria-hidden="true">◷</span> Attempt history</button>
+        <button disabled={busy} className={screen === 'authoring' ? 'nav-active' : ''} aria-current={screen === 'authoring' ? 'page' : undefined} onClick={() => navigate('authoring')}><span aria-hidden="true">✎</span> Manage question sets</button>
         <button disabled={busy} className={screen === 'generate' ? 'nav-active' : ''} aria-current={screen === 'generate' ? 'page' : undefined} onClick={() => navigate('generate')}><span aria-hidden="true">✦</span> Generate questions</button>
         <button disabled={busy} className={screen === 'settings' ? 'nav-active' : ''} aria-current={screen === 'settings' ? 'page' : undefined} onClick={() => navigate('settings')}><span aria-hidden="true">⚙</span> Settings</button>
       </nav>
       <div className="sidebar-links">
+        <span className="account-name">{user.firstName} {user.lastName}</span>
+        <button className="button small secondary" disabled={busy || accountBusy} onClick={onLogout}>Sign out</button>
         <a href={studyGuide} target="_blank" rel="noreferrer">Microsoft study guide ↗</a>
         <a href={examExperience} target="_blank" rel="noreferrer">Official exam sandbox ↗</a>
       </div>
@@ -134,11 +139,18 @@ export default function App() {
     <main id="main" tabIndex={-1} ref={mainRef} className={screen === 'generate' ? 'workspace generator-workspace'
       : screen === 'exam' && section !== 'result' && activeQuestion?.type === 'coding'
         ? 'workspace coding-workspace' : 'workspace'}>
+      {accountError && <p role="alert" className="notice">{accountError}</p>}
       {saveError && <p role="alert" className="notice">{saveError}</p>}
       {screen === 'settings' && <>
-        <OpenAISettings outcome={signInOutcome} onImport={acceptImportedProgress} />
-        <ExecutionSettings sets={sets} />
+        <section className="question-panel settings-panel">
+          <h2>Account</h2>
+          <p>{user.firstName} {user.lastName} · {user.email}</p>
+          {googleEnabled && (user.googleLinked ? <p>Google is connected.</p> : <button className="button secondary" disabled={accountBusy} onClick={connectGoogle}>Connect Google</button>)}
+        </section>
+        <OpenAISettings outcome={signInOutcome} onImport={user.role === 'admin' ? acceptImportedProgress : undefined} />
+        {user.role === 'admin' && <ExecutionSettings sets={sets.filter(set => !set.private)} />}
       </>}
+      {screen === 'authoring' && <QuestionSetEditor user={user} onSaved={loadCatalog} />}
       {!catalog && needsCatalog && (catalogError
         ? <div className="notice" role="alert">{catalogError} <button className="button secondary" onClick={loadCatalog}>Retry loading question sets</button></div>
         : <p role="status">Loading question sets…</p>)}
@@ -149,7 +161,10 @@ export default function App() {
       {!ready && needsProgress && (loadError
         ? <div className="notice" role="alert">{loadError} <button className="button secondary" onClick={loadProgress}>Retry loading attempts</button></div>
         : <p role="status">Loading saved attempts…</p>)}
-      {ready && catalog && screen === 'home' && <PracticeSets catalog={catalog} goGenerate={() => navigate('generate')} attempts={attempts} history={history} openSet={openSet} />}
+      {ready && catalog && screen === 'home' && <PracticeSets catalog={{
+        ...catalog, sets: [...catalog.sets, ...Object.values(attempts).filter(item => !item.submitted
+          && item.practiceSet && !catalog.sets.some(set => set.id === item.practiceSet.id)).map(item => item.practiceSet)],
+      }} goGenerate={() => navigate('generate')} attempts={attempts} history={history} openSet={openSet} />}
       {ready && catalog && screen === 'dashboard' && <StudyDashboard catalog={catalog} history={history} snapshots={snapshots}
         openAttempt={openAttempt} openHistory={() => navigate('history')} openPractice={() => navigate('home')} />}
       {ready && <div hidden={screen !== 'history'}><AttemptHistory history={history}
@@ -158,8 +173,9 @@ export default function App() {
       {screen === 'exam' && ready && section === 'result' && resultSet && <Results key={result.id} set={resultSet} attempt={result}
         onExplain={keepExplanation} goSettings={() => navigate('settings')} restart={set ? () => finish('restart') : undefined}
         busy={busy} backLabel="Practice exams" goBack={() => navigate('home')} />}
-      {screen === 'exam' && ready && section === 'questions' && set && <Exam key={set.id} set={set} attempt={attempt} position={position}
-        timing={attempt.activity ?? timings[attempt.draftId]}
+      {screen === 'exam' && ready && section === 'questions' && set && <Exam key={set.id} set={set} attempt={attempt} position={position} useVsCode={user.role === 'admin'}
+        timing={timings[attempt.draftId] ?? attempt.activity}
+        pinned={Boolean(attempt.practiceSet || timings[attempt.draftId]?.practiceSet)}
         update={update => updateAttempt(setId, update, position)} openQuestion={openQuestion} goHome={() => navigate('home')} busy={busy} submit={() => finish('submit')} />}
       {((screen === 'exam' && ready && (section === 'result' ? !resultSet : catalog && !set))
         || (screen === 'history-result' && ready && !resultSet) || screen === 'not-found') &&

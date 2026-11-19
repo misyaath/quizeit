@@ -9,7 +9,7 @@ const decode = value => typeof value === 'string' ? Buffer.from(value, 'base64')
 const normalize = value => value.replace(/\r\n/g, '\n').trimEnd()
 
 export function createJudge0({
-  url = process.env.JUDGE0_URL || 'http://127.0.0.1:2358',
+  url = process.env.JUDGE0_URL || 'http://127.0.0.1:' + (process.env.JUDGE0_PORT || '2358'),
   token = process.env.JUDGE0_TOKEN,
   fetchJudge = fetch,
 } = {}) {

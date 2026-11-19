@@ -87,3 +87,30 @@ export function publicCodingSet(set) {
       : question),
   }
 }
+
+export function practiceSet(set) {
+  return {
+    ...set,
+    questions: publicCodingSet(set).questions.map(({ answer, explanation, ...question }) => ({
+      ...question,
+      ...(question.type === 'multi' && { answerCount: answer?.length ?? question.answerCount }),
+      ...(['match', 'order'].includes(question.type) && { options: [...question.options].sort() }),
+      ...(question.type === 'coding' && {
+        languages: question.languages.map(({ id, starter, files }) => ({
+          id, starter, ...(files && { files: files.map(({ path, starter }) => ({ path, starter })) }),
+        })),
+      }),
+    })),
+  }
+}
+
+export function practiceProgress(progress) {
+  const attempts = Object.fromEntries(Object.entries(progress.attempts).map(([setId, { setSnapshot, ...attempt }]) => {
+    const { clock, ...activity } = attempt.activity ?? {}
+    return [setId, {
+      ...attempt, ...(attempt.activity && { activity }),
+      ...(!attempt.submitted && setSnapshot && { practiceSet: practiceSet(setSnapshot) }),
+    }]
+  }))
+  return { ...progress, attempts }
+}

@@ -1,5 +1,5 @@
-import { createHash, randomUUID } from 'node:crypto'
-import { mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
+import { createHash } from 'node:crypto'
+import { readdir, readFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { loadQuestionSets } from '../src/questions/load.js'
 
@@ -50,11 +50,25 @@ async function readCategories(folder) {
   return categories
 }
 
-export async function readCatalog(folder = questionFolder) {
+export async function readCatalogSource(folder = questionFolder) {
   const categories = await readCategories(folder)
   const documents = await directories(categories, folder)
-  const sets = loadQuestionSets(documents)
+  return { categories, documents }
+}
+
+export function loadCatalogSource({ categories, documents }) {
+  const pairs = new Map(categories.flatMap(({ id, name, exams }) => exams.map(exam => [
+    id + '/' + exam.id, { categoryName: name, subcategoryName: exam.name },
+  ])).map(([key, labels], index) => [key, { index, labels }]))
+  const pairFor = ({ providerId, examId }) => pairs.get(providerId + '/' + examId)
+  const categoryOrder = set => pairFor(set)?.index ?? Infinity
+  const sets = loadQuestionSets(documents.slice().sort((a, b) => categoryOrder(a) - categoryOrder(b)
+    || (a.file < b.file ? -1 : Number(a.file > b.file)))).map(set => ({ ...set, ...pairFor(set)?.labels }))
   return { categories, sets }
+}
+
+export async function readCatalog(folder = questionFolder) {
+  return loadCatalogSource(await readCatalogSource(folder))
 }
 
 function displayName(value) {
@@ -95,35 +109,4 @@ export function resolveCategory(categories, proposal) {
     category: { providerId: provider.id, examId: exam.id, providerName: provider.name, examName: exam.name },
     categories: updatedCategories,
   }
-}
-
-async function writeJson(file, value) {
-  const temporary = file + '.' + randomUUID() + '.tmp'
-  try {
-    await writeFile(temporary, JSON.stringify(value, null, 2) + '\n', { flag: 'wx' })
-    await rename(temporary, file)
-  } finally {
-    await rm(temporary, { force: true })
-  }
-}
-
-export async function saveQuestionSet(folder, proposal, document) {
-  const current = await readCategories(folder)
-  const destination = resolveCategory(current, proposal)
-  if (!destination) throw new Error('The generated category no longer resolves.')
-  const { category, categories } = destination
-  const { providerId, examId } = category
-  const directory = join(folder, providerId, examId)
-  await mkdir(directory, { recursive: true })
-  const file = join(directory, document.id + '.json')
-  await writeJson(file, document)
-  if (categories !== current) {
-    try {
-      await writeJson(join(folder, 'categories.json'), categories)
-    } catch (error) {
-      await rm(file, { force: true })
-      throw error
-    }
-  }
-  return destination
 }

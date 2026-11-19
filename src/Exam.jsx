@@ -6,7 +6,7 @@ import { ExamClock, useQuestionTime } from './AttemptActivity.jsx'
 import { CaseDetails, Exhibits, formatLabel } from './QuestionDetails.jsx'
 import QuestionInput, { instructionFor } from './QuestionInput.jsx'
 
-export default function Exam({ set, attempt, position, timing, update, openQuestion, goHome, submit, busy }) {
+export default function Exam({ set, attempt, position, timing, update, openQuestion, goHome, submit, busy, useVsCode, pinned }) {
   const [confirming, setConfirming] = useState(false)
   const [submitError, setSubmitError] = useState('')
   const [questionCollapsed, setQuestionCollapsed] = useState(false)
@@ -23,14 +23,14 @@ export default function Exam({ set, attempt, position, timing, update, openQuest
   const heading = useRef(null)
   const dialog = useRef(null)
   const startingDraft = useRef(false)
-  const checkpoint = useQuestionTime(set.id, question.id, attempt.draftId)
+  const clock = useQuestionTime(set.id, question.id, attempt.draftId, timing, pinned)
 
   useEffect(() => {
-    if (!timing && !startingDraft.current) {
+    if (!pinned && !startingDraft.current) {
       startingDraft.current = true
       update(previous => previous)
     }
-  }, [timing, update])
+  }, [pinned, update])
 
   useEffect(() => {
     if (confirming) dialog.current?.showModal()
@@ -50,8 +50,10 @@ export default function Exam({ set, attempt, position, timing, update, openQuest
 
   return <>
     <button className="back-link" onClick={goHome}>← Practice exams</button>
-    <header className="exam-heading"><div><h1>{set.title}</h1><p>{answered} of {total} questions answered</p>
-      <ExamClock timing={timing} /></div>
+    <header className="exam-heading"><div><h1>{set.title}</h1>
+      {set.categoryName && <p>{[set.categoryName, set.subcategoryName].filter(Boolean).join(' · ')}</p>}
+      <p>{answered} of {total} questions answered</p>
+      <ExamClock clock={clock} /></div>
       <button className="button secondary" onClick={() => setConfirming(true)}>Submit set</button>
     </header>
     <progress className="progress" max={total} value={answered} aria-label="Questions answered" />
@@ -87,7 +89,7 @@ export default function Exam({ set, attempt, position, timing, update, openQuest
           value={questionWidth} min={22} max={60} step={3} measure={handle => 100 / handle.parentElement.clientWidth}
           onChange={setQuestionWidth} />}
         <CodingQuestion key={question.id} question={question} setId={set.id} draftId={attempt.draftId}
-          value={value} onChange={setAnswer} disabled={busy} />
+          value={value} onChange={setAnswer} disabled={busy} useVsCode={useVsCode} />
       </>}
       <aside className="navigator" aria-label="Question navigator">
         <h2>Question navigator</h2>
@@ -116,8 +118,10 @@ export default function Exam({ set, attempt, position, timing, update, openQuest
       <div className="dialog-actions">
         <button className="button secondary" disabled={busy} onClick={() => { setConfirming(false); setSubmitError('') }}>Keep practicing</button>
         <button className="button primary" disabled={busy} onClick={async () => {
-          await checkpoint.current()
-          setSubmitError(await submit() ?? '')
+          await clock.stop()
+          const error = await submit()
+          if (error) clock.restart()
+          setSubmitError(error ?? '')
         }}>{busy ? 'Saving attempt…' : 'Submit and see results'}</button>
       </div>
     </dialog>

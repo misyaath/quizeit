@@ -1,6 +1,6 @@
 # Developer guide
 
-Start with the [README](../README.md) to install and run the app. React handles the browser interface, esbuild bundles the client, and a local Node HTTP server serves the application and API.
+Start with the [README](../README.md) to install and run the app. React handles the browser interface, esbuild bundles the client, and one NestJS app serves the bundle and the API.
 
 ## Code map
 
@@ -10,7 +10,7 @@ Start with the [README](../README.md) to install and run the app. React handles 
 | Practice and review | [PracticeSets.jsx](../src/PracticeSets.jsx), [Exam.jsx](../src/Exam.jsx), [Results.jsx](../src/Results.jsx), [AttemptHistory.jsx](../src/AttemptHistory.jsx), and [QuestionBank.jsx](../src/QuestionBank.jsx) each own a screen. |
 | Shared UI | [QuestionInput.jsx](../src/QuestionInput.jsx) renders non-coding inputs. [QuestionDetails.jsx](../src/QuestionDetails.jsx), [AnswerReview.jsx](../src/AnswerReview.jsx), and [ExplainWithChatGPT.jsx](../src/ExplainWithChatGPT.jsx) supply shared question and review components. |
 | Client I/O and progress | [local-api.js](../src/local-api.js) handles JSON and streamed responses. [useAttemptProgress.js](../src/useAttemptProgress.js) owns loading, optimistic draft updates, submission state, and save errors. |
-| Server and HTTP routing | [server.mjs](../scripts/server.mjs) assembles services, checks the local host and origin, and serves built assets. [scripts/routes/](../scripts/routes) registers handlers for practice, coding, generation, and OpenAI. [http.mjs](../scripts/http.mjs) handles request bodies and responses. |
+| Server and HTTP routing | [server.mjs](../scripts/server.mjs) bootstraps NestJS with its Express adapter. [backend-services.module.mjs](../scripts/backend-services.module.mjs) provides services to the practice, coding, and AI modules. The [frontend controller](../scripts/routes/frontend.mjs) serves the React build and deep links. [nest-http.mjs](../scripts/routes/nest-http.mjs) checks the local host and origin and formats errors. |
 | Attempts and scoring | [attempt-service.mjs](../scripts/attempt-service.mjs) coordinates draft updates, grading, and activity. [attempt-draft.mjs](../scripts/attempt-draft.mjs) validates draft data. [attempts.js](../src/attempts.js) records a completed attempt and its question snapshot. |
 | Questions | [question-files.mjs](../scripts/question-files.mjs) reads the catalog. [questions/load.js](../src/questions/load.js) validates and normalizes question sets. [questions/index.js](../src/questions/index.js) defines formats and scoring rules. |
 | Integrations | [editor-workspaces.mjs](../scripts/editor-workspaces.mjs) manages files for code-server. [judge0.mjs](../scripts/judge0.mjs) adapts the execution API. [ai-service.mjs](../scripts/ai-service.mjs) handles provider selection and explanation caching. [generate-set.mjs](../scripts/generate-set.mjs) validates and saves generated sets. |
@@ -21,23 +21,27 @@ Start with the [README](../README.md) to install and run the app. React handles 
 - **Coding.** A workspace is scoped to a set, question, draft, and language. The server uses the editor to read workspace files and the runner to check them. The draft records question time and test runs.
 - **AI.** Explanations for results use the saved snapshot. Bank explanations are cached by a hash of the question content. Generation loads the catalog and prepares attachments before requesting questions. The generation routes own the active job and allow cancellation until saving begins. Streamed requests use NDJSON with progress events followed by a result or error.
 
-[local-store.mjs](../scripts/local-store.mjs) serializes updates per file within the server process and replaces each JSON file through a temporary file and rename. Use one server process per data directory.
+[app-data.mjs](../scripts/app-data.mjs) imports each store when it is missing from MongoDB. [mongo-store.mjs](../scripts/mongo-store.mjs) serializes updates per store within the server process and uses a revision check to publish each replacement atomically. Large values use GridFS. Use one server process per database because generation, sign-in flows, and coding operations keep some session state in memory.
 
 | Location | Contents |
 | --- | --- |
-| `questions/categories.json` and `questions/<provider>/<exam>/` | Category definitions and authored or generated sets |
-| `local-data/attempts.json` | Drafts, submissions, snapshots, and attempt explanations |
-| `local-data/execution-settings.json` | Execution limits and exam timers |
-| `local-data/bank-explanations.json` | Cached question bank explanations |
-| `local-data/chatgpt-auth.json` and `local-data/openai-platform.json` | Credentials and connection settings |
-| `local-data/editor/` and `local-data/judge0.env` | Coding workspaces, editor settings, and Judge0 configuration |
+| MongoDB `app_state.catalog` | Category definitions and question sets seeded from `questions/`, plus newly generated sets |
+| MongoDB `app_state.progress` | Drafts, submissions, snapshots, and attempt explanations |
+| MongoDB `app_state.executionSettings` | Execution limits and exam timers |
+| MongoDB `app_state.bankExplanations` | Cached question bank explanations |
+| MongoDB `app_state.chatgptAuth` and `app_state.platformTools` | Credentials and connection settings |
+| MongoDB `users`, `sessions`, and `google_signin` | Account profiles, hashed session tokens, and short-lived Google sign-in state |
+| `local-data/editor/` | Live coding workspaces and editor settings |
+| `.env` | Application and Docker configuration initialized from `.env.example` and legacy env files |
+
+Learner stores use account-specific document IDs. The designated owner accesses the original practice and AI stores. The catalog records private set ownership and archive state, and drafts keep a set snapshot for grading and review after edits.
 
 ## Where to make changes
 
 - Add practice content using the [question authoring guide](question-authoring.md). Keep set and question IDs stable because saved drafts reference them.
 - For a new question format, update the catalog validator, shared response and scoring rules, exam input, answer review, draft validation, and generation schema together. Use the existing formats as examples.
-- Register a new endpoint with `router.add(method, path, handler)` in the relevant route module. Keep HTTP input and status codes in the route handler and pass domain operations to the relevant service.
-- Supply `dataDir`, `questionsDir`, and `port: 0` to `startServer` for isolated checks. Inject `fetchResponse`, `runCode`, or `editor` to exercise the API with substitutes for external services.
+- Add a controller method in the relevant NestJS module under [scripts/routes/](../scripts/routes) and attach the HTTP method decorator with `bindRoute`. Pass domain operations to the relevant service. Controllers use [http.mjs](../scripts/http.mjs) for request size limits, JSON responses, and NDJSON streaming.
+- Supply a separate `mongoDatabase`, `dataDir`, `questionsDir`, and `port: 0` to `startServer` for isolated checks. Supply `mongoUri` if the test data directory lacks MongoDB connection settings. Inject `fetchResponse`, `runCode`, or `editor` to exercise the API with substitutes for external services.
 
 ## Verify a change
 

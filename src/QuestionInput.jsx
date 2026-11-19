@@ -3,7 +3,7 @@ import { formats } from './questions/index.js'
 
 export function instructionFor(question) {
   return question.type === 'multi'
-    ? `Choose ${question.answer.length} answers.`
+    ? `Choose ${(question.answerCount ?? question.answer?.length)} answers.`
     : formats[question.type].instruction
 }
 
@@ -20,7 +20,7 @@ export default function QuestionInput({ question, value, onChange }) {
       const checked = type === 'single' ? value === option : answerList.includes(option)
       return <label className={'option' + (checked ? ' selected' : '')} key={option}>
         <input type={type === 'single' ? 'radio' : 'checkbox'} name={question.id} checked={checked}
-          disabled={type === 'multi' && !checked && answerList.length >= question.answer.length}
+          disabled={type === 'multi' && !checked && answerList.length >= (question.answerCount ?? question.answer?.length)}
           onChange={() => onChange(type === 'single' ? option : checked ? answerList.filter(answer => answer !== option) : [...answerList, option])} />
         <span className="letter" aria-hidden="true">{String.fromCharCode(65 + index)}</span><span>{option}</span>
       </label>

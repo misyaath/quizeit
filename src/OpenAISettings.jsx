@@ -68,7 +68,7 @@ export default function OpenAISettings({ onImport, outcome }) {
       }
       const progress = await localApi('progress/import', 'POST', recent ?? { attempts: legacy, history: [], snapshots: [] })
       onImport(progress)
-      setImportMessage('Previous attempts imported into the local JSON file.')
+      setImportMessage('Previous attempts imported into your account.')
     } catch (error) {
       setImportMessage(error.message)
     } finally {
@@ -101,13 +101,13 @@ export default function OpenAISettings({ onImport, outcome }) {
       <p><a href="https://chatgpt.com/settings/usage" target="_blank" rel="noreferrer">Manage ChatGPT usage ↗</a></p>
     </section>
     <HostedToolsSettings />
-    <section className="question-panel settings-panel" aria-labelledby="attempt-storage">
+    {onImport && <section className="question-panel settings-panel" aria-labelledby="attempt-storage">
       <h2 id="attempt-storage">Attempt storage</h2>
-      <p>Drafts and results are stored in <code>local-data/attempts.json</code>. If you used the previous version in this browser, you can import that history into the file.</p>
+      <p>Drafts and results are stored in MongoDB. If you used an older version in this browser, you can import that history.</p>
       <div className="ai-actions">
         <button className="button secondary" disabled={importing} onClick={importPrevious}>Import previous browser attempts</button>
         <span role="status">{importMessage}</span>
       </div>
-    </section>
+    </section>}
   </>
 }

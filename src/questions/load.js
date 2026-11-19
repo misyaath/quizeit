@@ -1,6 +1,8 @@
 import { domains, formats, generalDomain } from './index.js'
 import { codingLanguages, maxCodeLength, maxProjectFiles, maxRunOutput, projectLanguages, validProjectPath } from '../coding.js'
 
+import { questionLimitFields, setLimitFields, validLimitOverrides } from '../execution-settings.js'
+
 const validText = value => typeof value === 'string' && value.trim().length > 0
 const validId = value => validText(value) && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value)
   && !Object.hasOwn(Object.prototype, value)
@@ -13,7 +15,7 @@ export function loadQuestionSets(documents) {
   const sets = []
   const setIds = new Set()
   const questionIds = new Set()
-  for (const { file, document, providerId, examId } of documents) {
+  for (const { file, document, providerId, examId, ownerId } of documents) {
     const fail = message => { throw new Error(file + ' — ' + message) }
     if (!document || typeof document !== 'object') fail('Expected a JSON object.')
     const { id, title, questions, difficulty } = document
@@ -29,6 +31,7 @@ export function loadQuestionSets(documents) {
     }) : []
     if (!validId(id)) fail('Set id must use lowercase letters, digits, and hyphens.')
     if (difficulty !== undefined && (!Number.isInteger(difficulty) || difficulty < 1 || difficulty > 10)) fail('Difficulty must be an integer from 1 to 10.')
+    if (!validLimitOverrides(document.limits, setLimitFields)) fail('Set limits are invalid.')
     if (!validText(title)) fail('Set title is required.')
     if (!Array.isArray(questions) || questions.length === 0) fail('Add at least one question to the questions array.')
 
@@ -43,6 +46,7 @@ export function loadQuestionSets(documents) {
       check(!questionIds.has(id), 'Use a unique question id across all files.')
       check(domain, 'Use a supported domain.')
       check(Object.hasOwn(formats, type), 'Use a supported question type.')
+      check(validLimitOverrides(question.limits, type === 'coding' ? questionLimitFields : questionLimitFields.slice(-1)), 'Question limits are invalid.')
       check(validText(prompt) && validText(explanation), 'Prompt and explanation are required.')
       if (caseStudy !== undefined) check(validText(caseStudy?.title) && validText(caseStudy?.background), 'Case study needs a title and background.')
 
@@ -84,7 +88,7 @@ export function loadQuestionSets(documents) {
         check(textList(choices, answer.length) && choices.length === answer.length && answer.every(item => choices.includes(item)), 'Options must contain the same items as the answer.')
       }
       questionIds.add(id)
-      return { id, domain, type, prompt, answer, explanation, options: choices, labels, caseStudy, exhibits,
+      return { id, domain, type, prompt, answer, ...(question.limits && { limits: question.limits }), explanation, options: choices, labels, caseStudy, exhibits,
         ...(type === 'coding' && {
           languages: languages.map(({ id, starter, solution, files }) => ({
             id, starter, solution, ...(files && { files: files.map(({ path, starter, solution }) => ({ path, starter, solution })) }),
@@ -98,7 +102,7 @@ export function loadQuestionSets(documents) {
       const setId = part === 1 ? id : id + '-part-' + part
       if (setIds.has(setId)) fail('Duplicate set id ' + setId + '.')
       setIds.add(setId)
-      sets.push({ id: setId, ...(providerId && { providerId, examId }), difficulty, title: part === 1 ? title : title + ' · Part ' + part, ...(sources.length && { sources }), ...(studyFiles.length && { studyFiles }), ...(attachmentNames.length && { attachmentNames }), questions: normalized.slice(offset, offset + 60) })
+      sets.push({ id: setId, sourceId: id, ...(ownerId && { private: true }), ...(document.limits && { limits: document.limits }), ...(providerId && { providerId, examId }), difficulty, title: part === 1 ? title : title + ' · Part ' + part, ...(sources.length && { sources }), ...(studyFiles.length && { studyFiles }), ...(attachmentNames.length && { attachmentNames }), questions: normalized.slice(offset, offset + 60) })
     }
   }
   return sets

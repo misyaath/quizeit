@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { codingLanguages, codingOptions, maxRunOutput } from './coding.js'
+import { codingLanguages, codingOptions, codingSelection, maxCodeLength, maxRunOutput, projectFiles } from './coding.js'
 import { localApi } from './local-api.js'
 import ResizeHandle from './ResizeHandle.jsx'
 
@@ -11,6 +11,12 @@ export function ExecutionResults({ result }) {
   if (!result) return null
   return <div className="execution-results">
     <p><strong>{result.mode === 'custom' ? 'Custom run' : `${result.tests.filter(test => test.passed).length} of ${result.tests.length} tests passed`}</strong> · {result.runtime}</p>
+    {(Number.isFinite(result.cpuSeconds) || Number.isFinite(result.peakMemoryKiB)) && <p className="muted">
+      {[
+        Number.isFinite(result.cpuSeconds) && Number(result.cpuSeconds.toFixed(3)) + 's CPU used',
+        Number.isFinite(result.peakMemoryKiB) && result.peakMemoryKiB + ' KiB peak memory',
+      ].filter(Boolean).join(' · ')}
+    </p>}
     {result.limits && <p className="muted">Limits {result.limits.cpuSeconds}s CPU · {result.limits.wallSeconds}s wall · {result.limits.memoryKiB / 1024} MiB</p>}
     {result.tests.map(test => <details key={test.label} open={!test.hidden}>
       <summary><span>{test.label}</span><span className={test.passed ? 'result-correct' : 'result-missed'}>
@@ -37,7 +43,7 @@ export function CodeExamples({ question }) {
   </div>
 }
 
-export default function CodingQuestion({ question, value, setId, draftId, onChange, disabled }) {
+export default function CodingQuestion({ question, value, setId, draftId, onChange, disabled, useVsCode }) {
   const language = value?.language ?? question.languages[0].id
   const label = codingLanguages[language].label
   const [session, setSession] = useState(null)
@@ -57,6 +63,9 @@ export default function CodingQuestion({ question, value, setId, draftId, onChan
   const started = session?.language === language && session?.draftId === draftId
   const blocked = disabled || running
   const stdin = value?.stdin ?? ''
+  const selection = codingSelection(question, language)
+  const code = value?.code?.[language] ?? selection.starter
+  const files = projectFiles(selection, value)
 
   useEffect(() => {
     mounted.current = true
@@ -67,7 +76,7 @@ export default function CodingQuestion({ question, value, setId, draftId, onChan
   }, [])
 
   useEffect(() => {
-    if (!draftId) return
+    if (!useVsCode || !draftId) return
     let mounted = true
     setEditorError('')
     setSession(null)
@@ -77,7 +86,7 @@ export default function CodingQuestion({ question, value, setId, draftId, onChan
       if (mounted) setSession({ ...session, language, draftId })
     }).catch(error => { if (mounted) setEditorError(error.message) })
     return () => { mounted = false }
-  }, [setId, question.id, draftId, language, retry])
+  }, [setId, question.id, draftId, language, retry, useVsCode])
 
   useEffect(() => {
     if (!started) return
@@ -109,13 +118,13 @@ export default function CodingQuestion({ question, value, setId, draftId, onChan
   }, [started, setId, question.id, draftId, language])
 
   async function run(custom = false) {
-    if (disabled || runningRef.current || !started || !status?.editorOnline) return
+    if (disabled || runningRef.current || !canRun) return
     runningRef.current = true
     setRunning(true)
     setError('')
     setConsoleView('output')
     try {
-      const { code, files, stats, ...result } = await localApi('code/run', 'POST', { ...identity, ...(custom && { stdin }) })
+      const { code, files, stats, ...result } = await localApi('code/run', 'POST', { ...identity, ...(!useVsCode && { code, files }), ...(custom && { stdin }) })
       if (!mounted.current) return
       onChange(previous => ({ ...previous, language, code: { ...previous?.code, [language]: code },
         files: { ...previous?.files, [language]: files }, ...(custom && { stdin }), lastRun: result }))
@@ -128,15 +137,15 @@ export default function CodingQuestion({ question, value, setId, draftId, onChan
     }
   }
 
-  const canRun = !blocked && started && status?.editorOnline
+  const canRun = !blocked && Boolean(draftId) && (useVsCode ? started && status?.editorOnline : code.trim() || Object.keys(files).length)
   const starterIds = new Set(question.languages.map(item => item.id))
   const options = new Map(available.map(item => [item.id, item]))
   if (!options.has(language)) options.set(language, { id: language, label })
   const option = item => <option key={item.id} value={item.id} title={item.runtime}>{item.label}</option>
   return <section className="coding-ide" aria-label="Code workspace" style={{ '--console-height': consoleHeight + 'px' }}>
     <header className="coding-toolbar">
-      <strong>VS Code</strong>
-      <span className="editor-status" role="status">{status?.editorOnline ? 'Auto Save on' : started ? 'Connecting editor…' : 'Workspace'}</span>
+      <strong>{useVsCode ? 'VS Code' : 'Code editor'}</strong>
+      <span className="editor-status" role="status">{status?.editorOnline ? 'Auto Save on' : started ? 'Connecting editor…' : useVsCode ? 'Workspace' : 'Saved with your draft'}</span>
       <label>Language <select value={language} disabled={blocked} onChange={event => {
         setError('')
         const next = event.target.value
@@ -152,7 +161,22 @@ export default function CodingQuestion({ question, value, setId, draftId, onChan
       {started && <a className="button small secondary" href={session.editorUrl} target="_blank" rel="noreferrer">Open in new tab ↗</a>}
     </header>
     <div className="coding-edit-area">
-      {started
+      {!useVsCode ? <div className="inline-code-editor">
+        <label>{codingLanguages[language].filename}
+          <textarea value={code} maxLength={maxCodeLength} spellCheck={false} disabled={blocked} onChange={event => {
+            const source = event.target.value
+            onChange(previous => ({ ...previous, language, code: { ...previous?.code, [language]: source } }))
+          }} />
+        </label>
+        {selection.files?.map(file => <label key={file.path}>{file.path}
+          <textarea value={files[file.path]} maxLength={maxCodeLength} spellCheck={false} disabled={blocked} onChange={event => {
+            const source = event.target.value
+            onChange(previous => ({ ...previous, language, code: previous?.code ?? {}, files: {
+              ...previous?.files, [language]: { ...previous?.files?.[language], [file.path]: source },
+            } }))
+          }} />
+        </label>)}
+      </div> : started
         ? <iframe title="Visual Studio Code workspace" src={session.editorUrl} allow="clipboard-read; clipboard-write" />
         : <div className="editor-message" role={editorError ? 'alert' : 'status'}>
           <p>{editorError || 'Opening VS Code…'}</p>

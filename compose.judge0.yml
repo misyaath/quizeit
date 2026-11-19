@@ -27,7 +27,7 @@ services:
   server:
     <<: *judge0
     ports:
-      - '127.0.0.1:2358:2358'
+      - '127.0.0.1:${JUDGE0_PORT:-2358}:2358'
     healthcheck:
       test: ['CMD', 'ruby', '-rnet/http', '-e', 'uri = URI("http://127.0.0.1:2358/languages"); req = Net::HTTP::Get.new(uri); req["X-Auth-Token"] = ENV.fetch("AUTHN_TOKEN"); abort unless Net::HTTP.start(uri.host, uri.port) { |http| http.request(req) }.is_a?(Net::HTTPSuccess)']
       interval: 5s

@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto'
 import { formats } from '../src/questions/index.js'
 import { loadQuestionSets } from '../src/questions/load.js'
-import { codingLanguages, maxCodeLength, maxRunOutput, projectLanguages, publicCodingSet } from '../src/coding.js'
+import { codingLanguages, maxCodeLength, maxRunOutput, projectLanguages, practiceSet } from '../src/coding.js'
 import { ApiError } from './openai.mjs'
-import { resolveCategory, saveQuestionSet } from './question-files.mjs'
+import { resolveCategory } from './question-files.mjs'
 
 import { quizTools, runQuizTool } from './quiz-tools.mjs'
 
@@ -49,7 +49,7 @@ function parseBatch(reply) {
   }
 }
 
-export async function generateSet(input, { catalog, folder, ask, onProgress, signal, beforeSave, attachments }) {
+export async function generateSet(input, { catalog, saveQuestionSet, ask, onProgress, signal, beforeSave, attachments }) {
   signal?.throwIfAborted()
   const { count, types, modelId, effort } = input
   const prompt = (typeof input.prompt === 'string' ? input.prompt.trim() : '')
@@ -142,15 +142,15 @@ export async function generateSet(input, { catalog, folder, ask, onProgress, sig
       const { providerId, examId, providerName, examName } = generated
       proposal = { providerId, examId, providerName, examName }
       category = resolveCategory(catalog.categories, proposal)?.category
-      if (!category) throw new ApiError(502, 'The model did not return a usable provider and exam. No file was written.')
+      if (!category) throw new ApiError(502, 'The model did not return a usable provider and exam. No set was saved.')
     }
     const { providerId, examId } = category
     if (!document.title) document.title = typeof generated.title === 'string' ? generated.title.trim().slice(0, maxLength) || fallbackTitle : fallbackTitle
-    if (generated.questions.length !== required.length) throw new ApiError(502, 'The model returned the wrong question count. No file was written.')
+    if (generated.questions.length !== required.length) throw new ApiError(502, 'The model returned the wrong question count. No set was saved.')
     for (const [index, question] of generated.questions.entries()) {
       if (question?.type !== required[index] || typeof question.prompt !== 'string' || !question.prompt.trim()
         || used.has(normalizedPrompt(question.prompt))) {
-        throw new ApiError(502, 'The model returned a repeated question or a mismatched format. No file was written.')
+        throw new ApiError(502, 'The model returned a repeated question or a mismatched format. No set was saved.')
       }
       const key = normalizedPrompt(question.prompt)
       used.add(key)
@@ -163,7 +163,7 @@ export async function generateSet(input, { catalog, folder, ask, onProgress, sig
     try {
       loadQuestionSets([{ file: document.id, providerId, examId, document }])
     } catch {
-      throw new ApiError(502, 'The model returned an invalid answer key or question structure. No file was written.')
+      throw new ApiError(502, 'The model returned an invalid answer key or question structure. No set was saved.')
     }
     offset += required.length
   }
@@ -172,11 +172,10 @@ export async function generateSet(input, { catalog, folder, ask, onProgress, sig
   signal?.throwIfAborted()
   beforeSave?.()
   onProgress?.('Saving the question set…')
-  const saved = await saveQuestionSet(folder, proposal, document)
+  const saved = await saveQuestionSet(proposal, document)
   const { providerId, examId } = saved.category
   return {
-    set: publicCodingSet(loadQuestionSets([{ file: document.id, providerId, examId, document }])[0]),
-    filename: ['questions', providerId, examId, id + '.json'].join('/'),
+    set: practiceSet(loadQuestionSets([{ file: document.id, providerId, examId, document }])[0]),
     models: [...models],
     ...saved,
   }

@@ -5,6 +5,7 @@ import { limitsFor } from '../src/execution-settings.js'
 import { elapsedActivity, includeWorkspaceStats, addRun, newActivity } from './attempt-activity.mjs'
 import { cleanDraft, validUuid, workspaceAnswer } from './attempt-draft.mjs'
 import { editorCounters } from './editor-workspaces.mjs'
+import { currentUser } from './request-user.mjs'
 import { ApiError } from './openai.mjs'
 
 export function createAttemptService({ progress, executionSettings, getSets, runCode, editor }) {
@@ -18,8 +19,13 @@ export function createAttemptService({ progress, executionSettings, getSets, run
     })
   }
 
+  async function activeSet(setId, saved) {
+    return (!saved?.submitted && saved?.setSnapshot) || (await getSets()).find(item => item.id === setId)
+  }
+
   async function selectCoding(body) {
-    const set = (await getSets()).find(item => item.id === body.setId)
+    const saved = (await progress.read()).attempts[body.setId]
+    const set = await activeSet(body.setId, saved)
     const question = set?.questions.find(item => item.id === body.questionId && item.type === 'coding')
     if (!question) throw new ApiError(404, 'Coding question not found.')
     const selection = codingSelection(question, body.language)
@@ -34,9 +40,9 @@ export function createAttemptService({ progress, executionSettings, getSets, run
       if (existing && (existing.submitted || (existing.draftId && existing.draftId !== draftId))) {
         throw new ApiError(409, 'This attempt changed. Reload the quiz.')
       }
-      if (existing?.draftId === draftId && existing.activity) return current
-      const activity = existing?.activity ?? newActivity(limitsFor(settings, set.id).examMinutes)
-      return { ...current, attempts: { ...current.attempts, [set.id]: { ...newAttempt(), index, ...existing, draftId, activity } } }
+      if (existing?.draftId === draftId && existing.activity && existing.setSnapshot) return current
+      const activity = existing?.activity ?? newActivity(limitsFor(settings, set).examMinutes)
+      return { ...current, attempts: { ...current.attempts, [set.id]: { ...newAttempt(), index, ...existing, draftId, activity, setSnapshot: existing?.setSnapshot ?? set } } }
     })).attempts[set.id]
   }
 
@@ -65,7 +71,9 @@ export function createAttemptService({ progress, executionSettings, getSets, run
   async function changeAttempt(body) {
     const { action, setId, draft, previousResultId } = body
     if (!['draft', 'restart', 'submit'].includes(action)) throw new ApiError(400, 'Unknown practice action.')
-    const set = (await getSets()).find(set => set.id === setId)
+    const previous = await progress.read()
+    if (action === 'submit' && validUuid(draft?.draftId) && previous.history.some(entry => entry.id === draft.draftId && entry.setId === setId)) return previous
+    const set = await activeSet(setId, action === 'restart' ? null : previous.attempts[setId])
     if (!set) throw new ApiError(404, 'This practice set is no longer available.')
     const next = cleanDraft(set, draft)
     function alreadySubmitted(current) {
@@ -88,20 +96,20 @@ export function createAttemptService({ progress, executionSettings, getSets, run
       const saved = current.attempts[setId]
       if (alreadySubmitted(current) || (action === 'restart' && saved?.draftId === next.draftId && !saved.submitted)) return current
       checkAttempt(current)
-      const activity = action === 'restart' ? newActivity(limitsFor(settings, setId).examMinutes, now)
-        : saved?.activity ?? newActivity(limitsFor(settings, setId).examMinutes, now)
+      const activity = action === 'restart' ? newActivity(limitsFor(settings, set).examMinutes, now)
+        : saved?.activity ?? newActivity(limitsFor(settings, set).examMinutes, now)
       next.activity = action === 'submit' ? elapsedActivity(includeWorkspaceStats(activity, workspaceMetrics), submittedAt) : activity
       if (action === 'submit') return recordSubmission(current, set, next, next.draftId, submittedAt)
+      next.setSnapshot = action === 'restart' ? set : saved?.setSnapshot ?? set
       return { ...current, attempts: { ...current.attempts, [setId]: next } }
     }
     if (action !== 'submit') return progress.update(saveAttempt)
 
-    const previous = await progress.read()
-    if (alreadySubmitted(previous)) return previous
     checkAttempt(previous)
     // Grading calls the runner outside the store's serialized writes.
-    if (pendingGrades.has(setId)) throw new ApiError(409, 'This practice set is already being graded.')
-    pendingGrades.add(setId)
+    const gradeKey = currentUser()._id + ':' + setId
+    if (pendingGrades.has(gradeKey)) throw new ApiError(409, 'This practice set is already being graded.')
+    pendingGrades.add(gradeKey)
     try {
       await savedDraft(set, next.draftId, next.index, settings)
       await updateDraft(setId, next.draftId, saved => ({
@@ -109,7 +117,7 @@ export function createAttemptService({ progress, executionSettings, getSets, run
         activity: { ...saved.activity, submissions: saved.activity.submissions + 1 },
       }))
       for (const question of set.questions.filter(item => item.type === 'coding')) {
-        const stats = await prepareAnswer(set, question, next)
+        const stats = currentUser().legacyOwner ? await prepareAnswer(set, question, next) : null
         if (stats) workspaceMetrics[question.id] = stats
         const answer = next.answers[question.id]
         if (!hasResponse(answer)) continue
@@ -118,7 +126,7 @@ export function createAttemptService({ progress, executionSettings, getSets, run
         const began = new Date().toISOString()
         try {
           const result = await runCode(question, answer.language, answer.code?.[answer.language] ?? language.starter, false,
-            { files: projectFiles(language, answer), limits: limitsFor(settings, setId, answer.language) })
+            { files: projectFiles(language, answer), limits: limitsFor(settings, set, answer.language, question) })
           next.codingResults[question.id] = result
           await recordRun(setId, next.draftId, question.id, answer.language, 'submit', began, result)
         } catch (error) {
@@ -128,7 +136,7 @@ export function createAttemptService({ progress, executionSettings, getSets, run
       }
       return await progress.update(saveAttempt)
     } finally {
-      pendingGrades.delete(setId)
+      pendingGrades.delete(gradeKey)
     }
   }
 
@@ -153,5 +161,5 @@ export function createAttemptService({ progress, executionSettings, getSets, run
     })
   }
 
-  return { updateDraft, selectCoding, savedDraft, changeAttempt, recordRun }
+  return { activeSet, updateDraft, selectCoding, savedDraft, changeAttempt, recordRun }
 }

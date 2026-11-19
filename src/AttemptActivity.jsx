@@ -8,51 +8,126 @@ export function formatDuration(ms = 0) {
   return minutes ? minutes + 'm ' + seconds % 60 + 's' : seconds + 's'
 }
 
-export function useQuestionTime(setId, questionId, draftId) {
-  const checkpoint = useRef(() => Promise.resolve())
+export function useQuestionTime(setId, questionId, draftId, timing, enabled) {
+  const tabId = useRef(null)
+  const sequence = useRef(0)
+  const queue = useRef(Promise.resolve())
+  const controls = useRef({})
+  const [snapshot, setSnapshot] = useState(null)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [now, setNow] = useState(() => performance.now())
+
   useEffect(() => {
-    if (!draftId) return
-    let since = document.hidden ? null : performance.now()
-    function send(stop = false) {
-      const now = performance.now()
-      const durationMs = since === null ? 0 : Math.min(15_000, Math.floor(now - since))
-      since = stop || document.hidden ? null : now
-      if (!durationMs) return Promise.resolve()
-      return fetch('/api/progress/time', { method: 'POST', keepalive: true,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ setId, questionId, draftId, durationMs }),
-      }).catch(() => {})
+    if (!draftId || !enabled) return
+    tabId.current ??= crypto.randomUUID()
+    let mounted = true
+    let since = null
+    let active = false
+    let paused = false
+    let finishing = false
+
+    function send(action, background = false) {
+      const time = performance.now()
+      const durationMs = since === null ? 0 : Math.min(15_000, Math.floor(time - since))
+      const payload = JSON.stringify({ setId, questionId, draftId, durationMs, action, tabId: tabId.current, sequence: ++sequence.current })
+      const starting = action === 'start' || action === 'resume'
+      since = active && action === 'tick' ? time : null
+      if (action !== 'tick') active = false
+
+      const task = queue.current.then(async () => {
+        const response = await fetch('/api/progress/time', {
+          method: 'POST', keepalive: background, headers: { 'Content-Type': 'application/json' }, body: payload,
+        })
+        const result = await response.json()
+        if (!response.ok) throw new Error(result.error ?? 'Could not save time.')
+        paused = result.paused
+        active = result.active && !document.hidden && !finishing
+        since = active ? (starting ? performance.now() : time) : null
+        if (mounted) {
+          setError('')
+          setSnapshot({ ...result, setId, questionId, draftId, active, since })
+        }
+      }).catch(() => {
+        if (mounted) setError('Could not save the timer. Resume it to retry.')
+        since = null
+        active = false
+      })
+      queue.current = task
+      return task
     }
-    checkpoint.current = () => send()
-    const timer = setInterval(() => void send(), 5000)
-    const visibility = () => void send(document.hidden)
-    const unload = () => void send(true)
+
+    function start() {
+      if (!document.hidden && !finishing) void send('start')
+    }
+    const visibility = () => {
+      if (document.hidden) void send('stop', true)
+      else start()
+    }
+    const hide = () => void send('stop', true)
+    const show = event => { if (event.persisted) start() }
+    controls.current = {
+      toggle: async () => {
+        setSaving(true)
+        try { await send(active && !paused ? 'pause' : 'resume') }
+        finally { if (mounted) setSaving(false) }
+      },
+      stop: () => {
+        finishing = true
+        return send('stop', true)
+      },
+      restart: () => {
+        finishing = false
+        start()
+      },
+    }
+    start()
+    const checkpoint = setInterval(() => { if (active && !document.hidden && !finishing) void send('tick') }, 5000)
+    const display = setInterval(() => setNow(performance.now()), 500)
     document.addEventListener('visibilitychange', visibility)
-    window.addEventListener('pagehide', unload)
+    window.addEventListener('pagehide', hide)
+    window.addEventListener('pageshow', show)
     return () => {
-      clearInterval(timer)
+      mounted = false
+      clearInterval(checkpoint)
+      clearInterval(display)
       document.removeEventListener('visibilitychange', visibility)
-      window.removeEventListener('pagehide', unload)
-      void send(true)
+      window.removeEventListener('pagehide', hide)
+      window.removeEventListener('pageshow', show)
+      if (!finishing) void send('stop', true)
     }
-  }, [setId, questionId, draftId])
-  return checkpoint
+  }, [setId, questionId, draftId, enabled])
+
+  const saved = snapshot?.setId === setId && snapshot?.questionId === questionId && snapshot?.draftId === draftId ? snapshot : null
+  const delta = saved?.active && !error ? Math.max(0, now - saved.since) : 0
+  const totalMs = saved?.totalMs ?? Object.values(timing?.questions ?? {}).reduce((sum, question) => sum + (question.visibleMs ?? 0), 0)
+  return {
+    totalMs: totalMs + delta, questionMs: (saved?.questionMs ?? timing?.questions?.[questionId]?.visibleMs ?? 0) + delta,
+    examMinutes: saved?.examMinutes ?? timing?.examMinutes ?? 0, questionMinutes: saved?.questionMinutes ?? 0,
+    active: Boolean(saved?.active) && !error, paused: saved?.paused ?? Boolean(timing?.paused), ready: Boolean(saved || error),
+    toggle: () => controls.current.toggle?.(), stop: () => controls.current.stop?.(), restart: () => controls.current.restart?.(),
+    error, saving,
+  }
 }
 
-export function ExamClock({ timing }) {
-  const [now, setNow] = useState(Date.now)
-  const deadline = timing?.examMinutes > 0 ? timing.startedAt + timing.examMinutes * 60_000 : 0
-  useEffect(() => {
-    if (!deadline) return
-    setNow(Date.now())
-    const tick = setInterval(() => setNow(Date.now()), 1000)
-    return () => clearInterval(tick)
-  }, [deadline])
-  if (!deadline) return null
-  const left = Math.max(0, deadline - now)
-  return <p className={left ? 'exam-timer' : 'exam-timer expired'}>
-    {left ? formatDuration(left) + ' remaining' : 'Exam time limit reached'}
-  </p>
+export function ExamClock({ clock }) {
+  const totalBudget = clock.examMinutes * 60_000
+  const questionBudget = clock.questionMinutes * 60_000
+  const totalOver = totalBudget > 0 && clock.totalMs >= totalBudget
+  const questionOver = questionBudget > 0 && clock.questionMs >= questionBudget
+  return <div className="practice-clock">
+    <p className={totalOver ? 'exam-timer expired' : 'exam-timer'}>
+      Set time {formatDuration(clock.totalMs)}{totalBudget > 0 && (totalOver ? ' · limit reached' : ' · ' + formatDuration(totalBudget - clock.totalMs) + ' remaining')}
+    </p>
+    <p className={questionOver ? 'exam-timer expired' : 'exam-timer'}>
+      Question time {formatDuration(clock.questionMs)}{questionBudget > 0 && (questionOver ? ' · limit reached' : ' · ' + formatDuration(questionBudget - clock.questionMs) + ' remaining')}
+    </p>
+    <button type="button" className="button small secondary" onClick={clock.toggle} disabled={!clock.ready || clock.saving}>
+      {clock.active ? 'Pause timer' : 'Resume timer'}
+    </button>
+    {clock.paused && <p className="muted">Timer paused</p>}
+    {clock.error && <p role="alert">{clock.error}</p>}
+  </div>
 }
 
 const languageLabel = id => codingLanguages[id]?.label ?? id
@@ -94,6 +169,7 @@ export default function AttemptActivity({ activity, questions }) {
   }), { edits: 0, active: 0, visible: 0, examples: 0, custom: 0 })
   const cards = [
     ['Elapsed time', formatDuration(activity.elapsedMs)],
+    ...(activity.activeMs !== undefined ? [['Active set time', formatDuration(activity.activeMs)]] : []),
     ['Time on questions', formatDuration(totals.visible)],
     ['Active editing', formatDuration(totals.active)],
     ['Edit events', totals.edits],

@@ -24,7 +24,7 @@ export const formats = {
 export function isAnswered(question, value) {
   if (question.type === 'coding') return hasCodingResponse(value)
   if (question.type === 'text') return typeof value === 'string' && Boolean(value.trim())
-  if (question.type === 'multi') return Array.isArray(value) && value.length === question.answer.length
+  if (question.type === 'multi') return Array.isArray(value) && value.length === (question.answerCount ?? question.answer?.length)
   if (question.type === 'order' || question.type === 'match') {
     return Array.isArray(value) && value.length === question.options.length && value.every(Boolean)
   }

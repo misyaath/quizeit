@@ -65,8 +65,14 @@ export function createAiService({ auth, hosted, fetchResponse, progress, bankExp
   async function explain({ attemptId, questionId, refresh }, onProgress) {
     let question, entry, cacheKey, cached, save
     if (attemptId === undefined) {
-      question = (await getSets()).flatMap(set => set.questions).find(item => item.id === questionId)
+      const set = (await getSets()).find(item => item.questions.some(question => question.id === questionId))
+      question = set?.questions.find(item => item.id === questionId)
       if (!question) throw new ApiError(404, 'This question was not found in the question bank.')
+      const { attempts } = await progress.read()
+      if (Object.values(attempts).some(draft => !draft.submitted && draft.setSnapshot?.questions.some(q => q.id === questionId))
+        || (attempts[set.id] && !attempts[set.id].submitted && !attempts[set.id].setSnapshot)) {
+        throw new ApiError(409, 'Submit the active attempt before viewing this explanation.')
+      }
       cacheKey = createHash('sha256').update(JSON.stringify(question)).digest('hex')
       cached = (await bankExplanations.read())[cacheKey]
       save = explanation => bankExplanations.update(latest => ({ ...latest, [cacheKey]: explanation }))

@@ -1,6 +1,5 @@
-import { extname, resolve } from 'node:path'
+import { extname } from 'node:path'
 import { ApiError } from './openai.mjs'
-import { jsonFile } from './local-store.mjs'
 import { quizTools } from './quiz-tools.mjs'
 
 export const platformModel = { id: 'gpt-6.2-astra', name: 'GPT-6.2 Astra · Hosted tools', efforts: ['low', 'medium', 'high', 'xhigh', 'max'] }
@@ -18,8 +17,7 @@ export function platformTools(storeId) {
   ]
 }
 
-export function createPlatformTools(dataDir, fetchResponse) {
-  const file = jsonFile(resolve(dataDir, 'openai-platform.json'), () => ({ apiKey: '', enabled: false, storeId: null, files: [] }))
+export function createPlatformTools(store, fetchResponse) {
 
   async function call(key, path, { method = 'GET', data, form, notFoundOk, signal } = {}) {
     let response
@@ -60,7 +58,7 @@ export function createPlatformTools(dataDir, fetchResponse) {
   }
 
   async function configure(input) {
-    const saved = await file.update(async current => {
+    const saved = await store.update(async current => {
       const apiKey = typeof input.apiKey === 'string' ? input.apiKey.trim() : ''
       if (apiKey) {
         if (!/^sk-[\w-]{6,250}$/.test(apiKey)) throw new ApiError(400, 'Enter an OpenAI Platform API key.')
@@ -83,14 +81,14 @@ export function createPlatformTools(dataDir, fetchResponse) {
     }
 
     // Persist an empty store before uploading so a failed file can be retried in that same store.
-    await file.update(async current => {
+    await store.update(async current => {
       if (!current.apiKey) throw new ApiError(409, 'Connect an OpenAI Platform API key first.')
       if (current.storeId) return current
       const store = await call(current.apiKey, 'vector_stores', { method: 'POST', data: { name: 'quizeit — study files' } })
       if (!/^vs_[\w-]+$/.test(store.id ?? '')) throw new ApiError(502, 'OpenAI did not return a valid search store.')
       return { ...current, storeId: store.id }
     })
-    const saved = await file.update(async current => {
+    const saved = await store.update(async current => {
       if (current.files.length >= 25) throw new ApiError(400, 'Remove a study file before adding more than 25.')
       const form = new FormData()
       form.set('purpose', 'assistants')
@@ -109,7 +107,7 @@ export function createPlatformTools(dataDir, fetchResponse) {
   }
 
   async function remove(id) {
-    const saved = await file.update(async current => {
+    const saved = await store.update(async current => {
       if (!current.files.some(item => item.id === id)) throw new ApiError(404, 'Study file not found.')
       await call(current.apiKey, 'files/' + id, { method: 'DELETE', notFoundOk: true })
       return { ...current, files: current.files.filter(item => item.id !== id) }
@@ -119,13 +117,13 @@ export function createPlatformTools(dataDir, fetchResponse) {
 
   return {
     configure, upload, remove,
-    disconnect: async () => describe(await file.update(current => {
+    disconnect: async () => describe(await store.update(current => {
       if (current.files.length) throw new ApiError(409, 'Remove the uploaded study files first so they can be deleted from OpenAI.')
       return { ...current, apiKey: '', enabled: false, storeId: null }
     })),
-    status: async () => describe(await file.read()),
+    status: async () => describe(await store.read()),
     connection: async () => {
-      const saved = await file.read()
+      const saved = await store.read()
       return saved.enabled ? { apiKey: saved.apiKey, storeId: saved.storeId, files: saved.files } : null
     },
     tools: async (saved, signal) => platformTools((await indexStatus(saved, signal)).some(item => item.status === 'completed') ? saved.storeId : null),
