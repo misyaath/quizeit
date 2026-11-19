@@ -15,7 +15,7 @@ The practice formats are single choice, multiple select, drag-and-drop matching 
 
 Open **Coding labs → AI-200 coding lab · Vector search** from Practice exams. The question and examples appear on the left. VS Code runs in the right pane with Auto Save on. Drag the dividers to resize the panels, or focus a divider and press the arrow keys. Every coding question offers the installed Judge0 programming languages. The language menu groups them by whether the question supplies starter code. Selecting another language opens a blank file in its own workspace. Open **AI-200 project lab · Score thresholds** to try the included multi-file starters in Python, JavaScript, or PHP.
 
-See [coding lab setup](../README.md#optional-coding-labs).
+See [coding lab setup](getting-started.md#run-coding-labs).
 
 **Run examples** saves any pending edits, then checks visible tests in Judge0. **Custom input** runs with your own standard input. **Submit set** saves pending edits and grades the selected solution against all tests. Each language has a separate workspace for each question and attempt. Grading reads the entry file and helper files declared by the question. The submitted source, custom input and output, grades, and run history are saved in MongoDB.
 

@@ -53,6 +53,6 @@ In `browser.jsx`, export `export const pages = { notes: StudyNotes }`. The compo
 
 `PluginError(status, message)` returns a handled client error from an action. `download(filename, text, contentType)` returns an attachment. Actions receive a public account profile in `user`, parsed query parameters in `query`, and `readJson()` for reading the request body once.
 
-Start with the [CSV results plugin](../plugins/results-csv/) for a complete example, including an extension point for adding CSV columns. The [demo generator](../plugins/demo-generator/) is a deterministic sample provider. Add `demo-generator` to the allowlist to try it from **Generate questions** without API credentials. Use it for development fixtures.
+Follow the [CSV export tutorial](csv-plugin-tutorial.md) to build on the bundled plugin and add a CSV column from a second plugin. The [demo generator](https://github.com/misyaath/quizeit/tree/main/plugins/demo-generator) is a deterministic sample provider. Add `demo-generator` to the allowlist to try it from **Generate questions** without API credentials. Use it for development fixtures.
 
 The version 1 SDK covers the APIs described here. To change a built-in workflow, use a hook that workflow exposes. For example, the generator accepts new providers today, while adding a question format still involves the question validator, assessment, input, and review code.

@@ -42,6 +42,7 @@ Open **Settings** at `http://127.0.0.1:5173/` to connect an eligible ChatGPT acc
 
 ## Documentation
 
+- [Quizeit developer documentation](https://misyaath.github.io/quizeit/) includes local setup, the plugin SDK, and a walkthrough of the CSV exporter.
 - [Developer guide](docs/development.md) covers architecture, data flows, extension points, and verification.
 - [Plugin guide](docs/plugins.md) shows how to add and enable features in the same repository.
 - [Contributing](CONTRIBUTING.md) covers local development and checks.
