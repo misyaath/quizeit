@@ -4,14 +4,18 @@ Start with the [README](../README.md) to install and run the app. React handles 
 
 ## Code map
 
+The repository runs as a modular monolith. The Nest application composes the built-in feature modules and plugin runtime. React uses the same server and signed-in session. Shared assessment logic is usable by both and has no framework dependency.
+
 | Area | Start here |
 | --- | --- |
+| Application composition | [apps/server/app-module.mjs](../apps/server/app-module.mjs) composes the NestJS modules. [apps/web/plugins/](../apps/web/plugins/) integrates plugin pages and navigation with React. |
+| Extensions | [packages/plugin-sdk/](../packages/plugin-sdk/) provides the versioned entry point. [apps/server/plugins/](../apps/server/plugins/) loads and validates the enabled plugins. Each plugin’s manifest and code live in [plugins/](../plugins/). See the [plugin guide](plugins.md). |
 | Client entry and navigation | [main.jsx](../src/main.jsx) mounts [App.jsx](../src/App.jsx). [routes.js](../src/routes.js) parses and formats browser URLs and is shared with the server for deep links. |
 | Practice and review | [PracticeSets.jsx](../src/PracticeSets.jsx), [Exam.jsx](../src/Exam.jsx), [Results.jsx](../src/Results.jsx), [AttemptHistory.jsx](../src/AttemptHistory.jsx), and [QuestionBank.jsx](../src/QuestionBank.jsx) each own a screen. |
 | Shared UI | [QuestionInput.jsx](../src/QuestionInput.jsx) renders non-coding inputs. [QuestionDetails.jsx](../src/QuestionDetails.jsx), [AnswerReview.jsx](../src/AnswerReview.jsx), and [ExplainWithChatGPT.jsx](../src/ExplainWithChatGPT.jsx) supply shared question and review components. |
 | Client I/O and progress | [local-api.js](../src/local-api.js) handles JSON and streamed responses. [useAttemptProgress.js](../src/useAttemptProgress.js) owns loading, optimistic draft updates, submission state, and save errors. |
 | Server and HTTP routing | [server.mjs](../scripts/server.mjs) bootstraps NestJS with its Express adapter. [backend-services.module.mjs](../scripts/backend-services.module.mjs) provides services to the practice, coding, and AI modules. The [frontend controller](../scripts/routes/frontend.mjs) serves the React build and deep links. [nest-http.mjs](../scripts/routes/nest-http.mjs) checks the local host and origin and formats errors. |
-| Attempts and scoring | [attempt-service.mjs](../scripts/attempt-service.mjs) coordinates draft updates, grading, and activity. [attempt-draft.mjs](../scripts/attempt-draft.mjs) validates draft data. [attempts.js](../src/attempts.js) records a completed attempt and its question snapshot. |
+| Attempts and scoring | [attempt-service.mjs](../scripts/attempt-service.mjs) coordinates draft updates, grading, and activity. [attempt-draft.mjs](../scripts/attempt-draft.mjs) validates draft data. [attempts.js](../src/attempts.js) records a completed attempt and its question snapshot. [packages/assessment/](../packages/assessment/) owns shared marks, exam section ordering, and result summaries. |
 | Questions | [question-files.mjs](../scripts/question-files.mjs) reads the catalog. [questions/load.js](../src/questions/load.js) validates and normalizes question sets. [questions/index.js](../src/questions/index.js) defines formats and scoring rules. |
 | Integrations | [editor-workspaces.mjs](../scripts/editor-workspaces.mjs) manages files for code-server. [judge0.mjs](../scripts/judge0.mjs) adapts the execution API. [ai-service.mjs](../scripts/ai-service.mjs) handles provider selection and explanation caching. [generate-set.mjs](../scripts/generate-set.mjs) validates and saves generated sets. |
 
@@ -39,12 +43,13 @@ Learner stores use account-specific document IDs. The designated owner accesses 
 ## Where to make changes
 
 - Add practice content using the [question authoring guide](question-authoring.md). Keep set and question IDs stable because saved drafts reference them.
+- Add an optional feature under `plugins/<id>/` and register it in the allowlist. Reuse a published service, event, or contribution point when integrating with existing features. Keep feature-specific policy and UI in the plugin.
 - For a new question format, update the catalog validator, shared response and scoring rules, exam input, answer review, draft validation, and generation schema together. Use the existing formats as examples.
 - Add a controller method in the relevant NestJS module under [scripts/routes/](../scripts/routes) and attach the HTTP method decorator with `bindRoute`. Pass domain operations to the relevant service. Controllers use [http.mjs](../scripts/http.mjs) for request size limits, JSON responses, and NDJSON streaming.
 - Supply a separate `mongoDatabase`, `dataDir`, `questionsDir`, and `port: 0` to `startServer` for isolated checks. Supply `mongoUri` if the test data directory lacks MongoDB connection settings. Inject `fetchResponse`, `runCode`, or `editor` to exercise the API with substitutes for external services.
 
 ## Verify a change
 
-1. Run `npm run build` to validate question files and compile the app.
+1. Run `npm test` for the extension contract checks and `npm run build` to validate question files and compile the app.
 2. Start the app. Begin a practice attempt, answer and flag a question, and refresh. Submit and reopen the result from Attempt history. Retake the set and confirm the prior result still opens.
 3. For coding changes, check an example run and submission. For AI changes, check a streamed success and error, and confirm generation remains cancellable before saving.

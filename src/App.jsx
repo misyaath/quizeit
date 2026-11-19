@@ -16,7 +16,9 @@ import QuestionBank from './QuestionBank.jsx'
 import UserManagement from './UserManagement.jsx'
 import QuestionSetEditor from './QuestionSetEditor.jsx'
 import RouteLink from './RouteLink.jsx'
-import RealExams from './RealExams.jsx'
+import RealExams, { ExamDetails } from './RealExams.jsx'
+import CandidateInvitations from './CandidateInvitations.jsx'
+import PluginArea from '../apps/web/plugins/PluginArea.jsx'
 
 const studyNavigation = [
   ['dashboard', '▥', 'Dashboard'],
@@ -26,6 +28,7 @@ const studyNavigation = [
   ['authoring', '✎', 'Manage question sets'],
   ['exam-bank', '☷', 'Exam question bank', true],
   ['real-exams', '▣', 'Real exams', true],
+  ['candidate-invitations', '✉', 'Candidate invitations', true],
   ['generate', '✦', 'Generate questions'],
   ['users', '♙', 'Users', true],
   ['settings', '⚙', 'Settings'],
@@ -41,6 +44,7 @@ export default function App({ user, onLogout, accountBusy, googleEnabled, connec
   } = useAttemptProgress()
   const [catalog, setCatalog] = useState(null)
   const [catalogError, setCatalogError] = useState('')
+  const [plugins, setPlugins] = useState(null)
   const [practiceFilters, setPracticeFilters] = useState({ providerId: '', examId: '' })
   const sets = catalog?.sets ?? []
   const { attempts, history, snapshots } = progress
@@ -74,6 +78,14 @@ export default function App({ user, onLogout, accountBusy, googleEnabled, connec
     window.addEventListener('popstate', restoreRoute)
     return () => window.removeEventListener('popstate', restoreRoute)
   }, [])
+
+  useEffect(() => {
+    let active = true
+    setPlugins(null)
+    localApi('plugins').then(entries => { if (active) setPlugins(entries) })
+      .catch(() => { if (active) setPlugins([]) })
+    return () => { active = false }
+  }, [user.id, user.role])
 
   function navigate(destination, { focus = true, replace = false } = {}) {
     const next = typeof destination === 'string' ? { screen: destination } : destination
@@ -144,6 +156,11 @@ export default function App({ user, onLogout, accountBusy, googleEnabled, connec
             aria-current={page === screen && !route.editorId && route.section !== 'new' ? 'page' : undefined}>
             <span aria-hidden="true">{icon}</span> {label}
           </RouteLink>)}
+        {plugins?.flatMap(plugin => plugin.pages.map(page => {
+          const active = screen === 'plugin' && route.pluginId === plugin.id && route.pageId === page.id
+          return <RouteLink key={plugin.id + '/' + page.id} to={{ screen: 'plugin', pluginId: plugin.id, pageId: page.id }}
+            navigate={navigate} className={active ? 'nav-active' : undefined} aria-current={active ? 'page' : undefined}>{page.title}</RouteLink>
+        }))}
       </nav>
       <div className="sidebar-links">
         <span className="account-name">{user.firstName} {user.lastName}</span>
@@ -166,6 +183,12 @@ export default function App({ user, onLogout, accountBusy, googleEnabled, connec
         </section>
         <OpenAISettings outcome={signInOutcome} onImport={user.owner ? acceptImportedProgress : undefined} />
         {user.role === 'admin' && <ExecutionSettings sets={sets.filter(set => !set.private)} />}
+        {plugins?.some(plugin => plugin.settings.length > 0) && <section className="question-panel settings-panel">
+          <h2>Plugins</h2>
+          <div className="ai-actions">{plugins.filter(plugin => plugin.settings.length > 0).map(plugin =>
+            <RouteLink key={plugin.id} className="button secondary" to={{ screen: 'plugin', pluginId: plugin.id, pageId: 'settings' }}
+              navigate={navigate}>{plugin.name} settings</RouteLink>)}</div>
+        </section>}
       </>}
       {screen === 'users' && (user.role === 'admin' ? <UserManagement user={user} onAccountUpdated={onAccountUpdated} /> : <p className="notice">Only administrators can manage users.</p>)}
       {screen === 'authoring' && <QuestionSetEditor user={user} onSaved={loadCatalog} navigate={navigate}
@@ -174,8 +197,14 @@ export default function App({ user, onLogout, accountBusy, googleEnabled, connec
         ? <QuestionSetEditor key="exam-bank" examBank user={user} onSaved={loadCatalog} navigate={navigate}
           editorId={route.editorId} creating={route.section === 'new'} />
         : <p className="notice">Only administrators can access the exam question bank.</p>)}
-      {screen === 'real-exams' && (user.role === 'admin' ? <RealExams navigate={navigate} />
+      {screen === 'real-exams' && (user.role === 'admin' ? route.realExamId
+        ? <ExamDetails key={route.realExamId} id={route.realExamId} navigate={navigate} /> : <RealExams navigate={navigate} />
         : <p className="notice">Only administrators can manage real exams.</p>)}
+      {screen === 'candidate-invitations' && (user.role === 'admin'
+        ? <CandidateInvitations key={route.invitationExamId ?? ''} navigate={navigate} initialExamId={route.invitationExamId} />
+        : <p className="notice">Only administrators can manage candidate invitations.</p>)}
+      {screen === 'plugin' && <PluginArea plugin={plugins?.find(item => item.id === route.pluginId)}
+        pageId={route.pageId} loading={plugins === null} />}
       {!catalog && needsCatalog && (catalogError
         ? <div className="notice" role="alert">{catalogError} <button className="button secondary" onClick={loadCatalog}>Retry loading question sets</button></div>
         : <p role="status">Loading question sets…</p>)}

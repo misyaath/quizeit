@@ -6,13 +6,18 @@ import { json, readBody, respondWithProgress } from '../http.mjs'
 import { AI_INTEGRATIONS } from '../backend-services.module.mjs'
 import { GenerationController } from './generation.mjs'
 import { bindRoute } from './nest-http.mjs'
+import { PLUGINS } from '../../apps/server/plugins/runtime.mjs'
+import { listedGenerators } from '../../apps/server/plugins/generation.mjs'
 
 function requireHostedOrigin(req, host) {
   if (req.headers.origin !== 'http://' + host) throw new ApiError(403, 'Manage hosted tools from the local quiz.')
 }
 
 class OpenAiController {
-  constructor(integrations) { this.integrations = integrations }
+  constructor(integrations, plugins) {
+    this.integrations = integrations
+    this.plugins = plugins
+  }
 
   get auth() { return this.integrations().auth }
   get hosted() { return this.integrations().hosted }
@@ -29,8 +34,16 @@ class OpenAiController {
   }
 
   async models(_context, res) {
-    const platform = await this.hosted.connection()
-    return json(res, { models: platform ? [platformModel] : await this.ai.withPlan(listModels), platformAttachments: Boolean(platform) })
+    const registered = listedGenerators(this.plugins)
+    let platform, models
+    try {
+      platform = await this.hosted.connection()
+      models = platform ? [platformModel] : await this.ai.withPlan(listModels)
+    } catch (error) {
+      if (!registered.length) throw error
+      models = []
+    }
+    return json(res, { models: [...models, ...registered], platformAttachments: Boolean(platform) })
   }
 
   async settings(_context, res) {
@@ -97,6 +110,7 @@ class OpenAiController {
 
 Controller()(OpenAiController)
 Inject(AI_INTEGRATIONS)(OpenAiController, undefined, 0)
+Inject(PLUGINS)(OpenAiController, undefined, 1)
 bindRoute(OpenAiController, 'callback', Get(callbackPath))
 bindRoute(OpenAiController, 'models', Get('api/openai/models'))
 bindRoute(OpenAiController, 'settings', Get('api/openai/settings'))

@@ -8,6 +8,8 @@ import { json, readBody, respondWithProgress } from '../http.mjs'
 import { AI_INTEGRATIONS, APP_DATA, CATALOG } from '../backend-services.module.mjs'
 import { currentUser } from '../request-user.mjs'
 import { bindRoute } from './nest-http.mjs'
+import { PLUGINS } from '../../apps/server/plugins/runtime.mjs'
+import { selectedGenerator } from '../../apps/server/plugins/generation.mjs'
 
 function cancelGeneration(job) {
   if (!job.cancellable || job.controller.signal.aborted) return
@@ -20,10 +22,11 @@ export class GenerationController {
 
   get generation() { return this.jobs.get(currentUser()._id) ?? null }
 
-  constructor(integrations, { getCatalog }, { saveQuestionSet }) {
+  constructor(integrations, { getCatalog }, { saveQuestionSet }, plugins) {
     this.integrations = integrations
     this.getCatalog = getCatalog
     this.saveQuestionSet = saveQuestionSet
+    this.plugins = plugins
   }
 
   generationStatus() {
@@ -53,6 +56,11 @@ export class GenerationController {
     if (req.headers.origin !== 'http://' + host) throw new ApiError(403, 'Generate questions from the local quiz.')
     const input = await readBody(req, Math.ceil(maxAttachmentBytes / 3) * 4 + 256_000)
     if (input.mode === 'exam' && currentUser().role !== 'admin') throw new ApiError(403, 'Only administrators can generate real exam questions.')
+    const generator = selectedGenerator(this.plugins, input.modelId)
+    if (generator === null) throw new ApiError(400, 'Choose an available question generator.')
+    if (generator && (input.attachments?.length || !Array.isArray(input.types) || input.types.some(type => !generator.formats.includes(type)))) {
+      throw new ApiError(400, 'Choose formats supported by this generator and remove any attachments.')
+    }
     if (this.generation) throw new ApiError(409, 'A generation is already running. Check its activity or cancel it before starting another.', 'generation_active')
     const job = { id: randomUUID(), startedAt: Date.now(), message: 'Loading the question catalog…', controller: new AbortController(), cancellable: true }
     const userId = currentUser()._id
@@ -68,13 +76,16 @@ export class GenerationController {
           onProgress?.(message)
         }
         const signal = job.controller.signal
-        const { hosted, ai } = this.integrations()
-        const platform = await hosted.connection()
+        const integrations = generator ? null : this.integrations()
+        const platform = await integrations?.hosted.connection()
         if (input.attachments?.length) report('Preparing attached files…')
         const attachments = await prepareGenerationAttachments(input.attachments, { platform: Boolean(platform), signal })
         return generateSet(input, {
           catalog: await this.getCatalog(), saveQuestionSet: this.saveQuestionSet,
-          ask: request => ai.ask(request, platform), signal, attachments,
+          ask: generator ? request => generator.generate({
+            batch: request.batch, prompt: request.prompt, instructions: request.instructions,
+            signal, onProgress: report,
+          }) : request => integrations.ai.ask(request, platform), signal, attachments,
           beforeSave: () => { job.cancellable = false },
           onProgress: report,
         })
@@ -90,6 +101,7 @@ Controller('api/questions/generate')(GenerationController)
 Inject(AI_INTEGRATIONS)(GenerationController, undefined, 0)
 Inject(CATALOG)(GenerationController, undefined, 1)
 Inject(APP_DATA)(GenerationController, undefined, 2)
+Inject(PLUGINS)(GenerationController, undefined, 3)
 bindRoute(GenerationController, 'cancel', Delete(':id'))
 bindRoute(GenerationController, 'status', Get('status'))
 bindRoute(GenerationController, 'generate', Post())

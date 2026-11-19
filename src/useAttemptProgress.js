@@ -94,12 +94,12 @@ export function useAttemptProgress() {
     })
   }
 
-  function keepVideoGrade({ id, videoGrades, correct, pendingReview, passed }) {
+  function keepVideoGrade({ id, videoGrades, correct, pendingReview, passed, pointsEarned, pointsPossible, passPercent }) {
     const current = progressRef.current
     showProgress({
       ...current,
       history: current.history.map(item => item.id === id
-        ? { ...item, videoGrades, correct, pendingReview, passed }
+        ? { ...item, videoGrades, correct, pendingReview, passed, pointsEarned, pointsPossible, passPercent }
         : item),
     })
   }

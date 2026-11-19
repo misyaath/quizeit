@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { localApi } from './local-api.js'
 
-const roles = { admin: 'Administrator', learner: 'Learner' }
+const builtInRoles = { admin: 'Administrator', learner: 'Learner' }
 const initialForm = { firstName: '', lastName: '', email: '', role: 'learner', password: '' }
 
 export default function UserManagement({ user, onAccountUpdated }) {
@@ -60,8 +60,10 @@ export default function UserManagement({ user, onAccountUpdated }) {
     finally { setBusy(false) }
   }
 
+  const roles = directory?.roles ?? builtInRoles
+  const roleLabel = role => roles[role] ?? role
   const users = directory?.users.filter(account =>
-    [account.firstName, account.lastName, account.email, roles[account.role], account.owner ? 'owner' : '',
+    [account.firstName, account.lastName, account.email, roleLabel(account.role), account.owner ? 'owner' : '',
       account.active ? 'active' : 'deactivated'].join(' ').toLowerCase().includes(query.trim().toLowerCase()),
   )
 
@@ -86,7 +88,7 @@ export default function UserManagement({ user, onAccountUpdated }) {
         onChange={event => setForm({ ...form, email: event.target.value })} /></label>
       {form.googleLinked && form.email.trim().toLowerCase() !== form.originalEmail && <p className="muted">Changing this email unlinks Google sign-in.</p>}
       <label className="editor-field">Role<select value={form.role} disabled={Boolean(form.owner)} onChange={event => setForm({ ...form, role: event.target.value })}>
-        {directory.assignableRoles.map(role => <option value={role} key={role}>{roles[role]}</option>)}
+        {[...new Set([form.role, ...directory.assignableRoles])].map(role => <option value={role} key={role}>{roleLabel(role)}</option>)}
       </select></label>
       <label className="editor-field">{form.id ? 'New password (optional)' : 'Password'}<input type="password"
         required={!form.id} minLength={12} maxLength={256} autoComplete="new-password" value={form.password}
@@ -114,7 +116,7 @@ export default function UserManagement({ user, onAccountUpdated }) {
           <tbody>{users.map(account => <tr key={account.id}>
             <th scope="row">{account.firstName} {account.lastName}</th>
             <td>{account.email}</td>
-            <td>{roles[account.role]}{account.owner ? ' · Owner' : ''}</td>
+            <td>{roleLabel(account.role)}{account.owner ? ' · Owner' : ''}</td>
             <td>{account.active ? 'Active' : 'Deactivated'}</td>
             <td><div className="ai-actions">
               {account.editable && <button className="button small secondary" disabled={busy} onClick={() => edit(account)}>Edit</button>}

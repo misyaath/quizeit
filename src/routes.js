@@ -8,6 +8,7 @@ const pages = {
   authoring: '/question-sets',
   'exam-bank': '/exam-bank',
   'real-exams': '/real-exams',
+  'candidate-invitations': '/candidate-invitations',
   users: '/users',
   login: '/login',
   signup: '/signup',
@@ -18,7 +19,10 @@ const examPath = new RegExp('^/practice/(' + setSegment + ')(?:/(results)|/quest
 const editorPath = new RegExp('^/(question-sets|exam-bank)/(' + setSegment + ')/edit$')
 const invitePath = /^\/exam-invite\/([A-Za-z0-9_-]{43})$/
 const candidatePath = /^\/candidate\/(exam-[a-f0-9-]{36})$/
+const invitationExamPath = /^\/candidate-invitations\/exam\/([a-f0-9-]{36})$/
+const realExamPath = /^\/real-exams\/([a-f0-9-]{36})$/
 const attemptPath = /^\/attempts\/([a-z0-9-]+)$/
+const pluginPath = new RegExp('^/plugins/(' + setSegment + ')/(' + setSegment + ')$')
 
 export function readRoute(location) {
   const path = location.pathname.replace(/\/$/, '') || '/'
@@ -34,6 +38,10 @@ export function readRoute(location) {
   if (invite) return { screen: 'invite', token: invite[1] }
   const candidate = candidatePath.exec(path)
   if (candidate) return { screen: 'candidate', setId: candidate[1] }
+  const invitationExam = invitationExamPath.exec(path)
+  if (invitationExam) return { screen: 'candidate-invitations', invitationExamId: invitationExam[1] }
+  const realExam = realExamPath.exec(path)
+  if (realExam) return { screen: 'real-exams', realExamId: realExam[1] }
   for (const [screen, pathname] of Object.entries(pages)) {
     if (path === pathname) return { screen }
   }
@@ -41,11 +49,16 @@ export function readRoute(location) {
   if (exam) return { screen: 'exam', setId: exam[1], section: exam[2] ? 'result' : 'questions', questionId: exam[3] }
   const attempt = attemptPath.exec(path)
   if (attempt) return { screen: 'history-result', historyId: attempt[1] }
+  const plugin = pluginPath.exec(path)
+  if (plugin) return { screen: 'plugin', pluginId: plugin[1], pageId: plugin[2] }
   return { screen: 'not-found' }
 }
 
-export function routePath({ screen, setId, section, questionId, historyId, editorId }) {
+export function routePath({ screen, setId, section, questionId, historyId, editorId, invitationExamId, realExamId, pluginId, pageId }) {
+  if (screen === 'plugin') return '/plugins/' + pluginId + '/' + pageId
   if (screen === 'history-result') return '/attempts/' + historyId
+  if (screen === 'candidate-invitations' && invitationExamId) return pages[screen] + '/exam/' + invitationExamId
+  if (screen === 'real-exams' && realExamId) return pages[screen] + '/' + realExamId
   if (screen === 'authoring' || screen === 'exam-bank') {
     if (editorId) return pages[screen] + '/' + editorId + '/edit'
     if (section === 'new') return pages[screen] + '/new'

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { domains, generalDomain, hasResponse, isAnswered, isCorrect } from './questions/index.js'
-import { practicePassPercent } from './attempts.js'
+import { earnedPoints, examGrading, pointsFor } from '../packages/assessment/grading.js'
 import { CaseDetails, Exhibits, formatLabel } from './QuestionDetails.jsx'
 import { formatScore, formatDate, PassBadge } from './AttemptDisplay.jsx'
 import { FormattedAnswer, ReferenceSolutions, SubmittedFiles } from './AnswerReview.jsx'
@@ -15,6 +15,7 @@ function answerStatus(question, value, codingResult, grade) {
   if (!hasResponse(value)) return 'Unanswered'
   if (!isAnswered(question, value)) return 'Incomplete'
   if (question.type === 'video' && !grade) return 'Pending review'
+  if (question.type === 'video' && !grade.correct && grade.points > 0) return 'Partial credit'
   return isCorrect(question, value, codingResult, grade) ? 'Correct' : 'Incorrect'
 }
 
@@ -28,12 +29,18 @@ export default function Results({ set, attempt, restart, onExplain, goSettings, 
   const review = set.questions.map((question, index) => {
     const value = attempt.answers[question.id]
     const codingResult = attempt.codingResults?.[question.id]
-    return { question, index, value, codingResult, status: answerStatus(question, value, codingResult, attempt.videoGrades?.[question.id]), flagged: attempt.flags.includes(question.id) }
+    const grade = attempt.videoGrades?.[question.id]
+    const status = answerStatus(question, value, codingResult, grade)
+    return { question, index, value, codingResult, grade, status, flagged: attempt.flags.includes(question.id),
+      earned: earnedPoints(set, question, status === 'Correct', grade), max: pointsFor(set, question) }
   })
   const totals = { Correct: 0, Incorrect: 0, Incomplete: 0, Unanswered: 0, ...(attempt.pendingReview && { 'Pending review': 0 }) }
-  for (const item of review) totals[item.status]++
+  for (const item of review) totals[item.status] = (totals[item.status] ?? 0) + 1
   const score = totals.Correct
-  const percentage = score / review.length * 100
+  const earned = attempt.pointsEarned ?? review.reduce((total, item) => total + item.earned, 0)
+  const possible = attempt.pointsPossible ?? review.reduce((total, item) => total + item.max, 0)
+  const passPercent = attempt.passPercent ?? examGrading(set).passPercent
+  const percentage = earned / possible * 100
   const visible = review.filter(item => {
     if (filter === 'all') return true
     if (filter === 'missed') return item.status !== 'Correct'
@@ -46,12 +53,12 @@ export default function Results({ set, attempt, restart, onExplain, goSettings, 
     else restartDialog.current?.close()
   }, [confirmRestart])
 
-  async function gradeVideo(questionId, correct) {
+  async function gradeVideo(questionId, grade) {
     setGradingQuestion(questionId)
     setGradeError(null)
     try {
       const { attempt: graded } = await localApi(
-        'attempt-media/reviews/' + reviewOwnerId + '/' + attempt.id + '/' + questionId, 'PUT', { correct },
+        'attempt-media/reviews/' + reviewOwnerId + '/' + attempt.id + '/' + questionId, 'PUT', grade,
       )
       onVideoGraded(graded)
       if (filter === 'Pending review' && !graded.pendingReview) setFilter('all')
@@ -67,11 +74,14 @@ export default function Results({ set, attempt, restart, onExplain, goSettings, 
       : <button className="back-link" onClick={goBack}>← {backLabel}</button>}
     <header className="results-hero">
       <div><PassBadge passed={attempt.passed} /><h1>{set.title} results</h1>
-        <p>{attempt.pendingReview ? attempt.pendingReview + (attempt.pendingReview === 1 ? ' video answer' : ' video answers') + ' pending review'
-          : score + ' of ' + set.questions.length + ' correct · Pass mark ' + practicePassPercent + '%'}</p>
+        {attempt.pendingReview ? <p>{attempt.pendingReview + (attempt.pendingReview === 1 ? ' video answer' : ' video answers') + ' pending review'}</p>
+          : <p>{set.mode === 'exam' ? earned + ' of ' + possible + ' points' : score + ' of ' + set.questions.length + ' correct'} · Pass mark {passPercent}%</p>}
+        {Boolean(attempt.pendingReview) && <p>Pass mark {passPercent}%</p>}
         <p>{formatDate(attempt.submittedAt)}</p>
       </div>
-      <div className="score" style={{ '--percent': percentage + '%' }}><strong>{attempt.pendingReview ? 'Pending' : formatScore(score, review.length)}</strong></div>
+      <div className={'score' + (attempt.pendingReview ? ' score-pending' : '')} style={{ '--percent': percentage + '%' }}>
+        <strong>{attempt.pendingReview ? 'Pending' : formatScore(earned, possible)}</strong>
+      </div>
     </header>
     <section className="dashboard-section" aria-labelledby="answer-stats">
       <div className="section-heading"><h2 id="answer-stats">Answer breakdown</h2></div>
@@ -101,12 +111,14 @@ export default function Results({ set, attempt, restart, onExplain, goSettings, 
         </select></label>
       </div>
       <div className="review-list">
-        {visible.map(({ question, index, value, codingResult, status }) => (
+        {visible.map(({ question, index, value, codingResult, status, grade, earned: questionEarned, max }) => (
           <details className="review-card" key={question.id}>
             <summary><span className="review-index">{index + 1}</span><span>{question.prompt} <small>{formatLabel(question)}</small></span><span className={status === 'Correct' ? 'result-correct' : 'result-missed'}>{status}</span></summary>
             <div className="review-body">
               <CaseDetails study={question.caseStudy} />
               <Exhibits items={question.exhibits} />
+              {set.mode === 'exam' && <p className="muted">{status === 'Pending review' ? max + ' points available'
+                : questionEarned + ' / ' + max + ' points'}</p>}
               {question.type === 'video' ? <div className="video-review">
                 <div className="video-review-answer">
                   <h4>Submitted answer</h4>
@@ -119,9 +131,18 @@ export default function Results({ set, attempt, restart, onExplain, goSettings, 
                   <p>{question.explanation}</p>
                   {question.domain.source && <a href={question.domain.source} target="_blank" rel="noreferrer">Review this exam domain ↗</a>}
                   {value?.mediaId && (reviewOwnerId ? <div className="ai-actions">
-                    <button className="button secondary" disabled={busy || Boolean(gradingQuestion)} onClick={() => gradeVideo(question.id, false)}>Mark incorrect</button>
-                    <button className="button primary" disabled={busy || Boolean(gradingQuestion)} onClick={() => gradeVideo(question.id, true)}>Mark correct</button>
+                    <button className="button secondary" disabled={busy || Boolean(gradingQuestion)} onClick={() => gradeVideo(question.id, { correct: false })}>Mark incorrect</button>
+                    <button className="button primary" disabled={busy || Boolean(gradingQuestion)} onClick={() => gradeVideo(question.id, { correct: true })}>Mark correct</button>
                   </div> : status === 'Pending review' && <p className="muted">An administrator will review this recording and assign a grade.</p>)}
+                  {value?.mediaId && reviewOwnerId && max > 1 && <form className="ai-actions video-grade-points" onSubmit={event => {
+                    event.preventDefault()
+                    void gradeVideo(question.id, { points: Number(new FormData(event.currentTarget).get('points')) })
+                  }}>
+                    <label className="editor-field">Points awarded (0–{max})<input key={grade?.points ?? grade?.correct}
+                      name="points" type="number" min={0} max={max} required defaultValue={grade ? questionEarned : undefined}
+                      disabled={busy || Boolean(gradingQuestion)} /></label>
+                    <button className="button secondary" disabled={busy || Boolean(gradingQuestion)}>Save points</button>
+                  </form>}
                   {gradeError?.questionId === question.id && <p className="notice" role="alert">{gradeError.message}</p>}
                 </section>
               </div> : <div className="answer-comparison">

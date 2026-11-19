@@ -10,6 +10,7 @@ import { examField, limitFields, limitsFor } from '../../src/execution-settings.
 import { APP_DATA, ATTEMPTS, CATALOG } from '../backend-services.module.mjs'
 import { currentUser } from '../request-user.mjs'
 import { bindRoute } from './nest-http.mjs'
+import { orderExamDraft } from '../../packages/assessment/sections.js'
 
 class PracticeController {
   constructor({ progress, executionSettings }, catalog, attempts) {
@@ -105,7 +106,7 @@ class PracticeController {
   visibleProgress(progress) {
     const user = currentUser()
     if (user.role === 'candidate') {
-      const attempt = progress.attempts[user.setId]
+      const attempt = orderExamDraft(progress.attempts[user.setId])
       const visibleAttempt = attempt?.submitted ? { submitted: true } : attempt
       return practiceProgress({ attempts: visibleAttempt ? { [user.setId]: visibleAttempt } : {}, history: [], snapshots: [] })
     }

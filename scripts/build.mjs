@@ -2,6 +2,7 @@ import { copyFile, mkdir } from 'node:fs/promises'
 import { build, context } from 'esbuild'
 import { readCatalog } from './question-files.mjs'
 import { startServer } from './server.mjs'
+import { pluginPageBundle } from '../apps/web/plugins/bundle.mjs'
 
 await readCatalog()
 
@@ -13,6 +14,7 @@ const options = {
   format: 'esm',
   minify: !development,
   sourcemap: development,
+  plugins: [pluginPageBundle()],
   define: { 'process.env.NODE_ENV': JSON.stringify(development ? 'development' : 'production') },
 }
 

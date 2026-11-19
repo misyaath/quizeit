@@ -21,7 +21,7 @@ export async function initializeAppData(db, dataDir, questionsDir, realExams) {
   const initialized = []
   const perAccount = new Map()
   const users = db.collection('users')
-  const media = createAttemptMedia(db)
+  const media = createAttemptMedia(db, dataDir)
   let progressStoreForUser
   async function reviewAccounts(includeCandidates = false) {
     const accounts = await users.find({}, { projection: { firstName: 1, lastName: 1, email: 1, role: 1, legacyOwner: 1 } }).toArray()

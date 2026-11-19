@@ -75,11 +75,15 @@ In **Manage question sets**, add a **Video response** question with a prompt, gr
 
 Open **Video Answer Practice** to try recording in Firefox, Chrome, or Edge. This sample uses Practice mode, so it opens directly to the video question.
 
-For a real exam, choose the exam tab in desktop Chrome or Edge. In Firefox, choose the browser window displaying the exam and keep it in front. Quizeit checks that the exam is visible and crops the image to the page before uploading. Screenshots are saved when each question opens and every 30 seconds, including during video recording.
+For the written and coding section of a real exam, choose the exam tab in desktop Chrome or Edge. In Firefox, choose the browser window displaying the exam. Quizeit checks that the exam is visible and crops the image to the page before uploading. Enable the webcam, then select **Start exam**. Screenshots are scheduled when each written or coding question opens and every 30 seconds.
 
-Set **Webcam photo interval (seconds)** between 5 and 300. The default is 30 seconds. Learners grant camera access separately for questions without a video answer. Quizeit takes a photo at the start of each of those questions and at the configured interval. Webcam photos use no microphone and stop during video questions. The exam pauses if required sharing or camera access stops. Practice sets use neither type of exam capture.
+When the candidate leaves or returns to the exam, Quizeit logs the focus change and takes a webcam photo when the camera supplies a frame. It also captures the shared exam surface when it can verify the source. If the browser does not identify the shared surface, Quizeit waits until the exam returns to the foreground before capturing it again. Switching windows keeps the existing permissions unless the browser ends the share. Reviewers can compare these events with the images in **Exam evidence**.
 
-Open **Attempt history** to review practice videos. Administrators can use **Real exams → Review exam submissions** to see exam screenshots, webcam photos, the sharing timeline, and recorded answers. Open a video answer and choose **Mark correct** or **Mark incorrect**. The attempt shows **Pending review** until all submitted video responses have been graded. Media is stored privately in MongoDB GridFS with the attempt.
+Set **Webcam photo interval (seconds)** between 5 and 300. The default is 30 seconds. Quizeit takes a photo at the start of each written or coding question and at the configured interval. Webcam photos use no microphone. The exam pauses if required sharing or camera access stops. The written section is locked when submitted. Video questions follow and use their own camera and microphone controls. Practice sets use neither type of exam capture.
+
+Open **Attempt history** to review practice videos. Administrators can use **Real exams → Review exam submissions** to see exam screenshots, webcam photos, the sharing timeline, and recorded answers. Open a video answer and choose **Mark correct** or **Mark incorrect**. The attempt shows **Pending review** until all submitted video responses have been graded.
+
+Exam screenshots and webcam photos are private files in `local-data/exam-images`. Set `QUIZEIT_EXAM_IMAGES_DIR` in `.env` to use another persistent folder. MongoDB stores the full path and access metadata. Video answers use MongoDB GridFS. Back up the image folder alongside MongoDB and keep its path when restoring. For an older installation, stop Quizeit and run `npm run exam-images:migrate` to move its existing images before restarting.
 
 ## Build and invite candidates to a real exam
 
@@ -87,8 +91,14 @@ Administrators manage assessment questions through **Exam question bank**. Pract
 
 Under **Real exams**, choose one or more exam question sets and enter the number to draw from each and its minimum difficulty. A question inherits its set's difficulty when it has no override. The fallback is 5. Each invitation gets a randomized selection and order from the pools saved when the exam was created. Later changes to the source sets apply to future exams.
 
-Enter the candidate's email and the number of days the link is valid. Use **Create invitation link** to share it yourself or **Send invitation email** when delivery is configured. Candidates start once with their name and matching email, then resume in the same browser for up to 24 hours after starting. Location sharing is optional. The candidate list shows the recorded IP address, browser information, and approximate location when shared. Open a submitted attempt to grade and review evidence.
+Use **Real exams → Saved exams → View details** to inspect the eligible questions and edit the pass percentage and points per written, coding, or video question. The defaults are 70% and one point per question. The final score is earned points divided by available points. Coding earns full points when all grading tests pass. Reviewers can award full, partial, or zero points for a submitted video. Grading changes apply to future invitations.
+
+Open **Candidate invitations**, select the exam, and enter the candidate's email and the number of days the link is valid. Use **Create invitation link** to share it yourself or **Send invitation email** when delivery is configured. The list shows invitations for every exam, their expiration date and time, and a copy icon for each unused, unexpired link. Older invitations created before copying was supported can use **Replace link** to issue a new link with the same expiry. Share the replacement with the candidate.
+
+Candidates start once with their name and matching email, then resume in the same browser for up to 24 hours after starting. Location sharing is optional. The candidate list shows the recorded IP address, browser information, and approximate location when shared. Open a submitted attempt to grade and review evidence.
 
 Set `QUIZEIT_PUBLIC_URL` to an HTTPS origin in `.env` for remote candidates. Forward that origin to the loopback app through your TLS reverse proxy. Configure the proxy to set a fixed public Host and overwrite `X-Forwarded-For` with the verified client address. Set `QUIZEIT_TRUST_PROXY=1` when using that proxy so Quizeit records the candidate's IP. The public origin serves invitation and candidate pages, while the administration console remains on localhost.
 
 To enable built-in email delivery, also set `QUIZEIT_RESEND_API_KEY` and `QUIZEIT_EXAM_FROM` to your Resend API key and verified sender, then restart Quizeit. [Resend email documentation](https://resend.com/docs/api-reference/emails/send-email)
+
+Keep `local-data/exam-invitation.key` with the deployment's private backup. Quizeit uses it to recover active invitation links for copying from the admin page.

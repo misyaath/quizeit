@@ -30,6 +30,8 @@ export default function GenerateSet({ active, savedSets, onGenerated, refreshCat
   const [mode, setMode] = useState('practice')
   const [difficulty, setDifficulty] = useState(5)
   const [types, setTypes] = useState(() => Object.keys(formats).filter(type => !['coding', 'video'].includes(type)))
+  const supportedFormats = selectedModel?.formats ?? Object.keys(formats)
+  const canAttach = selectedModel?.attachments !== false
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [result, setResult] = useState(null)
@@ -99,6 +101,17 @@ export default function GenerateSet({ active, savedSets, onGenerated, refreshCat
     if (result && active) resultHeading.current?.focus()
   }, [result, active])
 
+  function changeModel(id) {
+    setModelId(id)
+    setEffort('')
+    setAttachmentError('')
+    const available = models.find(model => model.id === id)?.formats
+    if (available) setTypes(current => {
+      const supported = current.filter(type => available.includes(type))
+      return supported.length ? supported : [available[0]]
+    })
+  }
+
   function attach(event) {
     const selection = Array.from(event.target.files ?? [])
     event.target.value = ''
@@ -113,7 +126,8 @@ export default function GenerateSet({ active, savedSets, onGenerated, refreshCat
   async function generate(event) {
     event.preventDefault()
     if (busy || serverGeneration) return
-    const issue = attachmentIssue(attachments, platformAttachments)
+    const issue = !canAttach && attachments.length ? 'Remove attached files to use this model.'
+      : attachmentIssue(attachments, platformAttachments)
     setAttachmentError(issue)
     if (issue) return
     setError('')
@@ -131,7 +145,7 @@ export default function GenerateSet({ active, savedSets, onGenerated, refreshCat
       setResult(response)
       activity.report('Question set saved.')
     } catch (error) {
-      if (error.code === 'generation_active') activity.report('This request was not sent to OpenAI.')
+      if (error.code === 'generation_active') activity.report('A question generation request is already active.')
       else if (error.code === 'generation_canceled') activity.report('Generation canceled. No set was saved.')
       else activity.report('Generation stopped.')
       if (error.code !== 'generation_canceled') setError(error.message)
@@ -179,17 +193,15 @@ export default function GenerateSet({ active, savedSets, onGenerated, refreshCat
           <div className="generator-models">
             <div className="filter-label">
               <label htmlFor="generator-model">Model</label>
-              <select id="generator-model" value={modelId} required disabled={briefingLocked || loadingModels || !models.length} onChange={event => {
-                setModelId(event.target.value)
-                setEffort('')
-              }}>
+              <select id="generator-model" value={modelId} required disabled={briefingLocked || loadingModels || !models.length}
+                onChange={event => changeModel(event.target.value)}>
                 <option value="">{loadingModels ? 'Loading models…' : 'Choose a model'}</option>
                 {models.map(model => <option value={model.id} key={model.id}>{model.name}</option>)}
               </select>
             </div>
             <div className="filter-label">
               <label htmlFor="generator-effort">Reasoning effort</label>
-              <select id="generator-effort" value={selectedModel?.efforts.includes(effort) ? effort : ''} disabled={briefingLocked || !selectedModel}
+              <select id="generator-effort" value={selectedModel?.efforts.includes(effort) ? effort : ''} disabled={briefingLocked || !selectedModel?.efforts.length}
                 onChange={event => setEffort(event.target.value)}>
                 <option value="">Model default</option>
                 {selectedModel?.efforts.map(value => <option value={value} key={value}>{value === 'xhigh' ? 'Extra high' : value[0].toUpperCase() + value.slice(1)}</option>)}
@@ -198,8 +210,8 @@ export default function GenerateSet({ active, savedSets, onGenerated, refreshCat
           </div>
           <div className="generator-submit-actions">
             <input type="file" ref={fileInput} multiple accept={attachmentExtensions(platformAttachments).join(',')} hidden
-              aria-label="Study attachments" disabled={briefingLocked} onChange={attach} />
-            <button className="button small secondary" type="button" disabled={briefingLocked} onClick={() => fileInput.current?.click()}>Attach files</button>
+              aria-label="Study attachments" disabled={briefingLocked || !canAttach} onChange={attach} />
+            <button className="button small secondary" type="button" disabled={briefingLocked || !canAttach} onClick={() => fileInput.current?.click()}>Attach files</button>
             <button className="button primary generator-send" aria-label="Generate question set" title="Generate question set"
               disabled={briefingLocked || loadingModels || !selectedModel || (!prompt.trim() && !attachments.length) || !types.length || Number(count) < types.length}>
               <span aria-hidden="true">{busy ? '…' : '↑'}</span>
@@ -207,8 +219,9 @@ export default function GenerateSet({ active, savedSets, onGenerated, refreshCat
           </div>
         </div>
       </div>
-      <p className="generator-file-help">Up to 3 files and 10 MiB total. {platformAttachments
-        ? 'PDF, Word, PowerPoint, Excel, and text formats.' : 'PDF and text formats. PDFs need selectable text.'}</p>
+      <p className="generator-file-help">{canAttach ? `Up to 3 files and 10 MiB total. ${platformAttachments
+        ? 'PDF, Word, PowerPoint, Excel, and text formats.' : 'PDF and text formats. PDFs need selectable text.'}`
+        : attachments.length ? 'Remove attached files to use this model.' : 'This model uses a text prompt.'}</p>
       {attachmentError && <p className="notice" role="alert">{attachmentError}</p>}
       {modelError && <div className="notice" role="alert">
         <p>{modelError}</p>
@@ -222,9 +235,9 @@ export default function GenerateSet({ active, savedSets, onGenerated, refreshCat
       </label>
       <fieldset className="generator-formats" disabled={briefingLocked}>
         <legend>Question formats</legend>
-        {Object.entries(formats).map(([type, format]) => <label key={type}>
+        {supportedFormats.map(type => <label key={type}>
           <input type="checkbox" checked={types.includes(type)} onChange={event => setTypes(current => event.target.checked
-            ? [...current, type] : current.filter(item => item !== type))} /> {format.label}
+            ? [...current, type] : current.filter(item => item !== type))} /> {formats[type].label}
         </label>)}
       </fieldset>
       {types.includes('coding') && <p className="muted">Name a programming language in your prompt, or use Python by default.</p>}

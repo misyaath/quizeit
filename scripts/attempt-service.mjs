@@ -5,11 +5,13 @@ import { limitsFor } from '../src/execution-settings.js'
 import { elapsedActivity, includeWorkspaceStats, addRun, newActivity } from './attempt-activity.mjs'
 import { cleanDraft, validUuid, workspaceAnswer } from './attempt-draft.mjs'
 import { editorCounters } from './editor-workspaces.mjs'
-import { finishCapture, requireExamCapture } from './capture-state.mjs'
+import { endCapture, finishCapture, requireExamCapture } from './capture-state.mjs'
+import { firstVideoQuestion, orderExamDraft } from '../packages/assessment/sections.js'
 import { currentUser } from './request-user.mjs'
 import { ApiError } from './openai.mjs'
+import { resultSummary } from '../packages/assessment/results.js'
 
-export function createAttemptService({ progress, executionSettings, getSets, runCode, editor }) {
+export function createAttemptService({ progress, executionSettings, getSets, runCode, editor, publish = () => {} }) {
   const pendingGrades = new Set()
   const canAttemptExam = setId => currentUser()?.role === 'candidate' && currentUser().setId === setId
 
@@ -80,6 +82,26 @@ export function createAttemptService({ progress, executionSettings, getSets, run
 
   async function changeAttempt(body) {
     const { action, setId, draft, previousResultId } = body
+    if (['start-proctored', 'submit-written'].includes(action)) {
+      if (!canAttemptExam(setId) || !validUuid(draft?.draftId)) throw new ApiError(403, 'Exam invitation required.')
+      return updateDraft(setId, draft.draftId, stored => {
+        const saved = orderExamDraft(stored)
+        const videoIndex = firstVideoQuestion(saved.setSnapshot)
+        const activity = saved.activity
+        if (action === 'start-proctored') {
+          if (activity.proctoredStartedAt) return saved
+          if (videoIndex === 0) throw new ApiError(409, 'This exam only has video answers.')
+          requireExamCapture(saved, saved.setSnapshot.questions[saved.index].id, { setup: true })
+          return { ...saved, activity: { ...activity, proctoredStartedAt: Date.now() } }
+        }
+        if (activity.writtenSubmittedAt) return saved
+        if (videoIndex < 1) throw new ApiError(409, 'This exam has no separate written section.')
+        requireExamCapture(saved, saved.setSnapshot.questions[saved.index].id)
+        const at = Date.now()
+        return { ...saved, index: videoIndex,
+          activity: { ...endCapture(activity, activity.capture.sessionId, at), writtenSubmittedAt: at } }
+      })
+    }
     if (!['draft', 'restart', 'submit'].includes(action)) throw new ApiError(400, 'Unknown practice action.')
     if (currentUser()?.role === 'candidate' && (!canAttemptExam(setId) || action === 'restart')) {
       throw new ApiError(403, 'This invitation is for one exam attempt.')
@@ -87,7 +109,8 @@ export function createAttemptService({ progress, executionSettings, getSets, run
     const previous = await progress.read()
     if (action === 'submit' && validUuid(draft?.draftId) && previous.history.some(entry => entry.id === draft.draftId && entry.setId === setId)) return previous
     const latest = await currentSet(setId)
-    const set = (action !== 'restart' && !previous.attempts[setId]?.submitted && previous.attempts[setId]?.setSnapshot) || latest
+    const previousDraft = orderExamDraft(previous.attempts[setId])
+    const set = (action !== 'restart' && !previousDraft?.submitted && previousDraft?.setSnapshot) || latest
     if (!set) throw new ApiError(404, 'This practice set is no longer available.')
     if (set.mode === 'exam' && !canAttemptExam(setId)) throw new ApiError(404, 'Exam invitation required.')
     const next = cleanDraft(set, draft)
@@ -117,13 +140,26 @@ export function createAttemptService({ progress, executionSettings, getSets, run
 
     function enforceCapture(saved) {
       if (set.mode !== 'exam' || action === 'restart') return
+      const videoIndex = firstVideoQuestion(set)
+      if (videoIndex > 0) {
+        const writtenSubmitted = Boolean(saved?.activity?.writtenSubmittedAt)
+        if ((next.index >= videoIndex) !== writtenSubmitted || (action === 'submit' && !writtenSubmitted)) {
+          throw new ApiError(409, writtenSubmitted ? 'The written section has already been submitted.'
+            : 'Submit the written section before recording video answers.')
+        }
+      }
       const draft = saved ?? { setSnapshot: set }
       if (action === 'submit') requireExamCapture(draft)
+      const lockedAnswers = saved?.activity?.writtenSubmittedAt ? cleanDraft(set, saved).answers : null
       for (const question of set.questions) {
+        const savedAnswer = lockedAnswers ? lockedAnswers[question.id] : saved?.answers[question.id]
         if ((question.type !== 'video'
-          && JSON.stringify(next.answers[question.id]) !== JSON.stringify(saved?.answers[question.id]))
+          && JSON.stringify(next.answers[question.id]) !== JSON.stringify(savedAnswer))
           || next.flags.includes(question.id) !== Boolean(saved?.flags.includes(question.id))) {
           requireExamCapture(draft, question.id)
+        }
+        if (lockedAnswers && question.type !== 'video' && Object.hasOwn(saved.answers, question.id)) {
+          next.answers[question.id] = saved.answers[question.id]
         }
       }
     }
@@ -139,7 +175,7 @@ export function createAttemptService({ progress, executionSettings, getSets, run
         : { ...saved.activity, examMinutes }
       next.activity = action === 'submit' ? elapsedActivity(finishCapture(includeWorkspaceStats(activity, workspaceMetrics), now), submittedAt) : activity
       if (action === 'submit') return recordSubmission(current, set, next, next.draftId, submittedAt)
-      next.setSnapshot = action === 'restart' ? set : saved?.setSnapshot ?? set
+      next.setSnapshot = set
       return { ...current, attempts: { ...current.attempts, [setId]: next } }
     }
     if (action !== 'submit') return progress.update(saveAttempt)
@@ -176,7 +212,10 @@ export function createAttemptService({ progress, executionSettings, getSets, run
           throw error
         }
       }
-      return await progress.update(saveAttempt)
+      const submission = await progress.update(saveAttempt)
+      const entry = submission.history.find(item => item.id === next.draftId)
+      if (entry) void publish('attempt.submitted', resultSummary(entry, set.mode ?? 'practice'))
+      return submission
     } finally {
       pendingGrades.delete(gradeKey)
     }
@@ -191,7 +230,7 @@ export function createAttemptService({ progress, executionSettings, getSets, run
         failed: result?.tests.filter(test => !test.passed).length ?? 0,
         cpuSeconds: result?.cpuSeconds, peakMemoryKiB: result?.peakMemoryKiB, limits: result?.limits,
       })
-      if (!result || !snapshot) return { ...saved, activity }
+      if (!result || !snapshot || saved.activity.writtenSubmittedAt) return { ...saved, activity }
       const current = saved.answers[questionId]
       const answer = workspaceAnswer(current, language, snapshot)
       if (current?.language && current.language !== language) answer.language = current.language

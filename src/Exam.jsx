@@ -9,8 +9,10 @@ import { ExamClock, useQuestionTime } from './AttemptActivity.jsx'
 import { CaseDetails, Exhibits, formatLabel } from './QuestionDetails.jsx'
 import QuestionInput, { instructionFor } from './QuestionInput.jsx'
 import { Breadcrumbs } from './RouteLink.jsx'
+import { firstVideoQuestion } from '../packages/assessment/sections.js'
 
-export default function Exam({ set, attempt, position, timing, update, openQuestion, navigate, submit, busy, useVsCode, pinned, flushDraft, candidate = false }) {
+export default function Exam({ set, attempt, position, timing, update, openQuestion, navigate, submit, busy, useVsCode, pinned, flushDraft,
+  candidate = false, startProctored, submitWritten }) {
   const [confirming, setConfirming] = useState(false)
   const [submitError, setSubmitError] = useState('')
   const [questionCollapsed, setQuestionCollapsed] = useState(false)
@@ -30,13 +32,23 @@ export default function Exam({ set, attempt, position, timing, update, openQuest
   const dialog = useRef(null)
   const startingDraft = useRef(false)
   const realExam = set.mode === 'exam'
+  const needsProctoring = realExam && !video
+  const started = !needsProctoring || Boolean(attempt.activity?.proctoredStartedAt)
+  const firstVideo = realExam ? firstVideoQuestion(set) : -1
+  const writtenPhase = firstVideo > 0 && !attempt.activity?.writtenSubmittedAt
+  const sectionStart = firstVideo > 0 && !writtenPhase ? firstVideo : 0
+  const sectionEnd = writtenPhase ? firstVideo : total
+  const sectionQuestions = set.questions.slice(sectionStart, sectionEnd)
+  const sectionAnswered = sectionQuestions.filter(item => isAnswered(item, answers[item.id])).length
+  const submitLabel = writtenPhase ? 'Submit written section' : 'Submit set'
   const [recording, setRecording] = useState(false)
-  const capture = useExamCapture({ required: realExam, setId: set.id, draftId: attempt.draftId,
+  const capture = useExamCapture({ required: needsProctoring, started, setId: set.id, draftId: attempt.draftId,
     questionId: question.id, flushDraft, recording })
-  const webcamInterval = realExam && !video ? set.webcamPhotoSeconds : undefined
+  const webcamInterval = needsProctoring ? set.webcamPhotoSeconds : undefined
   const webcam = useExamWebcam({ intervalSeconds: webcamInterval, setId: set.id, draftId: attempt.draftId,
-    questionId: question.id, sessionId: capture.sessionId, screenReady: capture.ready, onFailure: capture.stop })
-  const examReady = capture.ready && webcam.ready
+    questionId: question.id, sessionId: capture.sessionId, screenReady: capture.coveredQuestion, presence: capture.presence, onFailure: capture.stop })
+  const permissionsReady = capture.ready && webcam.ready
+  const examReady = started && permissionsReady && (!realExam || pinned)
   const clock = useQuestionTime(set.id, question.id, attempt.draftId, timing, pinned && examReady)
   const shareLabel = capture.windowSharing ? 'Share exam window' : 'Share exam tab'
 
@@ -53,6 +65,7 @@ export default function Exam({ set, attempt, position, timing, update, openQuest
   }, [confirming])
 
   function jump(next) {
+    if (!examReady || next < sectionStart || next >= sectionEnd) return
     openQuestion(next)
     requestAnimationFrame(() => {
       if (!heading.current?.closest('[hidden]')) heading.current?.focus({ preventScroll: true })
@@ -78,19 +91,19 @@ export default function Exam({ set, attempt, position, timing, update, openQuest
   }
 
   const questionActions = <div className="question-actions">
-    {(!video || total > 1) && <button className="button secondary" disabled={position === 0 || recording} onClick={() => jump(position - 1)}>← Previous</button>}
+    {(!video || sectionQuestions.length > 1) && <button className="button secondary" disabled={position === sectionStart || recording} onClick={() => jump(position - 1)}>← Previous</button>}
     <button className={'button secondary' + (flagged ? ' marked' : '')} aria-pressed={flagged} onClick={toggleFlag}>{flagged ? 'Flagged' : 'Flag for review'}</button>
-    {video && total > 1 && <label className="video-question-jump">
+    {video && sectionQuestions.length > 1 && <label className="video-question-jump">
       Jump to
       <select value={position} disabled={recording} onChange={event => jump(Number(event.target.value))}>
-        {set.questions.map((item, index) => <option key={item.id} value={index}>
-          {index + 1} · {questionStatus(item)}{flags.includes(item.id) ? ', flagged' : ''}
+        {sectionQuestions.map((item, index) => <option key={item.id} value={sectionStart + index}>
+          {sectionStart + index + 1} · {questionStatus(item)}{flags.includes(item.id) ? ', flagged' : ''}
         </option>)}
       </select>
     </label>}
-    {position < total - 1
+    {position < sectionEnd - 1
       ? <button className="button primary" disabled={recording} onClick={() => jump(position + 1)}>Next →</button>
-      : !video && <button className="button primary" disabled={recording} onClick={() => setConfirming(true)}>Submit set</button>}
+      : !video && <button className="button primary" disabled={recording || busy} onClick={() => setConfirming(true)}>{submitLabel}</button>}
   </div>
 
   return <>
@@ -108,16 +121,18 @@ export default function Exam({ set, attempt, position, timing, update, openQuest
         </button>}
         {video && <button type="button" className="button question-toggle" aria-expanded={!hideQuestion} aria-controls="exam-question-panel"
           disabled={!examReady} onClick={() => setVideoQuestionCollapsed(collapsed => !collapsed)}>{hideQuestion ? 'Show question' : 'Hide question'}</button>}
-        <button className="button primary exam-submit" disabled={!examReady || busy || recording} onClick={() => setConfirming(true)}>Submit set</button>
+        <button className="button primary exam-submit" disabled={!examReady || busy || recording} onClick={() => setConfirming(true)}>{submitLabel}</button>
         {!video && clock.paused && <p className="exam-pause-status" role="status">Timer paused</p>}
       </div>
     </header>
-    {realExam && <section className="notice exam-sharing" aria-label="Exam screen sharing">
+    {needsProctoring && <section className="notice exam-sharing" aria-label="Exam screen sharing">
       <div>
-        <strong>{capture.ready ? 'Screen sharing active' : capture.sharing ? 'Saving exam screenshot…' : 'Exam paused for screen sharing'}</strong>
+        <strong>{capture.ready ? 'Screen sharing active' : capture.recovering ? 'Waiting for an exam screenshot…'
+          : capture.sharing ? 'Saving exam screenshot…' : started ? 'Exam paused for screen sharing' : 'Screen sharing required'}</strong>
         {!capture.sharing && <p>{capture.windowSharing
           ? 'Choose the browser window displaying this exam and keep it in front. Quizeit saves only the visible exam page.'
-          : 'Choose this exam tab in the sharing dialog.'} Quizeit takes a screenshot when each question opens and every 30 seconds, including during video answers. Administrators can review the evidence after submission.</p>}
+          : 'Choose this exam tab in the sharing dialog.'} Quizeit takes screenshots of written and coding questions every 30 seconds and when each question opens.</p>}
+        {!capture.sharing && <p>Leaving the exam tab or window is recorded in the review timeline.</p>}
         {webcamInterval && <p>{webcam.ready ? 'Webcam active.' : webcam.active ? 'Saving webcam photo…' : 'Enable the webcam to continue.'}{' '}
           Webcam photos are saved when a question opens and every {webcamInterval} seconds. Audio is off for webcam photos.</p>}
         {capture.error && <p role="alert">{capture.error}</p>}
@@ -132,11 +147,13 @@ export default function Exam({ set, attempt, position, timing, update, openQuest
           <button className="button primary" disabled={webcam.starting} onClick={webcam.start}>
             {webcam.starting ? 'Opening webcam…' : 'Enable webcam'}
           </button>}
+        {!started && <button type="button" className="button primary" disabled={!permissionsReady || !pinned || busy}
+          onClick={startProctored}>Start exam</button>}
       </div>
     </section>}
-    {!video && <ExamClock clock={clock} />}
+    {!video && started && <ExamClock clock={clock} />}
     <progress className="progress" max={total} value={answered} aria-label="Questions answered" />
-    <div hidden={realExam && !capture.sharing} inert={!examReady} className={coding ? 'exam-grid coding-grid' + (hideQuestion ? ' coding-grid-expanded' : '') : video ? 'exam-grid video-exam-grid' + (hideQuestion ? ' video-exam-expanded' : '') : 'exam-grid'}
+    <div hidden={needsProctoring && (!started || !capture.sharing)} inert={!examReady} className={coding ? 'exam-grid coding-grid' + (hideQuestion ? ' coding-grid-expanded' : '') : video ? 'exam-grid video-exam-grid' + (hideQuestion ? ' video-exam-expanded' : '') : 'exam-grid'}
       style={coding ? { '--question-width': questionWidth + '%' } : undefined}>
       <div className="exam-question-column" hidden={video && hideQuestion}>
         {coding && <button className="button small question-toggle" aria-expanded={!hideQuestion} aria-controls="exam-question-panel"
@@ -161,17 +178,18 @@ export default function Exam({ set, attempt, position, timing, update, openQuest
           disabled={busy || !examReady} onChange={answer => setAnswer(() => answer)} onRecording={setRecording} flushDraft={flushDraft} />
       </div>}
       {video && questionActions}
-      {coding && examReady && <>
+      {coding && started && <>
         {!hideQuestion && <ResizeHandle className="coding-columns-resizer" orientation="vertical" label="Resize question and editor"
           value={questionWidth} min={22} max={60} step={3} measure={handle => 100 / handle.parentElement.clientWidth}
           onChange={setQuestionWidth} />}
         <CodingQuestion key={question.id} question={question} setId={set.id} draftId={attempt.draftId}
-          value={value} onChange={setAnswer} disabled={busy} useVsCode={useVsCode} />
+          value={value} onChange={setAnswer} disabled={busy || !examReady} useVsCode={useVsCode} />
       </>}
       {!video && <aside className="navigator" aria-label="Question navigator">
         <h2>Question navigator</h2>
         <div className="question-numbers">
-          {set.questions.map((item, target) => {
+          {sectionQuestions.map((item, index) => {
+            const target = sectionStart + index
             const status = questionStatus(item)
             const marked = flags.includes(item.id)
             return <button key={item.id} className={`question-number ${status}${marked ? ' flagged' : ''}`}
@@ -188,18 +206,20 @@ export default function Exam({ set, attempt, position, timing, update, openQuest
       </aside>}
     </div>
     <dialog className="submit-dialog" ref={dialog} onCancel={event => { if (busy) event.preventDefault(); else setConfirming(false) }} aria-labelledby="submit-title">
-      <h2 id="submit-title">Submit {set.title.toLowerCase()}?</h2>
-      <p>{answered} of {total} questions are fully answered. {answered < total && 'Unanswered or incomplete questions count as zero.'}</p>
+      <h2 id="submit-title">{writtenPhase ? 'Submit the written section?' : 'Submit ' + set.title.toLowerCase() + '?'}</h2>
+      <p>{sectionAnswered} of {sectionQuestions.length} questions in this section are fully answered. {sectionAnswered < sectionQuestions.length && 'Unanswered or incomplete questions count as zero.'}</p>
+      {writtenPhase && <p>Submitting locks your answers and ends screen sharing. Video answers come next.</p>}
       {submitError && <p role="alert">{submitError}</p>}
       <div className="dialog-actions">
         <button className="button secondary" disabled={busy} onClick={() => { setConfirming(false); setSubmitError('') }}>{candidate ? 'Continue exam' : 'Keep practicing'}</button>
         <button className="button primary" disabled={busy || !examReady || recording} onClick={async () => {
           if (!examReady || recording) return
           await clock.stop()
-          const error = await submit()
+          const error = await (writtenPhase ? submitWritten() : submit())
           if (error) clock.restart()
+          else setConfirming(false)
           setSubmitError(error ?? '')
-        }}>{busy ? 'Saving attempt…' : candidate ? 'Submit exam' : 'Submit and see results'}</button>
+        }}>{busy ? 'Saving attempt…' : writtenPhase ? 'Submit and start video answers' : candidate ? 'Submit exam' : 'Submit and see results'}</button>
       </div>
     </dialog>
   </>

@@ -1,14 +1,15 @@
 import { execFile } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { createWriteStream, createReadStream } from 'node:fs'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { link, lstat, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { Transform } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import { promisify } from 'node:util'
 import { GridFSBucket } from 'mongodb'
 import { ApiError } from './openai.mjs'
+import { validUuid } from './attempt-draft.mjs'
 import { screenshotByteLimit, videoByteLimit, videoTypes } from '../src/exam-media.js'
 
 const probe = promisify(execFile)
@@ -58,9 +59,64 @@ function readRange(header, size) {
   return Number.isSafeInteger(start) && start <= end && start < size ? { start, end } : false
 }
 
-export function createAttemptMedia(db) {
+async function readImage(stream) {
+  const chunks = []
+  let size = 0
+  for await (const chunk of stream) {
+    size += chunk.length
+    if (size > screenshotByteLimit) throw new ApiError(413, 'The image is too large.')
+    chunks.push(chunk)
+  }
+  const image = Buffer.concat(chunks)
+  if (size < 5 || image[0] !== 255 || image[1] !== 216 || image.at(-2) !== 255 || image.at(-1) !== 217) {
+    throw new ApiError(422, 'The image is not a JPEG.')
+  }
+  return image
+}
+
+export function createAttemptMedia(db, dataDir = resolve('local-data')) {
   const bucket = new GridFSBucket(db, { bucketName: 'attempt_media' })
   const files = db.collection('attempt_media.files')
+  const images = db.collection('exam_image_files')
+  const imagesDir = resolve(process.env.QUIZEIT_EXAM_IMAGES_DIR || join(dataDir, 'exam-images'))
+  const imagePath = id => join(imagesDir, id + '.jpg')
+
+  async function storeImage(id, image, metadata, uploadDate = new Date()) {
+    if (!validUuid(id)) throw new Error('The exam image ID is invalid.')
+    const path = imagePath(id)
+    const staged = path + '.' + randomUUID() + '.tmp'
+    await mkdir(imagesDir, { recursive: true, mode: 0o700 })
+    try {
+      await writeFile(staged, image, { flag: 'wx', mode: 0o600, flush: true })
+      await link(staged, path).catch(error => { if (error.code !== 'EEXIST') throw error })
+    } finally {
+      await rm(staged, { force: true })
+    }
+    if (!(await lstat(path)).isFile() || !(await readFile(path)).equals(image)) {
+      throw new Error('The saved exam image failed verification.')
+    }
+    await images.updateOne({ _id: id }, { $setOnInsert: { path, length: image.length, metadata, uploadDate } }, { upsert: true })
+    const entry = await images.findOne({ _id: id })
+    if (entry?.path !== path || entry.length !== image.length
+      || Object.entries(metadata).some(([key, value]) => entry.metadata?.[key] !== value)) {
+      throw new Error('The saved exam image metadata failed verification.')
+    }
+  }
+
+  async function migrateImages() {
+    let migrated = 0
+    let bytes = 0
+    for await (const file of files.find({ 'metadata.kind': { $in: ['screenshot', 'webcam'] } })) {
+      const image = await readImage(bucket.openDownloadStream(file._id))
+      if (image.length !== file.length) throw new Error('The original exam image length changed during migration.')
+      await storeImage(file._id, image, file.metadata, file.uploadDate)
+      await bucket.delete(file._id)
+      migrated++
+      bytes += image.length
+    }
+    return { migrated, bytes }
+  }
+
   async function upload(req, identity, maxSeconds) {
     const mime = req.headers['content-type']?.split(';', 1)[0]
     const video = identity.kind === 'video'
@@ -69,20 +125,8 @@ export function createAttemptMedia(db) {
     }
     const id = randomUUID()
     if (!video) {
-      const sizeCheck = limiter(req, screenshotByteLimit)
-      // Collect one bounded JPEG and verify the container before exposing it to playback.
-      const chunks = []
-      let size = 0
-      for await (const chunk of req) {
-        size += chunk.length
-        if (size > screenshotByteLimit) throw new ApiError(413, 'The image is too large.')
-        chunks.push(chunk)
-      }
-      const image = Buffer.concat(chunks)
-      if (size < 5 || image[0] !== 255 || image[1] !== 216 || image.at(-2) !== 255 || image.at(-1) !== 217) {
-        throw new ApiError(422, 'The image is not a JPEG.')
-      }
-      await pipeline([image], sizeCheck, bucket.openUploadStreamWithId(id, id, { metadata: { ...identity, mime } }))
+      if (Number(req.headers['content-length']) > screenshotByteLimit) throw new ApiError(413, 'The image is too large.')
+      await storeImage(id, await readImage(req), { ...identity, mime })
       return { id }
     }
 
@@ -99,6 +143,13 @@ export function createAttemptMedia(db) {
   }
 
   async function send(req, res, file) {
+    if (file.path) {
+      const stat = file.path === imagePath(file._id) && await lstat(file.path).catch(error => {
+        if (error.code === 'ENOENT') return null
+        throw error
+      })
+      if (!stat || !stat.isFile() || stat.size !== file.length) throw new ApiError(404, 'Exam image not found.')
+    }
     const range = readRange(req.headers.range, file.length)
     if (range === false) {
       res.writeHead(416, { 'Content-Range': 'bytes */' + file.length })
@@ -109,8 +160,22 @@ export function createAttemptMedia(db) {
       'Accept-Ranges': 'bytes', 'Content-Length': range ? range.end - range.start + 1 : file.length,
       ...(range && { 'Content-Range': `bytes ${range.start}-${range.end}/${file.length}` }),
     })
-    await pipeline(bucket.openDownloadStream(file._id, range ? { start: range.start, end: range.end + 1 } : {}), res)
+    const stream = file.path ? createReadStream(file.path, range || undefined)
+      : bucket.openDownloadStream(file._id, range ? { start: range.start, end: range.end + 1 } : {})
+    await pipeline(stream, res)
   }
 
-  return { upload, send, find: id => files.findOne({ _id: id }), remove: id => bucket.delete(id) }
+  async function find(id) {
+    return (await images.findOne({ _id: id })) ?? files.findOne({ _id: id })
+  }
+
+  async function remove(id) {
+    const image = await images.findOne({ _id: id })
+    if (!image) return bucket.delete(id)
+    if (image.path !== imagePath(id)) throw new Error('The exam image path is invalid.')
+    await rm(image.path, { force: true })
+    await images.deleteOne({ _id: id })
+  }
+
+  return { upload, send, find, remove, migrateImages }
 }

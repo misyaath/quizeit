@@ -31,6 +31,7 @@ const validPassword = password => typeof password === 'string' && password.lengt
 const key = (password, salt) => derive(password, salt, 64, { N: 32768, r: 8, p: 1, maxmem: 64 * 1024 * 1024 })
 
 export async function createAccounts(db, { googleClientId = process.env.GOOGLE_CLIENT_ID, googleClientSecret = process.env.GOOGLE_CLIENT_SECRET,
+  roles = { learner: 'Learner', admin: 'Administrator' },
   fetchResponse = fetch, verifyGoogle = (token, audience, nonce) => jwtVerify(token, jwks, {
     issuer: ['https://accounts.google.com', 'accounts.google.com'], audience, requiredClaims: ['sub', 'exp', 'iat', 'nonce'],
   }).then(({ payload }) => {
@@ -126,12 +127,14 @@ export async function createAccounts(db, { googleClientId = process.env.GOOGLE_C
   async function listUsers(actor) {
     requireAdmin(actor)
     const accounts = await users.find({}, { projection: { passwordHash: 0, passwordSalt: 0 } }).sort({ firstName: 1, lastName: 1, email: 1 }).toArray()
-    return { users: accounts.map(target => managementUser(actor, target)), assignableRoles: actor.legacyOwner ? ['learner', 'admin'] : ['learner'] }
+    return { users: accounts.map(target => managementUser(actor, target)), roles,
+      assignableRoles: actor.legacyOwner ? Object.keys(roles) : ['learner'] }
   }
 
   function validateRole(actor, role) {
-    if (!['learner', 'admin'].includes(role)) throw new ApiError(400, 'Choose a valid role.')
-    if (role === 'admin' && !actor.legacyOwner) throw new ApiError(403, 'Only the owner can grant the administrator role.')
+    if (typeof role !== 'string' || !Object.hasOwn(roles, role)) throw new ApiError(400, 'Choose a valid role.')
+    if (role !== 'learner' && !actor.legacyOwner) throw new ApiError(403, role === 'admin'
+      ? 'Only the owner can grant the administrator role.' : 'Only the owner can grant roles with additional permissions.')
   }
 
   async function createUser(actor, input) {

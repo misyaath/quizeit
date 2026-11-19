@@ -1,6 +1,6 @@
 # quizeit
 
-A local React app for cloud certification practice. It includes an Azure AI-200 question bank, a study dashboard, saved attempts, and optional coding labs and AI study tools.
+A self-hosted React and NestJS app for certification practice and real exams. It includes an Azure AI-200 question bank, saved attempts, coding labs, and optional AI study tools.
 
 ## Start the full app
 
@@ -43,6 +43,8 @@ Open **Settings** at `http://127.0.0.1:5173/` to connect an eligible ChatGPT acc
 ## Documentation
 
 - [Developer guide](docs/development.md) covers architecture, data flows, extension points, and verification.
+- [Plugin guide](docs/plugins.md) shows how to add and enable features in the same repository.
+- [Contributing](CONTRIBUTING.md) covers local development and checks.
 - [Question authoring](docs/question-authoring.md) covers catalog structure, JSON formats, and coding questions.
 - [Using the app](docs/using-the-app.md) covers practice, coding labs, AI sign-in, question generation, and hosted tools.
 

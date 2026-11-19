@@ -124,10 +124,12 @@ export default function CodingQuestion({ question, value, setId, draftId, onChan
     setError('')
     setConsoleView('output')
     try {
-      const { code, files, stats, ...result } = await localApi('code/run', 'POST', { ...identity, ...(!useVsCode && { code, files }), ...(custom && { stdin }) })
+      const { code: savedCode, files: savedFiles, stats, ...result } = await localApi('code/run', 'POST', {
+        ...identity, ...(!useVsCode && { code, files }), ...(custom && { stdin }),
+      })
       if (!mounted.current) return
-      onChange(previous => ({ ...previous, language, code: { ...previous?.code, [language]: code },
-        files: { ...previous?.files, [language]: files }, ...(custom && { stdin }), lastRun: result }))
+      onChange(previous => ({ ...previous, language, code: { ...previous?.code, [language]: savedCode },
+        files: { ...previous?.files, [language]: savedFiles }, ...(custom && { stdin }), lastRun: result }))
       setStatus(previous => ({ ...previous, stats }))
     } catch (failure) {
       if (mounted.current) setError(failure.message)

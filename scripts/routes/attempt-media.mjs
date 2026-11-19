@@ -1,12 +1,15 @@
 import { Controller, Delete, Get, Inject, Module, Post, Put } from '@nestjs/common'
 import { APP_DATA, ATTEMPTS } from '../backend-services.module.mjs'
 import { validUuid } from '../attempt-draft.mjs'
-import { addFrame, addWebcamFrame, checkFrame, checkWebcamFrame, endCapture, requireExamCapture } from '../capture-state.mjs'
+import { addFrame, addWebcamFrame, checkFrame, checkWebcamFrame, endCapture, recordPresence, requireExamCapture } from '../capture-state.mjs'
 import { json, readBody } from '../http.mjs'
 import { ApiError } from '../openai.mjs'
 import { currentUser, requestUser } from '../request-user.mjs'
 import { bindRoute } from './nest-http.mjs'
 import { gradeVideoResponse } from '../../src/attempts.js'
+import { pointsFor } from '../../packages/assessment/grading.js'
+import { PLUGINS } from '../../apps/server/plugins/runtime.mjs'
+import { resultSummary } from '../../packages/assessment/results.js'
 
 function requireReviewer() {
   if (currentUser().role !== 'admin') throw new ApiError(403, 'Only administrators can review submitted media.')
@@ -14,9 +17,10 @@ function requireReviewer() {
 const reviewable = attempt => Boolean(attempt.activity?.capture || Object.values(attempt.answers ?? {}).some(value => value?.mediaId))
 
 class AttemptMediaController {
-  constructor(data, attempts) {
+  constructor(data, attempts, plugins) {
     this.data = data
     this.attempts = attempts
+    this.plugins = plugins
   }
 
   async draftFor(setId, draftId) {
@@ -63,38 +67,50 @@ class AttemptMediaController {
   }
 
   async screenshot({ req, url }, res) {
-    const { setId, draftId, questionId } = req.params
+    const { questionId } = req.params
     const sessionId = url.searchParams.get('session')
     const reason = url.searchParams.get('reason')
-    if (!validUuid(sessionId) || !['start', 'open', 'interval'].includes(reason)) throw new ApiError(400, 'Invalid screen sharing session.')
-    const identity = { sessionId, reason, questionId, recording: url.searchParams.get('recording') === 'true',
+    if (!validUuid(sessionId) || !['start', 'open', 'interval', 'away', 'returned'].includes(reason)) throw new ApiError(400, 'Invalid screen sharing session.')
+    const identity = { sessionId, reason, questionId, requestId: url.searchParams.get('request'), recording: url.searchParams.get('recording') === 'true',
       surface: url.searchParams.get('surface') === 'window' ? 'window' : 'tab' }
-    const draft = await this.draftFor(setId, draftId)
-    checkFrame(draft, identity)
-    const file = await this.data.media.upload(req, { kind: 'screenshot', ownerId: req.user._id, setId, draftId, questionId })
-    try {
-      await this.attempts.updateDraft(setId, draftId, current => addFrame(current, identity, file.id))
-    } catch (error) {
-      await this.data.media.remove(file.id).catch(() => {})
-      throw error
-    }
-    return json(res, { id: file.id }, 201)
+    return this.saveEvidence(req, res, identity, 'screenshot', 'screenshots', checkFrame, addFrame)
   }
 
   async webcam({ req, url }, res) {
-    const { setId, draftId, questionId } = req.params
+    const { questionId } = req.params
     const sessionId = url.searchParams.get('session')
     if (!validUuid(sessionId)) throw new ApiError(400, 'Invalid screen sharing session.')
-    const identity = { sessionId, questionId }
-    checkWebcamFrame(await this.draftFor(setId, draftId), identity)
-    const file = await this.data.media.upload(req, { kind: 'webcam', ownerId: req.user._id, setId, draftId, questionId })
+    const reason = url.searchParams.get('reason') ?? 'interval'
+    if (!['interval', 'away', 'returned'].includes(reason)) throw new ApiError(400, 'Invalid webcam capture reason.')
+    const identity = { sessionId, questionId, requestId: url.searchParams.get('request'), reason }
+    return this.saveEvidence(req, res, identity, 'webcam', 'webcamPhotos', checkWebcamFrame, addWebcamFrame)
+  }
+
+  async saveEvidence(req, res, identity, kind, collection, check, add) {
+    const { setId, draftId, questionId } = req.params
+    if (identity.requestId && !validUuid(identity.requestId)) throw new ApiError(400, 'Invalid image upload.')
+    const existingId = draft => identity.requestId && draft.activity?.capture?.[collection]?.find(frame =>
+      frame.requestId === identity.requestId && frame.sessionId === identity.sessionId && frame.questionId === questionId)?.id
+    const draft = await this.draftFor(setId, draftId)
+    const previous = existingId(draft)
+    if (previous) {
+      req.resume()
+      return json(res, { id: previous })
+    }
+    check(draft, identity)
+    const file = await this.data.media.upload(req, { kind, ownerId: req.user._id, setId, draftId, questionId })
+    let reused
     try {
-      await this.attempts.updateDraft(setId, draftId, draft => addWebcamFrame(draft, identity, file.id))
+      await this.attempts.updateDraft(setId, draftId, current => {
+        reused = existingId(current)
+        return reused ? current : add(current, identity, file.id)
+      })
     } catch (error) {
       await this.data.media.remove(file.id).catch(() => {})
       throw error
     }
-    return json(res, { id: file.id }, 201)
+    if (reused) await this.data.media.remove(file.id).catch(() => {})
+    return json(res, { id: reused || file.id }, reused ? 200 : 201)
   }
 
   async stop({ req }, res) {
@@ -104,6 +120,16 @@ class AttemptMediaController {
     await this.attempts.updateDraft(setId, draftId, current => ({
       ...current, activity: endCapture(current.activity, sessionId),
     }))
+    return json(res, {})
+  }
+
+  async presence({ req }, res) {
+    const { setId, draftId } = req.params
+    const { sessionId, type, source } = await readBody(req, 2000)
+    if (!validUuid(sessionId) || !['away', 'returned'].includes(type) || !['visibility', 'focus'].includes(source)) {
+      throw new ApiError(400, 'Invalid exam focus event.')
+    }
+    await this.attempts.updateDraft(setId, draftId, current => recordPresence(current, sessionId, type, source))
     return json(res, {})
   }
 
@@ -131,7 +157,8 @@ class AttemptMediaController {
     for (const account of await this.data.reviewAccounts(examMode)) {
       const { history, snapshots } = await this.data.reviewProgress(account)
       for (const attempt of history) {
-        if (!reviewable(attempt) || (JSON.parse(snapshots[attempt.snapshotIndex])?.mode === 'exam') !== examMode) continue
+        const isExam = JSON.parse(snapshots[attempt.snapshotIndex])?.mode === 'exam'
+        if (isExam !== examMode || (!isExam && !reviewable(attempt))) continue
         const { id, title, submittedAt, pendingReview } = attempt
         entries.push({ id, title, submittedAt, pendingReview, ownerId: account._id, learner: [account.firstName, account.lastName].join(' ') })
       }
@@ -144,26 +171,33 @@ class AttemptMediaController {
     requireReviewer()
     const account = await this.data.reviewAccount(req.params.ownerId)
     const progress = await this.data.reviewProgress(account)
-    const attempt = progress.history.find(item => item.id === req.params.attemptId && reviewable(item))
-    if (!attempt) throw new ApiError(404, 'Submitted attempt not found.')
-    return json(res, { attempt, set: JSON.parse(progress.snapshots[attempt.snapshotIndex]) })
+    const attempt = progress.history.find(item => item.id === req.params.attemptId)
+    const set = attempt && JSON.parse(progress.snapshots[attempt.snapshotIndex])
+    if (!set || (set.mode !== 'exam' && !reviewable(attempt))) throw new ApiError(404, 'Submitted attempt not found.')
+    return json(res, { attempt, set })
   }
 
   async grade({ req }, res) {
     requireReviewer()
-    const { correct } = await readBody(req)
-    if (typeof correct !== 'boolean') throw new ApiError(400, 'Choose a grade.')
+    const { correct, points } = await readBody(req)
+    if (points === undefined && typeof correct !== 'boolean') throw new ApiError(400, 'Choose a grade.')
     const account = await this.data.reviewAccount(req.params.ownerId)
-    let reviewed
+    let reviewed, mode
     await requestUser.run(account, () => this.data.progress.update(progress => {
       const entry = progress.history.find(item => item.id === req.params.attemptId)
       if (!entry) throw new ApiError(404, 'Submitted attempt not found.')
       const set = JSON.parse(progress.snapshots[entry.snapshotIndex])
+      mode = set.mode ?? 'practice'
       const question = set.questions.find(item => item.id === req.params.questionId && item.type === 'video')
       if (!question || !entry.answers[question.id]?.mediaId) throw new ApiError(404, 'Submitted video answer not found.')
-      reviewed = gradeVideoResponse(entry, set, question.id, correct)
+      const max = pointsFor(set, question)
+      if (points !== undefined && (!Number.isInteger(points) || points < 0 || points > max)) {
+        throw new ApiError(400, 'Enter points between 0 and ' + max + '.')
+      }
+      reviewed = gradeVideoResponse(entry, set, question.id, points ?? correct)
       return { ...progress, history: progress.history.map(item => item === entry ? reviewed : item) }
     }))
+    void this.plugins.emit('attempt.graded', resultSummary(reviewed, mode))
     return json(res, { attempt: reviewed })
   }
 }
@@ -171,11 +205,13 @@ class AttemptMediaController {
 Controller('api/attempt-media')(AttemptMediaController)
 Inject(APP_DATA)(AttemptMediaController, undefined, 0)
 Inject(ATTEMPTS)(AttemptMediaController, undefined, 1)
+Inject(PLUGINS)(AttemptMediaController, undefined, 2)
 bindRoute(AttemptMediaController, 'video', Post('video/:setId/:draftId/:questionId'))
 bindRoute(AttemptMediaController, 'removeVideo', Delete('video/:setId/:draftId/:questionId/:id'))
 bindRoute(AttemptMediaController, 'screenshot', Post('screenshot/:setId/:draftId/:questionId'))
 bindRoute(AttemptMediaController, 'webcam', Post('webcam/:setId/:draftId/:questionId'))
 bindRoute(AttemptMediaController, 'stop', Post('stop/:setId/:draftId'))
+bindRoute(AttemptMediaController, 'presence', Post('presence/:setId/:draftId'))
 bindRoute(AttemptMediaController, 'file', Get('files/:id'))
 bindRoute(AttemptMediaController, 'reviews', Get('reviews'))
 bindRoute(AttemptMediaController, 'readReview', Get('reviews/:ownerId/:attemptId'))

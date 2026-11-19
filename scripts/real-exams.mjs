@@ -1,11 +1,15 @@
 import { createHash, randomBytes, randomInt, randomUUID } from 'node:crypto'
 import { isIP } from 'node:net'
+import { resolve } from 'node:path'
 import { mongoStore } from './mongo-store.mjs'
 import { ApiError } from './openai.mjs'
 import { currentUser } from './request-user.mjs'
 import { validUuid } from './attempt-draft.mjs'
 import { defaultWebcamPhotoSeconds, maxWebcamPhotoSeconds, minWebcamPhotoSeconds } from '../src/exam-media.js'
 import { questionLimitFields, questionTimeField } from '../src/execution-settings.js'
+import { createInvitationLinks } from './invitation-links.mjs'
+import { orderExamQuestions } from '../packages/assessment/sections.js'
+import { defaultExamGrading, examGrading } from '../packages/assessment/grading.js'
 
 const dayMs = 86_400_000
 const tokenPattern = /^[A-Za-z0-9_-]{43}$/
@@ -44,10 +48,18 @@ function shuffle(items) {
   return result
 }
 
-function publicTemplate({ id, title, examMinutes, webcamPhotoSeconds, pools }) {
-  return { id, title, examMinutes, webcamPhotoSeconds, sources: pools.map(({ sourceId, title, count, minimumDifficulty }) => ({
+function publicTemplate({ id, title, examMinutes, webcamPhotoSeconds, pools, grading }) {
+  return { id, title, examMinutes, webcamPhotoSeconds, grading: grading ?? defaultExamGrading, sources: pools.map(({ sourceId, title, count, minimumDifficulty }) => ({
     sourceId, title, count, minimumDifficulty,
   })), questionCount: pools.reduce((total, pool) => total + pool.count, 0) }
+}
+
+function checkedGrading(grading) {
+  const { passPercent, marks } = grading ?? {}
+  if (!integerIn(passPercent, 1, 100) || !['written', 'coding', 'video'].every(type => integerIn(marks?.[type], 1, 100))) {
+    throw new ApiError(400, 'Enter a pass mark and points per question between 1 and 100.')
+  }
+  return { passPercent, marks: { written: marks.written, coding: marks.coding, video: marks.video } }
 }
 
 function browserLocation(value) {
@@ -70,13 +82,14 @@ function configuredOrigin(value) {
 
 export async function createRealExams(db, {
   publicUrl = process.env.QUIZEIT_PUBLIC_URL, mailKey = process.env.QUIZEIT_RESEND_API_KEY,
-  mailFrom = process.env.QUIZEIT_EXAM_FROM, sendRequest = fetch, now = () => new Date(),
+  mailFrom = process.env.QUIZEIT_EXAM_FROM, sendRequest = fetch, now = () => new Date(), dataDir = resolve('local-data'),
 } = {}) {
   const publicOrigin = configuredOrigin(publicUrl)
   const mailEnabled = Boolean(publicOrigin?.protocol === 'https:' && mailKey && mailFrom)
   const templates = mongoStore(db, 'real_exam_templates')
   const invitations = db.collection('exam_invitations')
-  await Promise.all([
+  const [links] = await Promise.all([
+    createInvitationLinks(dataDir),
     templates.initialize(() => []),
     invitations.createIndex({ tokenHash: 1 }, { unique: true }),
     invitations.createIndex({ examId: 1, createdAt: -1 }),
@@ -91,6 +104,8 @@ export async function createRealExams(db, {
   async function list() {
     return { exams: (await templates.read()).map(publicTemplate), mailEnabled }
   }
+
+  const linkFor = (token, requestOrigin) => new URL('/exam-invite/' + token, publicOrigin ?? requestOrigin).href
 
   async function create(input, sources) {
     const title = cleanText(input.title, 160)
@@ -111,9 +126,32 @@ export async function createRealExams(db, {
       return { sourceId: source.id, title: source.title, count: row.count, minimumDifficulty: row.minimumDifficulty, questions }
     })
     if (pools.reduce((total, pool) => total + pool.count, 0) > 60) throw new ApiError(400, 'An exam can contain at most 60 questions.')
-    const exam = { id: randomUUID(), title, examMinutes, webcamPhotoSeconds, pools }
+    const grading = checkedGrading(input.grading ?? defaultExamGrading)
+    const exam = { id: randomUUID(), title, examMinutes, webcamPhotoSeconds, pools, grading }
     await templates.update(current => [exam, ...current])
     return publicTemplate(exam)
+  }
+
+  async function details(id) {
+    const exam = await findExam(id)
+    const summary = publicTemplate(exam)
+    return { ...summary, sources: summary.sources.map((source, index) => ({
+      ...source, questions: exam.pools[index].questions.map(({ id, prompt, type, difficulty }) => ({ id, prompt, type, difficulty })),
+    })) }
+  }
+
+  async function updateGrading(id, input) {
+    const grading = checkedGrading(input)
+    let updated
+    await templates.update(current => {
+      if (!current.some(exam => exam.id === id)) throw new ApiError(404, 'Real exam not found.')
+      return current.map(exam => {
+        if (exam.id !== id) return exam
+        updated = { ...exam, grading }
+        return updated
+      })
+    })
+    return publicTemplate(updated)
   }
 
   async function invite(id, input, requestOrigin) {
@@ -128,8 +166,9 @@ export async function createRealExams(db, {
     const createdAt = now()
     const expiresAt = new Date(createdAt.getTime() + input.days * dayMs)
     const questionIds = shuffle(exam.pools.flatMap(pool => shuffle(pool.questions).slice(0, pool.count).map(question => question.id)))
-    const link = new URL('/exam-invite/' + token, publicOrigin ?? requestOrigin).href
-    await invitations.insertOne({ _id: invitationId, examId: exam.id, email, tokenHash: hash(token), questionIds, createdAt, expiresAt })
+    const link = linkFor(token, requestOrigin)
+    await invitations.insertOne({ _id: invitationId, examId: exam.id, email, tokenHash: hash(token),
+      sealedToken: links.seal(invitationId, token), questionIds, grading: examGrading(exam), createdAt, expiresAt })
     let delivery = 'link'
     if (input.send) {
       const response = await sendRequest('https://api.resend.com/emails', {
@@ -144,8 +183,23 @@ export async function createRealExams(db, {
     return { link, expiresAt, delivery }
   }
 
-  const unclaimed = token => ({ tokenHash: hash(token), expiresAt: { $gt: now() }, startedAt: { $exists: false } })
+  const pending = () => ({ expiresAt: { $gt: now() }, startedAt: { $exists: false } })
+  const unclaimed = token => ({ tokenHash: hash(token), ...pending() })
   const unavailable = () => new ApiError(404, 'This exam invitation has expired or has already been used.')
+
+  async function invitationLink(id, requestOrigin, replace = false) {
+    const invite = validUuid(id) && await invitations.findOne({ _id: id, ...pending() })
+    if (!invite) throw unavailable()
+    const token = links.open(id, invite.sealedToken)
+    if (token && hash(token) === invite.tokenHash) return { link: linkFor(token, requestOrigin) }
+    if (!replace) throw new ApiError(409, 'This invitation needs a replacement link.')
+    const replacement = makeToken()
+    const saved = await invitations.updateOne({ _id: id, tokenHash: invite.tokenHash, ...pending() }, {
+      $set: { tokenHash: hash(replacement), sealedToken: links.seal(id, replacement), delivery: 'link' },
+    })
+    if (!saved.matchedCount) throw new ApiError(409, 'This invitation changed. Refresh the list and try again.')
+    return { link: linkFor(replacement, requestOrigin) }
+  }
   async function inspect(token) {
     const invite = tokenPattern.test(token) && await invitations.findOne(unclaimed(token))
     if (!invite) throw unavailable()
@@ -168,7 +222,7 @@ export async function createRealExams(db, {
       firstName, lastName, startedAt, sessionHash: hash(session), sessionExpiresAt: new Date(startedAt.getTime() + dayMs),
       verification: { ip: isIP(clientIp ?? '') ? clientIp : null, location: browserLocation(input.location),
         userAgent: cleanText(req.headers['user-agent'], 300) },
-    } }, { returnDocument: 'after' })
+    }, $unset: { sealedToken: '' } }, { returnDocument: 'after' })
     if (!claimed) throw unavailable()
     const setId = 'exam-' + claimed._id
     res.append('Set-Cookie', 'quizeit_candidate=' + session + '; Path=/api/candidate/' + setId
@@ -183,22 +237,35 @@ export async function createRealExams(db, {
     if (!validUuid(id) || !tokenPattern.test(token ?? '')) return null
     const invite = await invitations.findOne({ _id: id, sessionHash: hash(token), sessionExpiresAt: { $gt: now() } })
     if (!invite) return null
-    return { _id: id, role: 'candidate', setId, examId: invite.examId, questionIds: invite.questionIds }
+    return { _id: id, role: 'candidate', setId, examId: invite.examId, questionIds: invite.questionIds, grading: examGrading(invite) }
   }
 
   async function assignedSet(candidate) {
     const exam = await findExam(candidate.examId)
     const questions = new Map(exam.pools.flatMap(pool => pool.questions.map(question => [question.id, question])))
-    return { id: candidate.setId, title: exam.title, mode: 'exam', webcamPhotoSeconds: exam.webcamPhotoSeconds,
-      limits: { examMinutes: exam.examMinutes }, questions: candidate.questionIds.map(id => questions.get(id)) }
+    return orderExamQuestions({ id: candidate.setId, title: exam.title, mode: 'exam', webcamPhotoSeconds: exam.webcamPhotoSeconds, grading: examGrading(candidate),
+      limits: { examMinutes: exam.examMinutes }, questions: candidate.questionIds.map(id => questions.get(id)) })
   }
 
   const reviewFields = { firstName: 1, lastName: 1, email: 1 }
   const reviewCandidates = () => invitations.find({ startedAt: { $exists: true } }, { projection: reviewFields }).toArray()
   const reviewCandidate = id => invitations.findOne({ _id: id, startedAt: { $exists: true } }, { projection: reviewFields })
-  const listInvitations = id => invitations.find({ examId: id }, {
-    projection: { email: 1, startedAt: 1, expiresAt: 1, firstName: 1, lastName: 1, verification: 1, delivery: 1 },
-  }).sort({ createdAt: -1 }).toArray()
+  async function listInvitations(id) {
+    const [exams, entries] = await Promise.all([
+      templates.read(),
+      invitations.find(id ? { examId: id } : {}, {
+        projection: { examId: 1, email: 1, startedAt: 1, expiresAt: 1, firstName: 1, lastName: 1, verification: 1, delivery: 1, sealedToken: 1 },
+      }).sort({ createdAt: -1 }).toArray(),
+    ])
+    const titles = new Map(exams.map(exam => [exam.id, exam.title]))
+    const at = now()
+    const listed = entries.map(({ sealedToken, ...entry }) => {
+      const status = entry.startedAt ? 'Started' : entry.expiresAt <= at ? 'Expired' : 'Invited'
+      return { ...entry, examTitle: titles.get(entry.examId), status,
+        linkAction: status !== 'Invited' ? null : links.canOpen(sealedToken) ? 'copy' : 'replace' }
+    })
+    return { entries: listed, exams: exams.map(publicTemplate), mailEnabled }
+  }
 
-  return { publicOrigin, list, create, invite, inspect, claim, getCandidate, assignedSet, reviewCandidates, reviewCandidate, listInvitations }
+  return { publicOrigin, list, create, details, updateGrading, invite, inspect, claim, getCandidate, assignedSet, reviewCandidates, reviewCandidate, listInvitations, invitationLink }
 }

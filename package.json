@@ -9,6 +9,7 @@
     "docker:up": "node scripts/docker.mjs",
     "dev": "node --env-file-if-exists=.env --watch scripts/build.mjs --dev",
     "build": "node scripts/build.mjs",
+    "test": "node --test",
     "start": "node --env-file-if-exists=.env scripts/start.mjs",
     "judge0:up": "node scripts/docker.mjs judge0",
     "judge0:stop": "node scripts/docker.mjs judge0 --stop",
@@ -17,6 +18,7 @@
     "mongo:up": "node scripts/docker.mjs mongo",
     "mongo:stop": "node scripts/docker.mjs mongo --stop",
     "mongo:migrate": "node --env-file-if-exists=.env scripts/migrate-mongo.mjs",
+    "exam-images:migrate": "node --env-file-if-exists=.env scripts/migrate-exam-images.mjs",
     "account:owner": "node --env-file-if-exists=.env scripts/set-owner.mjs"
   },
   "dependencies": {

@@ -9,7 +9,7 @@ const inviteApi = /^\/api\/exam-invites\/[A-Za-z0-9_-]{43}$/
 const publicPage = /^(?:\/exam-invite\/[A-Za-z0-9_-]{43}|\/candidate\/exam-[a-f0-9-]{36}|\/assets\/main\.(?:js|css))\/?$/
 const candidatePaths = {
   GET: /^\/api\/(?:catalog|progress|code\/languages|attempt-media\/files\/[a-f0-9-]{36})$/,
-  POST: /^\/api\/(?:progress(?:\/time)?|code\/run|attempt-media\/(?:video|screenshot|webcam|stop)\/[a-z0-9/-]+)$/,
+  POST: /^\/api\/(?:progress(?:\/time)?|code\/run|attempt-media\/(?:video|screenshot|webcam|stop|presence)\/[a-z0-9/-]+)$/,
   DELETE: /^\/api\/attempt-media\/video\/[a-z0-9/-]+$/,
 }
 

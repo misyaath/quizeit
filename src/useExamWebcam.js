@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
-import { apiUrl } from './local-api.js'
 import { encodeFrame, readFrame, releaseVideo, videoForStream } from './video-frame.js'
+import { uploadExamEvidence } from './upload-exam-evidence.js'
 
-export function useExamWebcam({ intervalSeconds, setId, draftId, questionId, sessionId, screenReady, onFailure }) {
+export function useExamWebcam({ intervalSeconds, setId, draftId, questionId, sessionId, screenReady, presence, onFailure }) {
   const scope = useRef(null)
   const current = useRef(null)
   const activeQuestion = useRef(questionId)
+  const delivery = useRef(null)
+  const latestPresence = useRef(presence)
+  latestPresence.current = presence
   activeQuestion.current = questionId
   const fail = useRef(onFailure)
   fail.current = onFailure
@@ -77,34 +80,56 @@ export function useExamWebcam({ intervalSeconds, setId, draftId, questionId, ses
     if (!active || !screenReady) return
     const controller = new AbortController()
     let timer
+    let pending = Promise.resolve()
+    let returningRetries = 0
     const valid = () => !controller.signal.aborted && current.current === active && activeQuestion.current === questionId
 
-    async function takePhoto() {
+    function schedule(delay = intervalSeconds * 1000, reason = 'interval') {
+      clearTimeout(timer)
+      if (valid()) timer = setTimeout(() => takePhoto(reason), delay)
+    }
+
+    function takePhoto(reason = 'interval') {
       if (!valid()) return
-      try {
+      clearTimeout(timer)
+      pending = pending.then(async () => {
+        if (!valid()) return
+        if (reason !== 'interval' && latestPresence.current?.type !== reason) {
+          schedule()
+          return
+        }
         const frame = await readFrame(active.video, 640, 480, 'The webcam did not send a photo.')
         if (active.track.muted || active.track.readyState !== 'live') throw new Error('The webcam feed is unavailable.')
         const blob = await encodeFrame(frame, 0.65)
         if (!valid()) return
-        const response = await fetch(apiUrl('attempt-media/webcam/' + setId + '/' + draftId + '/' + questionId
-          + '?session=' + active.sessionId), { method: 'POST', body: blob, signal: controller.signal })
-        if (!response.ok) {
-          const problem = await response.json().catch(() => null)
-          throw new Error(problem?.error ?? 'Could not save the webcam photo.')
-        }
+        await uploadExamEvidence('attempt-media/webcam/' + setId + '/' + draftId + '/' + questionId,
+          new URLSearchParams({ session: active.sessionId, reason }), blob, 'webcam photo', controller.signal)
         if (!valid()) return
         setCovered({ active, questionId })
-        timer = setTimeout(takePhoto, intervalSeconds * 1000)
-      } catch (failure) {
-        if (valid()) fail.current(failure.message)
-      }
+        schedule()
+      }).catch(failure => {
+        if (!valid()) return
+        if (failure.status === 429) schedule()
+        else if (latestPresence.current?.type === 'away' && active.track.readyState === 'live') schedule()
+        else if (reason === 'returned' && active.track.readyState === 'live' && returningRetries++ < 3) schedule(1000, 'returned')
+        else fail.current(failure.message)
+      })
     }
-    void takePhoto()
+    delivery.current = reason => {
+      if (reason === 'returned') returningRetries = 0
+      takePhoto(reason)
+    }
+    takePhoto()
     return () => {
+      delivery.current = null
       controller.abort()
       clearTimeout(timer)
     }
   }, [active, screenReady, setId, draftId, questionId, intervalSeconds])
+
+  useEffect(() => {
+    if (presence && presence.sessionId === sessionId) delivery.current?.(presence.type)
+  }, [presence, sessionId])
 
   return {
     ready: !intervalSeconds || Boolean(active && covered?.active === active && covered.questionId === questionId),

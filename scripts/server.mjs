@@ -1,7 +1,6 @@
 import 'reflect-metadata'
 import { resolve } from 'node:path'
-import { Module } from '@nestjs/common'
-import { APP_FILTER, APP_GUARD, NestFactory } from '@nestjs/core'
+import { NestFactory } from '@nestjs/core'
 import { ExpressAdapter } from '@nestjs/platform-express'
 import express from 'express'
 import { connectMongo } from './mongo-store.mjs'
@@ -9,39 +8,15 @@ import { initializeAppData } from './app-data.mjs'
 import { questionFolder } from './question-files.mjs'
 import { createJudge0 } from './judge0.mjs'
 import { createEditorWorkspaces } from './editor-workspaces.mjs'
-import { BackendServicesModule } from './backend-services.module.mjs'
 import { createAccounts } from './accounts.mjs'
-import { AccountModule } from './routes/account.mjs'
-import { AuthoringModule } from './routes/authoring.mjs'
-import { RealExamsModule } from './routes/real-exams.mjs'
 import { createRealExams } from './real-exams.mjs'
-import { AttemptMediaModule } from './routes/attempt-media.mjs'
-import { PracticeModule } from './routes/practice.mjs'
-import { CodingModule } from './routes/coding.mjs'
-import { AiModule } from './routes/openai.mjs'
-import { FrontendModule } from './routes/frontend.mjs'
-import { ApiExceptionFilter, LocalRequestGuard } from './routes/nest-http.mjs'
 import { readEnvFile } from './env-file.mjs'
-
-class AppModule {
-  static register(services) {
-    return {
-      module: AppModule,
-      // Mount the frontend fallback after the API controllers.
-      imports: [BackendServicesModule.register(services), AccountModule, PracticeModule, AttemptMediaModule, AuthoringModule, RealExamsModule, CodingModule, AiModule, FrontendModule],
-      providers: [
-        { provide: APP_GUARD, useClass: LocalRequestGuard },
-        { provide: APP_FILTER, useClass: ApiExceptionFilter },
-      ],
-    }
-  }
-}
-
-Module({})(AppModule)
+import { AppModule } from '../apps/server/app-module.mjs'
+import { loadPlugins } from '../apps/server/plugins/runtime.mjs'
 
 export async function startServer({
   port = Number(process.env.QUIZEIT_PORT || 5173), dataDir = resolve('local-data'), fetchResponse = fetch, questionsDir = questionFolder,
-  runCode, editor = createEditorWorkspaces(dataDir), mongoUri, mongoDatabase, accountOptions, examOptions,
+  runCode, editor = createEditorWorkspaces(dataDir), mongoUri, mongoDatabase, accountOptions, examOptions, pluginOptions,
 } = {}) {
   if (!runCode) {
     const token = process.env.JUDGE0_TOKEN || (!process.env.JUDGE0_URL
@@ -52,9 +27,10 @@ export async function startServer({
   const mongo = await connectMongo({ dataDir, mongoUri, mongoDatabase })
   let app
   try {
-    const realExams = await createRealExams(mongo.db, examOptions)
+    const realExams = await createRealExams(mongo.db, { dataDir, ...examOptions })
     const data = await initializeAppData(mongo.db, dataDir, questionsDir, realExams)
-    const accounts = await createAccounts(mongo.db, accountOptions)
+    const plugins = await loadPlugins(mongo.db, pluginOptions)
+    const accounts = await createAccounts(mongo.db, { ...accountOptions, roles: plugins.roles() })
     const httpApp = express()
     httpApp.disable('x-powered-by')
     httpApp.enable('case sensitive routing')
@@ -68,7 +44,7 @@ export async function startServer({
       }
       next()
     })
-    app = await NestFactory.create(AppModule.register({ data, accounts, realExams, runCode, editor, fetchResponse }), new ExpressAdapter(httpApp), {
+    app = await NestFactory.create(AppModule.register({ data, accounts, realExams, runCode, editor, fetchResponse, plugins }), new ExpressAdapter(httpApp), {
       abortOnError: false,
       // The controllers enforce different JSON limits and accept raw file uploads.
       bodyParser: false,

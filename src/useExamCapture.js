@@ -3,6 +3,7 @@ import { apiUrl } from './local-api.js'
 import { screenshotIntervalMs } from './exam-media.js'
 import { cropExamWindow, markExamWindow } from './exam-window-capture.js'
 import { encodeFrame, readFrame, releaseVideo, videoForStream } from './video-frame.js'
+import { uploadExamEvidence } from './upload-exam-evidence.js'
 
 const stopTracks = stream => stream.getTracks().forEach(track => track.stop())
 const paint = () => new Promise(resolve => {
@@ -13,7 +14,7 @@ const paint = () => new Promise(resolve => {
   }))
 })
 
-export function useExamCapture({ required, setId, draftId, questionId, flushDraft, recording }) {
+export function useExamCapture({ required, started, setId, draftId, questionId, flushDraft, recording }) {
   const current = useRef(null)
   const pending = useRef(Promise.resolve())
   const mounted = useRef(false)
@@ -26,6 +27,8 @@ export function useExamCapture({ required, setId, draftId, questionId, flushDraf
   const [covered, setCovered] = useState('')
   const [starting, setStarting] = useState(false)
   const [error, setError] = useState('')
+  const [presence, setPresence] = useState(null)
+  const [recovering, setRecovering] = useState(false)
   const devices = navigator.mediaDevices
   const windowSharing = typeof devices?.setCaptureHandleConfig !== 'function'
 
@@ -38,7 +41,7 @@ export function useExamCapture({ required, setId, draftId, questionId, flushDraf
       sharing.markers?.remove()
       releaseVideo(sharing.video)
       // If an upload is already in progress, stop the server session after it completes.
-      void pending.current.then(() => fetch(apiUrl('attempt-media/stop/' + sharing.setId + '/' + sharing.draftId), {
+      void Promise.allSettled([pending.current, sharing.presenceWrites]).then(() => fetch(apiUrl('attempt-media/stop/' + sharing.setId + '/' + sharing.draftId), {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId: sharing.id }), keepalive: true,
       })).catch(() => {})
@@ -47,24 +50,25 @@ export function useExamCapture({ required, setId, draftId, questionId, flushDraf
       setSession(null)
       setCovered('')
       setError(message)
+      setPresence(null)
+      setRecovering(false)
     }
   }
 
   useEffect(() => {
     mounted.current = {}
     const leave = () => stop()
-    const visibilityChanged = () => {
-      if (document.hidden && current.current?.markers) stop('The exam is no longer visible. Share its window to resume.')
-    }
     window.addEventListener('pagehide', leave)
-    document.addEventListener('visibilitychange', visibilityChanged)
     return () => {
       mounted.current = false
       window.removeEventListener('pagehide', leave)
-      document.removeEventListener('visibilitychange', visibilityChanged)
       stop()
     }
   }, [setId, draftId])
+
+  useEffect(() => {
+    if (!required && current.current) stop()
+  }, [required])
 
   async function start() {
     if (!draftId || starting || current.current) return
@@ -95,7 +99,9 @@ export function useExamCapture({ required, setId, draftId, questionId, flushDraf
       }
       const video = videoForStream(stream)
       void video.play().catch(() => {})
-      const sharing = { id, markers, track, video, setId, draftId, questionId: null, surface: windowSharing ? 'window' : 'tab' }
+      const sharing = { id, markers, track, video, setId, draftId, questionId: null, surface: windowSharing ? 'window' : 'tab',
+        verifiedSurface: !windowSharing || ['window', 'browser'].includes(surface),
+        presence: 'returned', presenceWrites: Promise.resolve() }
       current.current = sharing
       accepted = true
       openingMarkers.current = null
@@ -124,15 +130,31 @@ export function useExamCapture({ required, setId, draftId, questionId, flushDraf
     if (!required || !session) return
     let canceled = false
     let timer
+    let returnRetries = 0
+    const controller = new AbortController()
+    const valid = () => !canceled && current.current === session
+    function schedule(delay = screenshotIntervalMs, reason = 'interval') {
+      clearTimeout(timer)
+      if (valid()) timer = setTimeout(() => capture(reason), delay)
+    }
     function capture(reason) {
+      clearTimeout(timer)
       const task = pending.current.then(async () => {
-        if (canceled || current.current !== session || activeQuestion.current !== questionId) return
+        if (!valid() || activeQuestion.current !== questionId) return
         await flushDraft()
-        if (reason === 'open' && !document.hidden) await paint()
-        if (canceled || current.current !== session) return
-        if (session.markers ? document.hidden || !document.hasFocus() : session.track.getCaptureHandle()?.handle !== session.id) {
-          throw new Error(session.markers ? 'Bring the exam window to the front.' : 'The shared tab changed.')
+        if ((reason === 'open' || reason === 'returned') && !document.hidden) await paint()
+        if (!valid()) return
+        if ((reason === 'away' || reason === 'returned') && session.presence !== reason) {
+          schedule()
+          return
         }
+        if (!session.verifiedSurface && (document.hidden || session.presence === 'away')) {
+          setRecovering(true)
+          schedule()
+          return
+        }
+        if (session.track.muted) throw new Error('The shared exam did not send an image.')
+        if (!session.markers && session.track.getCaptureHandle()?.handle !== session.id) throw new Error('The shared tab changed.')
         const frame = await readFrame(session.video, session.markers ? 1920 : 1280, session.markers ? 1080 : 720,
           'The shared exam did not send an image.')
         if (canceled || current.current !== session) return
@@ -141,30 +163,65 @@ export function useExamCapture({ required, setId, draftId, questionId, flushDraf
         const params = new URLSearchParams({ session: session.id,
           reason: session.questionId === null ? 'start' : reason, recording: String(videoRecording.current), surface: session.surface,
         })
-        const response = await fetch(apiUrl('attempt-media/screenshot/' + setId + '/' + draftId + '/' + questionId + '?' + params), {
-          method: 'POST', body: blob,
-        })
-        if (!response.ok) {
-          const error = await response.json().catch(() => null)
-          throw new Error(error?.error ?? 'Could not save the screenshot.')
-        }
+        await uploadExamEvidence('attempt-media/screenshot/' + setId + '/' + draftId + '/' + questionId,
+          params, blob, 'screenshot', controller.signal)
         session.questionId = questionId
-        if (!canceled && current.current === session) {
+        if (valid()) {
           setCovered(questionId)
-          timer = setTimeout(() => capture('interval'), screenshotIntervalMs)
+          setRecovering(false)
+          schedule()
         }
       }).catch(failure => {
-        if (!canceled && current.current === session) stop(failure.message)
+        if (!valid()) return
+        if (failure.status === 429) {
+          if (reason === 'returned') setRecovering(false)
+          schedule()
+        } else if (session.presence === 'away' && session.track.readyState === 'live') {
+          setRecovering(true)
+          schedule()
+        } else if (reason === 'returned' && session.track.readyState === 'live' && returnRetries++ < 3) {
+          schedule(1000, 'returned')
+        } else stop(failure.message)
       })
       pending.current = task
+    }
+    function focusChanged(event) {
+      const type = document.hidden || event.type === 'blur'
+        || (event.type === 'visibilitychange' && !document.hasFocus()) ? 'away' : 'returned'
+      if (!valid() || type === session.presence) return
+      session.presence = type
+      const source = event.type === 'visibilitychange' ? 'visibility' : 'focus'
+      setPresence({ type, sessionId: session.id })
+      session.presenceWrites = session.presenceWrites.then(async () => {
+        const response = await fetch(apiUrl('attempt-media/presence/' + setId + '/' + draftId), {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId: session.id, type, source }), keepalive: true, signal: AbortSignal.timeout(5000),
+        })
+        if (!response.ok) throw new Error('Could not log the exam focus change.')
+      }).catch(() => {})
+      if (type === 'returned') {
+        returnRetries = 0
+        setRecovering(true)
+      }
+      capture(type)
+    }
+    if (started) {
+      window.addEventListener('blur', focusChanged)
+      window.addEventListener('focus', focusChanged)
+      document.addEventListener('visibilitychange', focusChanged)
     }
     capture('open')
     return () => {
       canceled = true
       clearTimeout(timer)
+      controller.abort()
+      window.removeEventListener('blur', focusChanged)
+      window.removeEventListener('focus', focusChanged)
+      document.removeEventListener('visibilitychange', focusChanged)
     }
-  }, [required, session, questionId, setId, draftId, flushDraft])
+  }, [required, started, session, questionId, setId, draftId, flushDraft])
 
-  return { ready: !required || Boolean(session && covered === questionId), sharing: Boolean(session),
+  const coveredQuestion = Boolean(session && covered === questionId)
+  return { ready: !required || (coveredQuestion && !recovering), coveredQuestion, recovering, presence, sharing: Boolean(session),
     sessionId: session?.id, windowSharing, starting, error, start, stop }
 }

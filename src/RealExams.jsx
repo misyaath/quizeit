@@ -1,27 +1,26 @@
 import React, { useEffect, useState } from 'react'
 import { localApi } from './local-api.js'
-import RouteLink from './RouteLink.jsx'
-import { formatDate } from './AttemptDisplay.jsx'
-import Results from './Results.jsx'
+import RouteLink, { Breadcrumbs } from './RouteLink.jsx'
 import { ReviewQueue } from './AttemptMediaReview.jsx'
 import { defaultWebcamPhotoSeconds, maxWebcamPhotoSeconds, minWebcamPhotoSeconds } from './exam-media.js'
+import { defaultExamGrading, pointsFor } from '../packages/assessment/grading.js'
+import { formats } from './questions/index.js'
 
 export default function RealExams({ navigate }) {
   const [catalog, setCatalog] = useState(null)
-  const [selectedId, select] = useState('')
   const [error, setError] = useState('')
   const [reviewing, setReviewing] = useState(false)
   useEffect(() => {
     localApi('real-exams').then(setCatalog).catch(failure => setError(failure.message))
   }, [])
 
-  const selected = catalog?.exams.find(exam => exam.id === selectedId)
   if (reviewing) return <ReviewQueue exam onClose={() => setReviewing(false)} />
   return <>
     <header className="section-heading author-heading">
       <h1>Real exams</h1>
       <div className="ai-actions">
         <RouteLink className="button secondary" to="exam-bank" navigate={navigate}>Exam question bank</RouteLink>
+        <RouteLink className="button secondary" to="candidate-invitations" navigate={navigate}>Candidate invitations</RouteLink>
         <button className="button secondary" onClick={() => setReviewing(true)}>Review exam submissions</button>
       </div>
     </header>
@@ -30,17 +29,102 @@ export default function RealExams({ navigate }) {
     {catalog && <>
       <ExamBuilder sources={catalog.sources} onCreated={exam => {
         setCatalog(current => ({ ...current, exams: [exam, ...current.exams] }))
-        select(exam.id)
       }} />
-      <section className="dashboard-section" aria-labelledby="real-exam-invitations">
-        <h2 id="real-exam-invitations">Candidate invitations</h2>
-        {catalog.exams.length > 0 ? <label className="editor-field exam-selection">Exam
-          <select value={selectedId} onChange={event => select(event.target.value)}>
-            <option value="">Choose a real exam</option>
-            {catalog.exams.map(exam => <option key={exam.id} value={exam.id}>{exam.title} · {exam.questionCount} questions</option>)}
-          </select>
-        </label> : <p className="muted">Create an exam to invite candidates.</p>}
-        {selected && <Invitations key={selected.id} exam={selected} mailEnabled={catalog.mailEnabled} />}
+      <section className="dashboard-section" aria-labelledby="saved-real-exams">
+        <div className="section-heading"><h2 id="saved-real-exams">Saved exams</h2></div>
+        {!catalog.exams.length && <p className="muted">No real exams yet.</p>}
+        <ul className="history-list invitation-exam-list">{catalog.exams.map(exam => <li key={exam.id}>
+          <div><h3>{exam.title}</h3><p>{exam.questionCount} questions</p></div>
+          <div className="ai-actions">
+            <RouteLink className="button small secondary" to={{ screen: 'real-exams', realExamId: exam.id }}
+              aria-label={'View details for ' + exam.title} navigate={navigate}>View details</RouteLink>
+            <RouteLink className="button small secondary" to={{ screen: 'candidate-invitations', invitationExamId: exam.id }}
+              navigate={navigate}>Invite candidates</RouteLink>
+          </div>
+        </li>)}</ul>
+      </section>
+    </>}
+  </>
+}
+
+const gradeFields = [
+  ['passPercent', 'Pass mark (%)'],
+  ['written', 'Points per written question'],
+  ['coding', 'Points per coding question'],
+  ['video', 'Points per video question'],
+]
+
+function readGrading(fields) {
+  return {
+    passPercent: Number(fields.get('passPercent')),
+    marks: Object.fromEntries(gradeFields.slice(1).map(([name]) => [name, Number(fields.get(name))])),
+  }
+}
+
+function GradingFields({ grading = defaultExamGrading, disabled }) {
+  return <fieldset disabled={disabled}>
+    <legend>Grading</legend>
+    <div className="execution-limit-fields">{gradeFields.map(([name, label]) =>
+      <label className="editor-field" key={name}>{label}
+        <input name={name} type="number" min={1} max={100} required defaultValue={name === 'passPercent' ? grading.passPercent : grading.marks[name]} />
+      </label>)}</div>
+    <p className="muted">Coding earns full points when all tests pass. Reviewers can award partial points for video answers.</p>
+  </fieldset>
+}
+
+export function ExamDetails({ id, navigate }) {
+  const [exam, setExam] = useState(null)
+  const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
+  const [busy, setBusy] = useState(false)
+  const path = 'real-exams/' + id
+  useEffect(() => {
+    localApi(path).then(setExam).catch(failure => setError(failure.message))
+  }, [path])
+
+  async function save(event) {
+    event.preventDefault()
+    const grading = readGrading(new FormData(event.currentTarget))
+    setError('')
+    setNotice('')
+    setBusy(true)
+    try {
+      const updated = await localApi(path + '/grading', 'PUT', grading)
+      setExam(current => ({ ...current, grading: updated.grading }))
+      setNotice('Grading saved for future invitations.')
+    } catch (failure) { setError(failure.message) }
+    finally { setBusy(false) }
+  }
+
+  return <>
+    <Breadcrumbs to="real-exams" label="Real exams" navigate={navigate}>{exam?.title ?? 'Exam details'}</Breadcrumbs>
+    {error && <p role="alert" className="notice">{error}</p>}
+    {!exam && !error && <p role="status">Loading exam details…</p>}
+    {exam && <>
+      <header className="section-heading author-heading">
+        <div><h1>{exam.title}</h1><p>{exam.questionCount} questions · {exam.grading.passPercent}% pass mark</p></div>
+        <RouteLink className="button secondary" to={{ screen: 'candidate-invitations', invitationExamId: id }}
+          navigate={navigate}>Invite candidates</RouteLink>
+      </header>
+      <dl className="score-grid stat-grid">
+        <div className="score-card"><dt>Tracked time budget</dt><dd>{exam.examMinutes ? exam.examMinutes + ' minutes' : 'No budget'}</dd></div>
+        <div className="score-card"><dt>Webcam photo interval</dt><dd>{exam.webcamPhotoSeconds} seconds</dd></div>
+      </dl>
+      <form className="question-panel author-form" onSubmit={save} aria-label="Exam grading settings">
+        <GradingFields grading={exam.grading} disabled={busy} />
+        <p className="muted">Changes apply to future invitations. Each candidate keeps the grading rules assigned with their link.</p>
+        {notice && <p role="status">{notice}</p>}
+        <div><button className="button primary" disabled={busy}>{busy ? 'Saving…' : 'Save grading'}</button></div>
+      </form>
+      <section className="dashboard-section" aria-labelledby="exam-question-sources">
+        <div className="section-heading"><h2 id="exam-question-sources">Question sources</h2></div>
+        <div className="review-list">{exam.sources.map(source => <details className="question-panel" key={source.sourceId}>
+          <summary><strong>{source.title}</strong> · Draw {source.count} of {source.questions.length} eligible · Difficulty {source.minimumDifficulty}+</summary>
+          <ol className="exam-source-questions">{source.questions.map(question => <li key={question.id}>
+            <div>{question.prompt}</div>
+            <small className="muted">{formats[question.type].label} · Difficulty {question.difficulty} · {pointsFor(exam, question)} points</small>
+          </li>)}</ol>
+        </details>)}</div>
       </section>
     </>}
   </>
@@ -68,6 +152,7 @@ function ExamBuilder({ sources, onCreated }) {
     try {
       onCreated(await localApi('real-exams', 'POST', {
         title: fields.get('title'), examMinutes: Number(fields.get('examMinutes')), webcamPhotoSeconds: Number(fields.get('webcamPhotoSeconds')),
+        grading: readGrading(fields),
         sources: rows.map(({ sourceId, count, minimumDifficulty }) => ({ sourceId, count: Number(count), minimumDifficulty: Number(minimumDifficulty) })),
       }))
       setNotice('Real exam created. You can now invite candidates.')
@@ -83,6 +168,7 @@ function ExamBuilder({ sources, onCreated }) {
       <label className="editor-field">Webcam photo interval in seconds<input name="webcamPhotoSeconds" type="number" min={minWebcamPhotoSeconds}
         max={maxWebcamPhotoSeconds} defaultValue={defaultWebcamPhotoSeconds} required disabled={busy} /></label>
     </div>
+    <GradingFields disabled={busy} />
     <fieldset disabled={busy}>
       <legend>Question sets</legend>
       {rows.map((row, index) => {
@@ -113,83 +199,4 @@ function ExamBuilder({ sources, onCreated }) {
     {notice && <p role="status">{notice}</p>}
     <div><button className="button primary" disabled={busy || !rows.length || total > 60}>{busy ? 'Creating…' : 'Create exam'}</button></div>
   </form>
-}
-
-function Invitations({ exam, mailEnabled }) {
-  const [entries, setEntries] = useState([])
-  const [created, setCreated] = useState(null)
-  const [review, setReview] = useState(null)
-  const [error, setError] = useState('')
-  const [busy, setBusy] = useState(false)
-  const endpoint = 'real-exams/' + exam.id + '/invitations'
-
-  async function load() {
-    try { setEntries(await localApi(endpoint)) }
-    catch (failure) { setError(failure.message) }
-  }
-  useEffect(() => { void load() }, [endpoint])
-
-  async function invite(event) {
-    event.preventDefault()
-    const fields = new FormData(event.currentTarget)
-    const send = event.nativeEvent.submitter?.value === 'send'
-    setBusy(true)
-    setError('')
-    setCreated(null)
-    try {
-      setCreated(await localApi(endpoint, 'POST', { email: fields.get('email'), days: Number(fields.get('days')), send }))
-      await load()
-    } catch (failure) { setError(failure.message) }
-    finally { setBusy(false) }
-  }
-
-  async function openReview(entry) {
-    setError('')
-    try {
-      const detail = await localApi('attempt-media/reviews/' + entry.id + '/' + entry.resultId)
-      setReview({ ...detail, ownerId: entry.id })
-    } catch (failure) { setError(failure.message) }
-  }
-
-  return <div className="exam-invitations">
-    {error && <p role="alert" className="notice">{error}</p>}
-    {review ? <Results set={review.set} attempt={review.attempt} backLabel="Invitations" goBack={() => setReview(null)}
-      reviewOwnerId={review.ownerId} onVideoGraded={attempt => setReview(current => current && ({ ...current, attempt }))} /> : <>
-      <form onSubmit={invite} className="question-panel author-form" aria-label="Invite a candidate">
-        <div className="author-pair">
-          <label className="editor-field">Candidate email<input type="email" name="email" maxLength={254} required disabled={busy} /></label>
-          <label className="editor-field">Link expires after (days)<input type="number" name="days" min={1} max={365} defaultValue={7} required disabled={busy} /></label>
-        </div>
-        <div className="ai-actions">
-          {mailEnabled && <button className="button primary" value="send" disabled={busy}>Send invitation email</button>}
-          <button className={'button ' + (mailEnabled ? 'secondary' : 'primary')} value="copy" disabled={busy}>Create invitation link</button>
-        </div>
-        {created && <>
-          <p role="status">{created.delivery === 'sent' ? 'Invitation emailed.' : created.delivery === 'failed'
-            ? 'Email delivery failed. You can share the link below.' : 'Invitation link created.'} Expires {formatDate(created.expiresAt)}.</p>
-          <label className="editor-field">Invitation link<input readOnly value={created.link} onFocus={event => event.target.select()} /></label>
-        </>}
-      </form>
-      <div className="section-heading author-heading"><h3>Invited candidates</h3>
-        <button className="button small secondary" onClick={load}>Refresh</button>
-      </div>
-      {entries.length === 0 && <p className="muted">No invitations yet.</p>}
-      <ul className="history-list">{entries.map(entry => <li key={entry.id}>
-        <div>
-          <h3>{entry.firstName ? entry.firstName + ' ' + entry.lastName : entry.email}</h3>
-          <p>{entry.firstName && entry.email + ' · '}{entry.resultId ? 'Submitted' : entry.startedAt ? 'Started'
-            : Date.parse(entry.expiresAt) <= Date.now() ? 'Expired' : 'Invited'} · Link expires {formatDate(entry.expiresAt)}</p>
-          {entry.verification && <details className="candidate-verification">
-            <summary>Verification details</summary>
-            <p>Started {formatDate(entry.startedAt)}</p>
-            <p>IP address {entry.verification.ip ?? 'Unavailable'}</p>
-            <p>{entry.verification.location ? 'Approximate location ' + entry.verification.location.latitude + ', ' + entry.verification.location.longitude
-              : 'Approximate location unavailable'}</p>
-            <p>{entry.verification.userAgent}</p>
-          </details>}
-        </div>
-        {entry.resultId && <button className="button small secondary" onClick={() => openReview(entry)}>Review submission</button>}
-      </li>)}</ul>
-    </>}
-  </div>
 }

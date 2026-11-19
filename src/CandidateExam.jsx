@@ -66,8 +66,8 @@ export function ExamInvitation({ token }) {
             else shareLocation()
           }}>{locating ? 'Requesting location…' : location ? 'Remove location' : 'Share location (optional)'}</button>
           {locationStatus && <p role="status">{locationStatus}</p>}
-          <p className="muted">The exam requests screen sharing and takes periodic webcam photos on non-video questions.</p>
-          <button className="button primary" disabled={busy || locating}>{busy ? 'Starting exam…' : 'Start exam'}</button>
+          <p className="muted">Written and coding questions require screen sharing and periodic webcam photos. Video answers come last and use the camera and microphone.</p>
+          <button className="button primary" disabled={busy || locating}>{busy ? 'Opening exam setup…' : 'Continue to exam setup'}</button>
         </form>
       </> : !error && <p role="status">Checking invitation…</p>}
     </section>
@@ -101,7 +101,9 @@ export default function CandidateExam({ setId }) {
       update={update => updateAttempt(setId, update, position)}
       openQuestion={index => { if (index !== position) updateAttempt(setId, previous => previous, index) }}
       pinned={Boolean(attempt.practiceSet || timing?.practiceSet)} flushDraft={flushDraft}
-      busy={busy} submit={async () => (await finishAttempt('submit', setId, position)).error} />
+      busy={busy} startProctored={() => finishAttempt('start-proctored', setId, position)}
+      submitWritten={async () => (await finishAttempt('submit-written', setId, position)).error}
+      submit={async () => (await finishAttempt('submit', setId, position)).error} />
       : !catalogError && !loadError && <p role="status">Loading your exam…</p>}
   </main>
 }
