@@ -15,7 +15,7 @@ hero:
       link: /csv-plugin-tutorial
     - theme: alt
       text: User Guide
-      link: /guide/
+      link: /docs/
 
 features:
   - title: Architecture

@@ -9,18 +9,18 @@ export default defineConfig({
   lastUpdated: true,
   themeConfig: {
     nav: [
-      { text: 'User Guide', link: '/guide/', activeMatch: '^/guide/' },
-      { text: 'Developer Docs', link: '/', activeMatch: '^/(?!guide/)' },
+      { text: 'User Guide', link: '/docs/', activeMatch: '^/docs/' },
+      { text: 'Developer Docs', link: '/', activeMatch: '^/(?!docs/)' },
     ],
     sidebar: {
-      '/guide/': [
+      '/docs/': [
         {
           text: 'User Guide',
           items: [
-            { text: 'Set up Quizeit', link: '/guide/setup' },
-            { text: 'Create your first exam', link: '/guide/first-exam' },
-            { text: 'Take an invited exam', link: '/guide/take-exam' },
-            { text: 'Practice and review results', link: '/guide/practice' },
+            { text: 'Set up Quizeit', link: '/docs/setup' },
+            { text: 'Create your first exam', link: '/docs/first-exam' },
+            { text: 'Take an invited exam', link: '/docs/take-exam' },
+            { text: 'Practice and review results', link: '/docs/practice' },
             { text: 'Feature reference', link: '/using-the-app' },
           ],
         },

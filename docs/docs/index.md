@@ -8,18 +8,18 @@ hero:
   actions:
     - theme: brand
       text: Set up Quizeit
-      link: /guide/setup
+      link: /docs/setup
     - theme: alt
       text: Create your first exam
-      link: /guide/first-exam
+      link: /docs/first-exam
 features:
   - title: Administrators
     details: Manage accounts and question banks, send invitations, and grade submissions.
-    link: /guide/first-exam
+    link: /docs/first-exam
   - title: Learners
     details: Practice, resume an attempt, and review your results.
-    link: /guide/practice
+    link: /docs/practice
   - title: Exam candidates
     details: Open an invitation, check your devices, and submit an exam.
-    link: /guide/take-exam
+    link: /docs/take-exam
 ---
