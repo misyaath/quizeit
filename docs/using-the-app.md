@@ -37,7 +37,9 @@ Microsoft lists AI-200 as intermediate with a 120-minute assessment. It covers h
 
 Open **Generate questions**, choose a model from your connected ChatGPT account, and select its reasoning effort or leave it at Model default. Describe the topic in the prompt box and choose 1–60 questions and the formats you want. There must be at least one question per selected format.
 
-Select **Coding** to generate programming exercises. Name a language in the prompt or use the Python default. Generated coding questions open in the VS Code practice editor with starter code and a visible example, and use Judge0 to grade the submitted program.
+Select **Coding** to generate programming exercises. Name a language in the prompt or use the Python default. Generated coding questions include starter code and a visible example. Judge0 runs the examples and grades the submitted program.
+
+Learners and exam candidates edit code in Monaco, the editor used by VS Code. Select a file tab to switch files and press Ctrl+Space to open suggestions. JavaScript and TypeScript have type-aware suggestions. Python offers built-in function suggestions, and other languages can suggest words from the project. Code is saved in the draft. The owner can also open the full VS Code workspace through code-server during practice.
 
 Use **Attach files** to add up to three study files totaling 10 MiB. The quiz sends them with the prompt, or uses them on their own if the prompt is empty. With the ChatGPT connection, the quiz sends text extracted from PDFs and UTF-8 text files, up to 60,000 characters total. With OpenAI Platform enabled, it sends the files directly as Responses API inputs and also accepts Word, PowerPoint, and Excel files. The saved set records the attachment names.
 

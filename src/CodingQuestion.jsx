@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { codingLanguages, codingOptions, codingSelection, maxCodeLength, maxRunOutput, projectFiles } from './coding.js'
+import { codingLanguages, codingOptions, codingSelection, maxRunOutput, projectFiles } from './coding.js'
 import { localApi } from './local-api.js'
 import ResizeHandle from './ResizeHandle.jsx'
+import MonacoCodeEditor from './editor/MonacoCodeEditor.jsx'
 
 export function CodeBlock({ label, text }) {
   return <div className="execution-block"><span>{label}</span><pre><code>{text || '(empty)'}</code></pre></div>
@@ -64,6 +65,7 @@ export default function CodingQuestion({ question, value, setId, draftId, onChan
   const blocked = disabled || running
   const stdin = value?.stdin ?? ''
   const selection = codingSelection(question, language)
+  const filename = codingLanguages[language].filename
   const code = value?.code?.[language] ?? selection.starter
   const files = projectFiles(selection, value)
 
@@ -163,22 +165,16 @@ export default function CodingQuestion({ question, value, setId, draftId, onChan
       {started && <a className="button small secondary" href={session.editorUrl} target="_blank" rel="noreferrer">Open in new tab ↗</a>}
     </header>
     <div className="coding-edit-area">
-      {!useVsCode ? <div className="inline-code-editor">
-        <label>{codingLanguages[language].filename}
-          <textarea value={code} maxLength={maxCodeLength} spellCheck={false} disabled={blocked} onChange={event => {
-            const source = event.target.value
+      {!useVsCode ? <MonacoCodeEditor key={language} language={language} mainFile={filename}
+        sources={{ [filename]: code, ...files }} disabled={blocked} onEdit={(path, source) => {
+          if (path === filename) {
             onChange(previous => ({ ...previous, language, code: { ...previous?.code, [language]: source } }))
-          }} />
-        </label>
-        {selection.files?.map(file => <label key={file.path}>{file.path}
-          <textarea value={files[file.path]} maxLength={maxCodeLength} spellCheck={false} disabled={blocked} onChange={event => {
-            const source = event.target.value
+          } else {
             onChange(previous => ({ ...previous, language, code: previous?.code ?? {}, files: {
-              ...previous?.files, [language]: { ...previous?.files?.[language], [file.path]: source },
+              ...previous?.files, [language]: { ...previous?.files?.[language], [path]: source },
             } }))
-          }} />
-        </label>)}
-      </div> : started
+          }
+        }} /> : started
         ? <iframe title="Visual Studio Code workspace" src={session.editorUrl} allow="clipboard-read; clipboard-write" />
         : <div className="editor-message" role={editorError ? 'alert' : 'status'}>
           <p>{editorError || 'Opening VS Code…'}</p>

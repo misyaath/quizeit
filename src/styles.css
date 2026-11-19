@@ -499,7 +499,7 @@ input[type="search"], .typed, select { background: #fff; color: #17243a; border:
 .account-form { gap: .85rem; }
 .account-names, .author-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .65rem; }
 .account-form label, .editor-field { font-size: .88rem; font-weight: 650; }
-.account-form input, .editor-field :is(input, select, textarea), .inline-code-editor textarea { width: 100%; min-width: 0; min-height: 40px; border: 1px solid var(--line); background: white; color: inherit; border-radius: 8px; padding: .48rem .65rem; font: inherit; }
+.account-form input, .editor-field :is(input, select, textarea) { width: 100%; min-width: 0; min-height: 40px; border: 1px solid var(--line); background: white; color: inherit; border-radius: 8px; padding: .48rem .65rem; font: inherit; }
 .account-panel > .text-button { justify-self: start; }
 .account-name { overflow-wrap: anywhere; }
 .sidebar { overflow: auto; }
@@ -565,9 +565,14 @@ input[type="search"], .typed, select { background: #fff; color: #17243a; border:
   .exam-actions { justify-self: stretch; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .exam-actions .exam-pause { min-width: 0; }
 }
-.inline-code-editor { display: grid; flex: 1; min-width: 0; gap: .6rem; padding: .65rem; height: 100%; overflow: auto; background: #f5f8fc; }
-.inline-code-editor label { display: grid; min-width: 0; grid-template-rows: auto minmax(84px, 1fr); font-weight: 650; gap: .3rem; }
-.inline-code-editor textarea { min-height: 160px; resize: vertical; font-family: ui-monospace, monospace; font-weight: 400; }
+.embedded-code-editor { display: flex; flex-direction: column; flex: 1; min-width: 0; background: #1e1e1e; }
+.code-file-tabs { display: flex; flex: none; overflow-x: auto; background: #252526; }
+.code-file-tabs button { flex: none; padding: .55rem .85rem; border: 0; border-right: 1px solid #333; border-top: 2px solid transparent; background: #2d2d2d; color: #d4d4d4; font: .82rem ui-monospace, monospace; }
+.code-file-tabs button[aria-pressed="true"] { border-top-color: #79a9fb; background: #1e1e1e; color: #fff; }
+.code-file-tabs button:focus-visible { outline-offset: -3px; }
+.embedded-code-editor .editor-message { color: #ddd; }
+.monaco-editor-host { flex: 1 1 0; min-height: 0; min-width: 0; }
+.code-editor-notice { padding: .35rem .85rem; color: #ffe1ba; background: #3b2a1b; font-size: .82rem; }
 .user-search { margin-bottom: .85rem; max-width: 22rem; }
 .users-table { width: 100%; }
 .users-table .ai-actions { margin: 0; }
