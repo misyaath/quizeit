@@ -13,6 +13,9 @@ hero:
     - theme: alt
       text: Build a CSV export plugin
       link: /csv-plugin-tutorial
+    - theme: alt
+      text: User Guide
+      link: /guide/
 
 features:
   - title: Architecture
