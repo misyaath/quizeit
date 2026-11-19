@@ -4,18 +4,18 @@ title: User Guide
 hero:
   name: Quizeit
   text: User Guide
-  tagline: Set up Quizeit, build your first exam, and help candidates submit their answers.
+  tagline: Create accounts, manage questions, and run exams from invitation to grading.
   actions:
     - theme: brand
-      text: Set up Quizeit
+      text: Accounts and roles
       link: /docs/setup
     - theme: alt
       text: Create your first exam
       link: /docs/first-exam
 features:
-  - title: Administrators
-    details: Manage accounts and question banks, send invitations, and grade submissions.
-    link: /docs/first-exam
+  - title: Question authors
+    details: Organize question sets and add or edit questions and answer keys.
+    link: /docs/question-sets
   - title: Learners
     details: Practice, resume an attempt, and review your results.
     link: /docs/practice

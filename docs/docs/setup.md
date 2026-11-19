@@ -1,35 +1,45 @@
-# Set up Quizeit
+# Accounts and roles
 
-## Install and sign in
+## Create your own account
 
-1. On a Linux host with Docker Compose and Node.js 22.13 or later, obtain the [Quizeit repository](https://github.com/misyaath/quizeit) and open a terminal in its folder. Install FFmpeg on the host if you plan to accept video answers. Quizeit uses its `ffprobe` utility to validate uploads.
-2. Install dependencies and start the full system.
+1. Open the Quizeit sign-in page your organization uses and select **Create an account**.
+2. Enter your first name, last name, email, and a password of at least 12 characters.
+3. Select **Create account**. Quizeit signs you in as a **Learner** and opens your dashboard.
+4. On your next visit, use **Sign in** with the same email and password.
 
-   ```sh
-   npm ci
-   npm run up
-   ```
+![Quizeit signup form with first name, last name, email, and password fields](./images/signup.png)
 
-   The startup command starts MongoDB, Judge0 for code execution, and code-server in Docker, then builds and starts Quizeit.
-3. Open [Quizeit on localhost](http://127.0.0.1:5173/) and select **Create account**. Enter your first name, last name, email, and password.
-4. To make this account the installation owner, open a second terminal in the Quizeit folder and run the following command with your signup email. Refresh Quizeit afterward.
+If **Continue with Google** appears, you can use it to sign in. To connect Google to an existing password account, sign in with your password first, then open **Settings → Account → Connect Google**. If you received a personal exam link, follow [Take an invited exam](take-exam.md) to open your assigned exam.
 
-   ```sh
-   npm run account:owner -- owner@example.com
-   ```
+## Create an account for another person
 
-![Quizeit dashboard with the Practice exams, Question bank, Real exams, and Users links in the left sidebar](./images/dashboard.png)
+1. As an administrator or the owner, open **Users** and select **New user**.
+2. Enter the person's first name, last name, and email address. Choose a role and enter a password of at least 12 characters.
+3. Select **Create user**. Give the person their sign-in details privately. Use [Candidate invitations](invitations.md) when someone only needs to sit an exam.
 
-## Manage accounts
+![Create user form showing name, email, role, and password fields for a fictional learner](./images/new-user.png)
 
-Open **Users → New user**, enter the account details, and select a role. Use **Learner** for someone who practices and manages their own practice sets. **Administrator** can manage shared content, real exams, and submissions. The owner can assign administrator and plugin roles. Edit an existing account from its row, or deactivate it to block sign-in while preserving its saved work.
+## Who can see and do what
 
-Optional Google sign-in uses `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in `.env`. Use the application's `/auth/google/callback` URL as the authorized redirect for your local origin. Refresh or sign in again after changing an account's role or password. [Account configuration](https://github.com/misyaath/quizeit#accounts-and-question-sets)
+**Owner** is the designated administrator account with additional account-management permissions. **Exam candidate** is access granted by a personal invitation.
 
-## Prepare for remote exams
+| Area or action | Learner | Administrator | Owner | Exam candidate |
+| --- | --- | --- | --- | --- |
+| Dashboard, Practice exams, Question bank, and Attempt history | Shared practice material, own private material, and own history | Same access, plus submitted-media review | Same as administrator | Assigned exam only |
+| Manage question sets | Create and edit own private practice sets | Create private or shared practice sets. Edit own private sets and shared sets | Same as administrator | — |
+| Generate questions | Practice only | Practice and real exam banks | Practice and real exam banks | — |
+| Exam question bank | — | View, create, edit, and delete exam question sets | Same as administrator | Sees assigned exam questions during the attempt |
+| Real exams and Candidate invitations | — | Create exams, set grading, send or copy invitations, and review results and evidence | Same as administrator | Open own invitation and submit |
+| Users | — | View the user list. Create, edit, deactivate, and restore learner accounts | Manage accounts and assign Administrator and available plugin roles | — |
 
-You can test an invitation on the app host first. For candidates on other devices, configure an HTTPS origin and a TLS reverse proxy before sharing an invitation. Set `QUIZEIT_PUBLIC_URL` to that origin and follow the [proxy configuration](../using-the-app.md#build-and-invite-candidates-to-a-real-exam). Installations that send email from Quizeit also set `QUIZEIT_RESEND_API_KEY` and `QUIZEIT_EXAM_FROM`. Restart after editing `.env`.
+An optional role such as **Practice results exporter** adds access to a specific feature. This role allows the account to download its own practice results. The owner can assign roles shown in **Users**.
 
-The default MongoDB runs in Docker. To use your own MongoDB deployment, set `MONGODB_URI` and optionally `MONGODB_DATABASE` in `.env`. Keep MongoDB, the private exam image folder, and the invitation key in deployment backups. [Exam evidence storage](../using-the-app.md#video-answers-and-exam-screenshots)
+If **Candidate invitations** is missing from your sidebar, ask an administrator or the owner to create and send the invitation. They can also check expired or already-used links.
 
-[Create your first exam](first-exam.md)
+## Edit, deactivate, or restore a user
+
+- Open **Users** and use **Search users** to find an account by name, email, role, or status.
+- Select **Edit** to update the account. Leave **New password (optional)** empty to keep the existing password. Select **Save user**. Email, password, or role changes require the affected person to sign in again. Changing a Google-linked email disconnects Google sign-in. Set a password first when Google is the account's only sign-in method.
+- Select **Deactivate**, then **Confirm deactivation**, to sign the user out and block access. Their question sets and history are kept. Select **Restore** to allow sign-in again. These actions are available on accounts you can manage.
+
+![Administrator dashboard showing the Users, Exam question bank, Real exams, and Candidate invitations menu entries](./images/dashboard.png)

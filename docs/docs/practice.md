@@ -8,14 +8,12 @@
 
 Practice sets use no exam screen capture or webcam photos. Video practice questions open the camera when you select **Start camera**.
 
-## Coding and video practice
+## Record a video practice answer
 
-Open **Coding labs** under **Practice exams** to try the supplied coding sets. In the embedded editor, use **Ctrl+Space** for suggestions and select a file tab to switch files. Select **Run examples** or **Custom input**, then submit the set for grading. The account owner can use the full VS Code workspace through code-server during practice. [Coding lab details](../using-the-app.md#coding-labs)
-
-To practice recording, open **Video Answer Practice**. Start the camera, record an answer, review the preview, and select **Submit video** before submitting the set.
+Open **Video Answer Practice** to try the recording controls. Select **Start camera**, check your preview, then choose **Start recording**. Review the recording and select **Submit video** to attach it to the draft. Submit the set when you are ready for review.
 
 ## Create and export practice material
 
-Open **Manage question sets → New question set**, add questions, and save. Use **Generate questions** for AI-assisted authoring. Check the generated prompts and answer keys before using the set. You can set a time budget for a set and a specific time on an individual question. [Generate questions](../using-the-app.md#generate-a-question-set)
+Open **Manage question sets → New question set**, add questions, and save. Use **Generate questions** for AI-assisted authoring. Check the generated prompts and answer keys before using the set. You can set a time budget for a set and a specific time on an individual question. [Manage practice question sets](question-sets.md)
 
 If your account has export access, open **Export practice results → Download CSV** for a spreadsheet of your own practice scores. The owner can grant the **Practice results exporter** role when that plugin is enabled.

@@ -2,7 +2,7 @@
 
 ## Open the invitation
 
-Open the invitation in a supported desktop browser and enter your name and the email that received the link. Use **Continue to exam setup**. If you need to resume, reopen the exam in the same browser profile.
+Open the invitation in a supported desktop browser and enter your name and the email that received the link. Use **Continue to exam setup**. Location sharing is optional. If you need to resume, return to the exam page in the same browser profile within 24 hours after claiming the invitation. Ask the person who invited you for a new link if the old one has expired.
 
 ## Share your screen and enable the webcam
 
@@ -14,9 +14,9 @@ Open the invitation in a supported desktop browser and enter your name and the e
 
 ## Answer and submit
 
-Use **Previous**, **Next**, or the question navigator to move through the current section. Flag a question when you want to return to it. For a coding answer, pick a language, edit the code, and select **Run examples**. The editor saves code in your draft. Use **Custom input** to try different input.
+Use **Previous**, **Next**, or the question navigator to move through the current section. Flag a question when you want to return to it.
 
-![A candidate's Python workspace with line numbers, a file tab, and a passing example](./images/coding-answer.png)
+Choose one option for **Single choice**, and select all applicable options for **Multiple select**. For **Drag and drop**, match each item by dragging it or using its dropdown. For **Build list**, put the steps in order. For **Short answer**, enter the requested term or value in the answer field.
 
 In a mixed-format exam, **Submit and start video answers** locks the written and coding section. On a video question, select **Start camera**, check the preview and microphone, and select **Start recording**. Review the recording and choose **Submit video** to save it as your answer. Select **Submit exam** when you finish, and wait for **Exam submitted**.
 

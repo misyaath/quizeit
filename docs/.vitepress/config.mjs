@@ -15,13 +15,26 @@ export default defineConfig({
     sidebar: {
       '/docs/': [
         {
-          text: 'User Guide',
+          text: 'Accounts and practice',
           items: [
-            { text: 'Set up Quizeit', link: '/docs/setup' },
-            { text: 'Create your first exam', link: '/docs/first-exam' },
-            { text: 'Take an invited exam', link: '/docs/take-exam' },
+            { text: 'Accounts and roles', link: '/docs/setup' },
             { text: 'Practice and review results', link: '/docs/practice' },
-            { text: 'Feature reference', link: '/using-the-app' },
+          ],
+        },
+        {
+          text: 'Write questions',
+          items: [
+            { text: 'Manage question sets', link: '/docs/question-sets' },
+            { text: 'Add and edit questions', link: '/docs/questions' },
+          ],
+        },
+        {
+          text: 'Run real exams',
+          items: [
+            { text: 'Create your first exam', link: '/docs/first-exam' },
+            { text: 'Invite candidates', link: '/docs/invitations' },
+            { text: 'Take an invited exam', link: '/docs/take-exam' },
+            { text: 'Review exam submissions', link: '/docs/results' },
           ],
         },
       ],
